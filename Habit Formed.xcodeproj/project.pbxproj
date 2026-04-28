@@ -6,14 +6,76 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BBF9E9AC2FA0468A00A88A8F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BBF9E9AB2FA0468A00A88A8F /* WidgetKit.framework */; };
+		BBF9E9AE2FA0468A00A88A8F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BBF9E9AD2FA0468A00A88A8F /* SwiftUI.framework */; };
+		BBF9E9BD2FA0468B00A88A8F /* Habit Formed WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BBF9E9A92FA0468A00A88A8F /* Habit Formed WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BBF9E9BB2FA0468B00A88A8F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BBCC56CD2F9FE83D00B05D15 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BBF9E9A82FA0468A00A88A8F;
+			remoteInfo = "Habit Formed WidgetExtension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BBF9E9BE2FA0468B00A88A8F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BBF9E9BD2FA0468B00A88A8F /* Habit Formed WidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		BBCC56D52F9FE83D00B05D15 /* Habit Formed.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Habit Formed.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBF9E9A92FA0468A00A88A8F /* Habit Formed WidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Habit Formed WidgetExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBF9E9AB2FA0468A00A88A8F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		BBF9E9AD2FA0468A00A88A8F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		BBA1B2C3D4E5F60711223344 /* Exceptions for "Habit Formed Widget" folder in "Habit Formed" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				Habit_Formed_WidgetBundle.swift,
+				Habit_Formed_WidgetLiveActivity.swift,
+				Info.plist,
+			);
+			target = BBCC56D42F9FE83D00B05D15 /* Habit Formed */;
+		};
+		BBF9E9C12FA0468B00A88A8F /* Exceptions for "Habit Formed Widget" folder in "Habit Formed WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BBF9E9A82FA0468A00A88A8F /* Habit Formed WidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BBCC56D72F9FE83D00B05D15 /* Habit Formed */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Habit Formed";
+			sourceTree = "<group>";
+		};
+		BBF9E9AF2FA0468A00A88A8F /* Habit Formed Widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BBA1B2C3D4E5F60711223344 /* Exceptions for "Habit Formed Widget" folder in "Habit Formed" target */,
+				BBF9E9C12FA0468B00A88A8F /* Exceptions for "Habit Formed Widget" folder in "Habit Formed WidgetExtension" target */,
+			);
+			path = "Habit Formed Widget";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,6 +88,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BBF9E9A62FA0468A00A88A8F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BBF9E9AE2FA0468A00A88A8F /* SwiftUI.framework in Frameworks */,
+				BBF9E9AC2FA0468A00A88A8F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,6 +104,8 @@
 			isa = PBXGroup;
 			children = (
 				BBCC56D72F9FE83D00B05D15 /* Habit Formed */,
+				BBF9E9AF2FA0468A00A88A8F /* Habit Formed Widget */,
+				BBF9E9AA2FA0468A00A88A8F /* Frameworks */,
 				BBCC56D62F9FE83D00B05D15 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +114,18 @@
 			isa = PBXGroup;
 			children = (
 				BBCC56D52F9FE83D00B05D15 /* Habit Formed.app */,
+				BBF9E9A92FA0468A00A88A8F /* Habit Formed WidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		BBF9E9AA2FA0468A00A88A8F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BBF9E9AB2FA0468A00A88A8F /* WidgetKit.framework */,
+				BBF9E9AD2FA0468A00A88A8F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,13 +138,16 @@
 				BBCC56D12F9FE83D00B05D15 /* Sources */,
 				BBCC56D22F9FE83D00B05D15 /* Frameworks */,
 				BBCC56D32F9FE83D00B05D15 /* Resources */,
+				BBF9E9BE2FA0468B00A88A8F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BBF9E9BC2FA0468B00A88A8F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BBCC56D72F9FE83D00B05D15 /* Habit Formed */,
+				BBF9E9AF2FA0468A00A88A8F /* Habit Formed Widget */,
 			);
 			name = "Habit Formed";
 			packageProductDependencies = (
@@ -69,6 +155,28 @@
 			productName = "Habit Formed";
 			productReference = BBCC56D52F9FE83D00B05D15 /* Habit Formed.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BBF9E9A82FA0468A00A88A8F /* Habit Formed WidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BBF9E9C22FA0468B00A88A8F /* Build configuration list for PBXNativeTarget "Habit Formed WidgetExtension" */;
+			buildPhases = (
+				BBF9E9A52FA0468A00A88A8F /* Sources */,
+				BBF9E9A62FA0468A00A88A8F /* Frameworks */,
+				BBF9E9A72FA0468A00A88A8F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BBF9E9AF2FA0468A00A88A8F /* Habit Formed Widget */,
+			);
+			name = "Habit Formed WidgetExtension";
+			packageProductDependencies = (
+			);
+			productName = "Habit Formed WidgetExtension";
+			productReference = BBF9E9A92FA0468A00A88A8F /* Habit Formed WidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +189,9 @@
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					BBCC56D42F9FE83D00B05D15 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					BBF9E9A82FA0468A00A88A8F = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
@@ -100,12 +211,20 @@
 			projectRoot = "";
 			targets = (
 				BBCC56D42F9FE83D00B05D15 /* Habit Formed */,
+				BBF9E9A82FA0468A00A88A8F /* Habit Formed WidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BBCC56D32F9FE83D00B05D15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BBF9E9A72FA0468A00A88A8F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +241,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BBF9E9A52FA0468A00A88A8F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BBF9E9BC2FA0468B00A88A8F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BBF9E9A82FA0468A00A88A8F /* Habit Formed WidgetExtension */;
+			targetProxy = BBF9E9BB2FA0468B00A88A8F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BBCC56DE2F9FE83E00B05D15 /* Debug */ = {
@@ -178,12 +312,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -236,11 +370,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -248,64 +382,139 @@
 		BBCC56E12F9FE83E00B05D15 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = habitcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Habit Formed/Habit_Formed.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = "Habit-Formed-Info.plist";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, and mindful minutes from Apple Health to update your matching habits automatically.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed updates Apple Health when you log mindful sessions.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vansh.Habit-Formed";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
 		BBCC56E22F9FE83E00B05D15 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = habitcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Habit Formed/Habit_Formed.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = "Habit-Formed-Info.plist";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, and mindful minutes from Apple Health to update your matching habits automatically.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed updates Apple Health when you log mindful sessions.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vansh.Habit-Formed";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BBF9E9BF2FA0468B00A88A8F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F9MZJ6MU5W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Habit Formed Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vansh.Habit-Formed.Habit-Formed-Widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BBF9E9C02FA0468B00A88A8F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F9MZJ6MU5W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Habit Formed Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.vansh.Habit-Formed.Habit-Formed-Widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -326,6 +535,15 @@
 			buildConfigurations = (
 				BBCC56E12F9FE83E00B05D15 /* Debug */,
 				BBCC56E22F9FE83E00B05D15 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BBF9E9C22FA0468B00A88A8F /* Build configuration list for PBXNativeTarget "Habit Formed WidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BBF9E9BF2FA0468B00A88A8F /* Debug */,
+				BBF9E9C02FA0468B00A88A8F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
