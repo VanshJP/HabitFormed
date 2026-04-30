@@ -41,11 +41,17 @@ final class TimerCenter {
     private let notifications: NotificationService
     private var currentActivity: Activity<HabitTimerAttributes>?
 
+    /// Set in `restore()` when the snapshot's timer expired during
+    /// suspension. Honored by `reconcileLiveActivities()` once we've had
+    /// a chance to reattach to (or dismiss) the orphan Live Activity.
+    private var pendingClearOnReconcile = false
+
     init(notifications: NotificationService) {
         self.notifications = notifications
         restore()
-        reconnectLiveActivity()
+        reconcileLiveActivities()
         observeIntentToggles()
+        observeAppActivation()
     }
 
     // MARK: - Computed
@@ -137,7 +143,14 @@ final class TimerCenter {
     /// the Live Activity tap-to-toggle button via `TimerControlIntent`,
     /// which has no access to the SwiftData `Habit` object.
     func togglePause() {
-        guard isActive, let habitID else { return }
+        guard isActive, let habitID else {
+            print("⚠️ togglePause no-op: timer inactive")
+            return
+        }
+        // If we lost the activity reference (cold-relaunch via intent),
+        // try to reattach before pushing an update.
+        if currentActivity == nil { reconcileLiveActivities() }
+
         if isRunning {
             pause()
         } else if let pausedRemaining {
@@ -264,12 +277,34 @@ final class TimerCenter {
         self.currentActivity = nil
     }
 
-    private func reconnectLiveActivity() {
-        guard let habitID else { return }
-        let idString = habitID.uuidString
-        currentActivity = Activity<HabitTimerAttributes>.activities.first {
-            $0.attributes.habitID == idString
+    /// Attach to a matching in-flight Live Activity, dismiss any
+    /// orphans, and honor a deferred clear from `restore()`. Safe to
+    /// call repeatedly (idempotent).
+    private func reconcileLiveActivities() {
+        let snapshotID = habitID?.uuidString
+        let activities = Activity<HabitTimerAttributes>.activities
+
+        for activity in activities {
+            if let snapshotID, activity.attributes.habitID == snapshotID {
+                currentActivity = activity
+            } else {
+                // Orphan: either no in-app snapshot, or it belongs to a
+                // different habit (e.g. crash-relaunched into a stale one).
+                Task { await activity.end(nil, dismissalPolicy: .immediate) }
+            }
         }
+
+        if pendingClearOnReconcile {
+            pendingClearOnReconcile = false
+            endLiveActivity(finished: false)   // sees `currentActivity` now
+            tearDown()
+            return
+        }
+
+        // Resync the attached activity's content so any state drift
+        // (e.g. user paused from Dynamic Island while suspended) is
+        // pushed back out to the system after we re-foreground.
+        if currentActivity != nil { updateLiveActivity() }
     }
 
     /// `TimerControlIntent.perform()` posts this notification on the
@@ -283,6 +318,21 @@ final class TimerCenter {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in self?.togglePause() }
+        }
+    }
+
+    /// Resync state with iOS whenever the app returns to the foreground.
+    /// Covers user-initiated changes from the Dynamic Island/Lock Screen
+    /// that happened while the app was suspended.
+    private func observeAppActivation() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.reconcileLiveActivities()
+            }
         }
     }
 
@@ -319,9 +369,11 @@ final class TimerCenter {
         pausedRemaining = snap.pausedRemaining
 
         // If the timer should have completed while the app was suspended,
-        // clear it. The local notification will already have fired.
+        // defer cleanup to reconcileLiveActivities() so it can also
+        // dismiss the orphan Live Activity (which we haven't attached
+        // to yet). The local notification will already have fired.
         if let endDate, endDate <= Date() {
-            stop()
+            pendingClearOnReconcile = true
         }
     }
 }

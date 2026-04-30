@@ -14,6 +14,7 @@ struct TimerView: View {
     let habit: Habit
 
     @State private var showResetConfirm: Bool = false
+    @State private var showStopConfirm: Bool = false
     @State private var didAutoFinish: Bool = false
 
     var body: some View {
@@ -36,13 +37,25 @@ struct TimerView: View {
 
                 Spacer()
 
-                Button(role: .cancel) {
-                    Haptics.light()
-                    dismiss()
-                } label: {
-                    Text("Close")
+                HStack(spacing: 24) {
+                    Button(role: .cancel) {
+                        Haptics.light()
+                        dismiss()
+                    } label: {
+                        Text("Close")
+                    }
+                    .foregroundStyle(.white.opacity(0.65))
+
+                    if isOurTimer && center.isActive {
+                        Button(role: .destructive) {
+                            Haptics.light()
+                            showStopConfirm = true
+                        } label: {
+                            Text("Stop Timer")
+                        }
+                        .foregroundStyle(.red.opacity(0.9))
+                    }
                 }
-                .foregroundStyle(.white.opacity(0.65))
                 .padding(.bottom, 24)
             }
             .padding(.horizontal, 32)
@@ -74,6 +87,20 @@ struct TimerView: View {
             Button("Keep going", role: .cancel) {}
         } message: {
             Text("You'll lose this session's progress.")
+        }
+        .confirmationDialog(
+            "Stop timer?",
+            isPresented: $showStopConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Stop", role: .destructive) {
+                Haptics.warning()
+                center.stop()
+                dismiss()
+            }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("Progress won't be logged.")
         }
     }
 

@@ -6,6 +6,12 @@ import SwiftUI
 /// - Timer: icon, title, streak, week dots + play button
 struct HabitTileView: View {
     let habit: Habit
+    /// Date the home grid is currently displaying. Tile visuals (status badge,
+    /// glow, bottom action) all reflect this date. Equals `.now` in normal use.
+    var selectedDate: Date = .now
+    /// True when the user is browsing a non-today date. Suppresses the context
+    /// menu, slide-to-log, and timer start so past-day browsing is read-only.
+    var isReadOnly: Bool = false
     let onTap: () -> Void
     let onLog: () -> Void
     let onEdit: () -> Void
@@ -14,14 +20,29 @@ struct HabitTileView: View {
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
+    @Environment(DayTracker.self) private var dayTracker
 
     // Drives the radial reveal of `completionGlow`. 0 = empty, 1 = card fully
     // bathed in the habit color. Animated from the slide track's release end
     // when the user logs via slide; snapped instantly for non-manual habits.
     @State private var sweepProgress: CGFloat = 0
+    @State private var showStopConfirm: Bool = false
+
+    /// Completion state for the date currently being browsed. Weekly habits
+    /// "stay lit" for the entire calendar week containing `selectedDate` so
+    /// the glow doesn't flicker on/off as you scrub between days.
+    private var effectiveCompleted: Bool {
+        if habit.frequency == .weekly {
+            return !habit.completionsInWeek(of: selectedDate).isEmpty
+        }
+        return habit.isCompleted(on: selectedDate)
+    }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        // Re-render at midnight so `isCompletedToday`-driven UI updates.
+        let _ = dayTracker.today
+
+        return ZStack(alignment: .topLeading) {
             completionGlow
             content
         }
@@ -29,17 +50,36 @@ struct HabitTileView: View {
         .glassCard(cornerRadius: 20, tint: tileTint)
         .contentShape(RoundedRectangle(cornerRadius: 20))
         .onTapGesture { Haptics.light(); onTap() }
-        .contextMenu {
+        .conditionalContextMenu(isReadOnly == false) {
             Button("Edit", systemImage: "pencil")          { Haptics.light(); onEdit() }
             if !habit.isCompletedToday {
                 Button("Log Today", systemImage: "checkmark.seal.fill") { Haptics.success(); onLog() }
             }
+            if timerIsActiveForThisHabit && timerCenter.isActive {
+                Button("Stop Timer", systemImage: "stop.circle", role: .destructive) {
+                    Haptics.warning()
+                    timerCenter.stop()
+                }
+            }
             Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); onRequestDelete() }
         }
-        .onAppear { sweepProgress = habit.isCompletedToday ? 1 : 0 }
-        .onChange(of: habit.isCompletedToday) { _, isLogged in
+        .confirmationDialog(
+            "Stop timer for \(habit.title)?",
+            isPresented: $showStopConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Stop", role: .destructive) {
+                Haptics.warning()
+                timerCenter.stop()
+            }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("Progress won't be logged.")
+        }
+        .onAppear { sweepProgress = effectiveCompleted ? 1 : 0 }
+        .onChange(of: effectiveCompleted) { _, isLogged in
             if isLogged {
-                if isManualHabit {
+                if isManualHabit && !isReadOnly {
                     withAnimation(.easeOut(duration: 0.5)) { sweepProgress = 1 }
                 } else {
                     sweepProgress = 1
@@ -49,7 +89,7 @@ struct HabitTileView: View {
             }
         }
         .accessibilityLabel("\(habit.title), \(habit.streak) day streak")
-        .accessibilityHint("Tap to view history. Long press for options.")
+        .accessibilityHint(isReadOnly ? "Tap to view history." : "Tap to view history. Long press for options.")
     }
 
     // MARK: - Layout
@@ -127,7 +167,7 @@ struct HabitTileView: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        if habit.isCompletedToday {
+        if effectiveCompleted {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 18))
                 .foregroundStyle(habit.color)
@@ -148,10 +188,10 @@ struct HabitTileView: View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text("\(habit.streak)")
                 .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(habit.isCompletedToday ? .white : AppColors.streakColor(for: habit.streak))
+                .foregroundStyle(effectiveCompleted ? .white : AppColors.streakColor(for: habit.streak))
             Text(habit.streak == 1 ? "day" : "days")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(habit.isCompletedToday ? .white.opacity(0.7) : .white.opacity(0.42))
+                .foregroundStyle(effectiveCompleted ? .white.opacity(0.7) : .white.opacity(0.42))
         }
     }
 
@@ -159,7 +199,11 @@ struct HabitTileView: View {
 
     @ViewBuilder
     private var bottomSection: some View {
-        if habit.source != .none {
+        if isReadOnly {
+            // Past-day browse: collapse all interactive controls into a single
+            // read-only pill that reflects the selected date.
+            readOnlyStatusPill
+        } else if habit.source != .none {
             healthProgressView
         } else if habit.timerDurationSeconds > 0 {
             timerRow
@@ -168,9 +212,29 @@ struct HabitTileView: View {
         }
     }
 
-    // HealthKit: progress bar + value / target
+    private var readOnlyStatusPill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: effectiveCompleted ? "checkmark.circle.fill" : "circle.dashed")
+                .font(.system(size: 12, weight: .bold))
+            Text(effectiveCompleted ? "LOGGED" : "NOT LOGGED")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .tracking(1.2)
+        }
+        .foregroundStyle(effectiveCompleted ? .white : .white.opacity(0.55))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(
+            Capsule().fill(effectiveCompleted ? habit.color.opacity(0.45) : Color.white.opacity(0.06))
+        )
+    }
+
+    // HealthKit: progress bar + value / target. Switches between daily and
+    // weekly aggregates based on the habit's frequency.
     private var healthProgressView: some View {
-        let liveValue = health.liveValues[habit.source.rawValue] ?? 0
+        let isWeekly = habit.frequency == .weekly
+        let liveValue = (isWeekly
+            ? health.liveWeeklyValues[habit.source.rawValue]
+            : health.liveValues[habit.source.rawValue]) ?? 0
         let progress = min(liveValue / max(habit.targetValue, 1), 1.0)
 
         return VStack(alignment: .leading, spacing: 5) {
@@ -181,6 +245,13 @@ struct HabitTileView: View {
                 Text(" / \(formattedTarget)")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.42))
+                Spacer(minLength: 0)
+                if isWeekly {
+                    Text("WEEK")
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -220,6 +291,13 @@ struct HabitTileView: View {
             }
             .buttonStyle(.plain)
             .disabled(habit.isCompletedToday)
+            // Inside-out gesture priority: this absorbs the long-press
+            // before the parent contextMenu can claim it.
+            .onLongPressGesture(minimumDuration: 0.6) {
+                guard timerIsActiveForThisHabit else { return }
+                Haptics.light()
+                showStopConfirm = true
+            }
         }
     }
 
@@ -240,11 +318,28 @@ struct HabitTileView: View {
         return "\(habit.timerDurationSeconds / 60)m"
     }
 
-    // Manual: slide-to-log track
+    // Manual: slide-to-log track. For weekly habits a tiny "X / N THIS WEEK"
+    // caption sits above the slide so the user can see weekly progress at a
+    // glance without losing the per-day log gesture.
     private var manualSlide: some View {
-        SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
-            onLog()
+        VStack(alignment: .leading, spacing: 4) {
+            if habit.frequency == .weekly {
+                weeklyCountCaption
+            }
+            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
+                onLog()
+            }
         }
+    }
+
+    private var weeklyCountCaption: some View {
+        let count = habit.completionsThisWeek
+        let target = habit.weeklyTarget
+        let met = count >= target
+        return Text("\(count) / \(target) THIS WEEK")
+            .font(.system(size: 9, weight: .heavy, design: .rounded))
+            .tracking(1.2)
+            .foregroundStyle(met ? habit.color : .white.opacity(0.42))
     }
 
     // MARK: - Helpers
@@ -285,6 +380,25 @@ struct HabitTileView: View {
     }
 
     private var tileTint: Color {
-        habit.isCompletedToday ? habit.color.opacity(0.14) : AppColors.glassTintAccent
+        effectiveCompleted ? habit.color.opacity(0.14) : AppColors.glassTintAccent
+    }
+}
+
+// MARK: - Conditional contextMenu
+
+private extension View {
+    /// Applies `.contextMenu { content }` only when `enabled` is true. When
+    /// disabled, the long-press gesture is suppressed entirely instead of
+    /// presenting an empty menu container.
+    @ViewBuilder
+    func conditionalContextMenu<M: View>(
+        _ enabled: Bool,
+        @ViewBuilder content: () -> M
+    ) -> some View {
+        if enabled {
+            self.contextMenu { content() }
+        } else {
+            self
+        }
     }
 }

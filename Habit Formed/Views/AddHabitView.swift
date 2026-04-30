@@ -52,13 +52,11 @@ struct AddHabitView: View {
                 AppBackground(style: .subtle).ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 18) {
-                        previewCard
-                        nameSection
+                        headerCard
                         typeSection
                         typeDetailSection
                         scheduleSection
                         reminderSection
-                        appearanceSection
                     }
                     .padding(20)
                 }
@@ -82,54 +80,115 @@ struct AddHabitView: View {
             }
             .onChange(of: inputType, handleTypeChange)
             .onChange(of: source) { _, new in
-                if new != .none { targetValue = new.defaultTarget }
+                if new != .none {
+                    targetValue = frequency == .weekly ? new.weeklyDefaultTarget : new.defaultTarget
+                }
+            }
+            .onChange(of: frequency) { _, newFreq in
+                // Snap the health target to a sensible default when toggling
+                // between daily and weekly so the user doesn't have to type
+                // (e.g. 30 → 150 exercise minutes when going weekly).
+                guard inputType == .health, source != .none else { return }
+                targetValue = newFreq == .weekly ? source.weeklyDefaultTarget : source.defaultTarget
             }
         }
     }
 
-    // MARK: - Preview
+    // MARK: - Header (preview + name + appearance)
 
-    private var previewCard: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: colorHex).opacity(0.28))
-                    .frame(width: 52, height: 52)
-                Image(systemName: symbol)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color(hex: colorHex))
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+
+            // 1. Preview row — large badge + title/subtitle
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(hex: colorHex).opacity(0.28))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: symbol)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(Color(hex: colorHex))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title.isEmpty ? "Habit Name" : title)
+                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        .foregroundStyle(title.isEmpty ? .white.opacity(0.25) : .white)
+                        .lineLimit(1)
+                    Text(previewSubtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.48))
+                }
+                Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title.isEmpty ? "Habit Name" : title)
-                    .font(.system(size: 19, weight: .heavy, design: .rounded))
-                    .foregroundStyle(title.isEmpty ? .white.opacity(0.25) : .white)
-                    .lineLimit(1)
-                Text(previewSubtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.48))
-            }
-            Spacer()
-        }
-        .padding(16)
-        .glassCard(cornerRadius: 18, tint: Color(hex: colorHex).opacity(0.14))
-        .animation(.spring(response: 0.3), value: colorHex)
-        .animation(.spring(response: 0.3), value: symbol)
-        .animation(.spring(response: 0.3), value: inputType)
-    }
 
-    // MARK: - Name
+            Divider().opacity(0.16)
 
-    private var nameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            GlassSectionHeader("Name", icon: "textformat")
+            // 2. Name field
             TextField("e.g. Read, Run, Meditate…", text: $title)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .submitLabel(.done)
                 .focused($nameFocused)
-                .padding(16)
-                .glassCard(cornerRadius: 16, tint: AppColors.glassTintAccent)
+
+            Divider().opacity(0.16)
+
+            // 3. Color chips
+            HStack(spacing: 10) {
+                ForEach(AppColors.tilePalette, id: \.hexString) { color in
+                    Button {
+                        Haptics.selection()
+                        colorHex = color.hexString
+                    } label: {
+                        ZStack {
+                            Circle().fill(color).frame(width: 32, height: 32)
+                            if colorHex == color.hexString {
+                                Circle().stroke(Color.white, lineWidth: 2.5)
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .animation(.spring(response: 0.25), value: colorHex)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Divider().opacity(0.16)
+
+            // 4. Icon grid
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                spacing: 8
+            ) {
+                ForEach(Self.symbols, id: \.self) { sym in
+                    Button {
+                        Haptics.selection()
+                        symbol = sym
+                    } label: {
+                        Image(systemName: sym)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(symbol == sym
+                                        ? Color(hex: colorHex).opacity(0.52)
+                                        : Color.white.opacity(0.07))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .animation(.spring(response: 0.25), value: symbol)
+                }
+            }
         }
+        .padding(18)
+        .glassCard(cornerRadius: 22, tint: Color(hex: colorHex).opacity(0.16))
+        .animation(.spring(response: 0.3), value: colorHex)
+        .animation(.spring(response: 0.3), value: symbol)
+        .animation(.spring(response: 0.3), value: inputType)
     }
 
     // MARK: - Type picker
@@ -236,7 +295,7 @@ struct AddHabitView: View {
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Daily Target")
+                        Text(frequency == .weekly ? "Weekly Target" : "Daily Target")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(.white.opacity(0.6))
                         Text(source.label)
@@ -301,7 +360,7 @@ struct AddHabitView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if frequency == .weekly {
+                if frequency == .weekly && inputType != .health {
                     HStack {
                         Text("\(weeklyTarget)× per week")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -365,69 +424,6 @@ struct AddHabitView: View {
         }
     }
 
-    // MARK: - Appearance (color + icon combined)
-
-    private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            GlassSectionHeader("Appearance", icon: "paintpalette.fill")
-            VStack(spacing: 14) {
-                // Color chips
-                HStack(spacing: 10) {
-                    ForEach(AppColors.tilePalette, id: \.hexString) { color in
-                        Button {
-                            Haptics.selection()
-                            colorHex = color.hexString
-                        } label: {
-                            ZStack {
-                                Circle().fill(color).frame(width: 32, height: 32)
-                                if colorHex == color.hexString {
-                                    Circle().stroke(Color.white, lineWidth: 2.5)
-                                        .frame(width: 32, height: 32)
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .animation(.spring(response: 0.25), value: colorHex)
-                    }
-                    Spacer()
-                }
-
-                Divider().opacity(0.16)
-
-                // Icon grid
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
-                    spacing: 8
-                ) {
-                    ForEach(Self.symbols, id: \.self) { sym in
-                        Button {
-                            Haptics.selection()
-                            symbol = sym
-                        } label: {
-                            Image(systemName: sym)
-                                .font(.system(size: 15))
-                                .foregroundStyle(.white)
-                                .frame(width: 40, height: 40)
-                                .background {
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(symbol == sym
-                                            ? Color(hex: colorHex).opacity(0.52)
-                                            : Color.white.opacity(0.07))
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .animation(.spring(response: 0.25), value: symbol)
-                    }
-                }
-            }
-            .padding(14)
-            .glassCard(cornerRadius: 16, tint: AppColors.glassTintAccent)
-        }
-    }
-
     // MARK: - Preview subtitle
 
     private var previewSubtitle: String {
@@ -441,7 +437,8 @@ struct AddHabitView: View {
             let val = source == .steps && targetValue >= 1000
                 ? String(format: "%.0fk", targetValue / 1000)
                 : "\(Int(targetValue))\(source.unitSuffix)"
-            return "\(source.label) · \(val)"
+            let cadence = frequency == .weekly ? " / week" : " / day"
+            return "\(source.label) · \(val)\(cadence)"
         }
     }
 

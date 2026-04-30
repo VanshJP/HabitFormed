@@ -6,27 +6,46 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(HealthKitService.self) private var health
     @Environment(NotificationService.self) private var notifications
+    @Environment(TimerCenter.self) private var timerCenter
+    @Environment(DayTracker.self) private var dayTracker
 
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
+    var onAdd: () -> Void = {}
+
     @State private var sheet: HabitSheet?
     @State private var pendingDelete: Habit?
+    @State private var selectedDate: Date = .now
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12),
     ]
 
+    private var isViewingToday: Bool {
+        // Compare against `dayTracker.today` so a midnight rollover correctly
+        // flips this from true → false (and the read-only banner appears).
+        selectedDate.isSameDay(as: dayTracker.today)
+    }
+
     var body: some View {
-        ZStack {
+        // Re-render when the calendar day rolls over so `isCompletedToday`
+        // checks (header counter, tile state) reflect reality at midnight.
+        let _ = dayTracker.today
+
+        return ZStack {
             AppBackground(style: .primary).ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 18) {
                     HeaderView(
-                        completedToday: habits.filter(\.isCompletedToday).count,
-                        totalHabits: habits.count
+                        selectedDate: $selectedDate,
+                        isViewingToday: isViewingToday,
+                        completedCount: habits.filter { $0.isCompleted(on: selectedDate) }.count,
+                        totalHabits: habits.count,
+                        onResetToToday: { selectedDate = .now },
+                        onAdd: onAdd
                     )
                     .padding(.horizontal, 4)
 
@@ -37,6 +56,8 @@ struct ContentView: View {
                             ForEach(habits) { habit in
                                 HabitTileView(
                                     habit: habit,
+                                    selectedDate: selectedDate,
+                                    isReadOnly: !isViewingToday,
                                     onTap:           { sheet = .detail(habit) },
                                     onLog:           { logCompletion(for: habit) },
                                     onEdit:          { sheet = .edit(habit) },
@@ -102,6 +123,7 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                dayTracker.refresh()
                 Task {
                     await health.syncHealthKitHabits(in: modelContext)
                     health.startObservingHealthKitHabits(in: modelContext)
@@ -131,7 +153,9 @@ struct ContentView: View {
     // MARK: - Actions
 
     private func logCompletion(for habit: Habit) {
-        guard !habit.isCompletedToday else { return }
+        // Logging only ever applies to today; the tile suppresses the
+        // slide/contextMenu when browsing a past date, this is a fallback.
+        guard isViewingToday, !habit.isCompletedToday else { return }
         let completion = HabitCompletion(date: Date(), value: habit.targetValue, habit: habit)
         modelContext.insert(completion)
         try? modelContext.save()
@@ -139,6 +163,12 @@ struct ContentView: View {
 
     private func delete(_ habit: Habit) {
         Haptics.error()
+        // Tear down any active timer for this habit BEFORE the model
+        // is deleted so `TimerCenter.stop()` can dismiss the Live
+        // Activity while the snapshot still references a real habit.
+        if timerCenter.habitID == habit.id {
+            timerCenter.stop()
+        }
         modelContext.delete(habit)
         try? modelContext.save()
     }
@@ -172,4 +202,5 @@ enum HabitSheet: Identifiable {
         .environment(HealthKitService())
         .environment(notifications)
         .environment(TimerCenter(notifications: notifications))
+        .environment(DayTracker())
 }

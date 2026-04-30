@@ -7,6 +7,7 @@ import Charts
 /// and a day-grouped feed of every completion across every habit.
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(DayTracker.self) private var dayTracker
 
     @Query(sort: [SortDescriptor(\HabitCompletion.date, order: .reverse)])
     private var completions: [HabitCompletion]
@@ -17,7 +18,11 @@ struct HistoryView: View {
     @State private var range: TimeRange = .month
 
     var body: some View {
-        ZStack {
+        // Re-render at midnight so "Today"/"Yesterday" feed headers and
+        // today's lifetime/week stats stay correct.
+        let _ = dayTracker.today
+
+        return ZStack {
             AppBackground(style: .primary).ignoresSafeArea()
 
             ScrollView {

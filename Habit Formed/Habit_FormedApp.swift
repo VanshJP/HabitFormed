@@ -14,6 +14,7 @@ struct Habit_FormedApp: App {
     @State private var health = HealthKitService()
     @State private var notifications: NotificationService
     @State private var timer: TimerCenter
+    @State private var dayTracker = DayTracker()
 
     init() {
         let n = NotificationService()
@@ -51,6 +52,7 @@ struct Habit_FormedApp: App {
                 .environment(health)
                 .environment(notifications)
                 .environment(timer)
+                .environment(dayTracker)
         }
         .modelContainer(sharedModelContainer)
     }

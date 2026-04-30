@@ -61,6 +61,23 @@ enum HealthKitSource: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Sensible default when the user picks Weekly as the schedule. Mirrors
+    /// Apple Health's recommended weekly numbers where possible
+    /// (e.g. 150 exercise minutes / week).
+    var weeklyDefaultTarget: Double {
+        switch self {
+        case .none:            return 1
+        case .steps:           return 70_000
+        case .sleepHours:      return 49
+        case .mindfulMinutes:  return 70
+        case .activeCalories:  return 3_500
+        case .exerciseMinutes: return 150
+        case .walkingDistance: return 35
+        case .standHours:      return 56
+        case .flightsClimbed:  return 70
+        }
+    }
+
     var unitSuffix: String {
         switch self {
         case .none:            return ""
@@ -163,12 +180,37 @@ final class Habit {
         (completions ?? []).first { $0.date.isToday }
     }
 
+    func isCompleted(on date: Date) -> Bool {
+        (completions ?? []).contains { $0.date.isSameDay(as: date) }
+    }
+
+    func completion(on date: Date) -> HabitCompletion? {
+        (completions ?? []).first { $0.date.isSameDay(as: date) }
+    }
+
     var streak: Int { Date.calculateStreak(from: completionDates) }
 
     var completionsThisWeek: Int {
+        completionsInWeek(of: Date()).count
+    }
+
+    /// Sum of the `value` field across this week's completions. Useful for
+    /// manual weekly habits where each log carries a numeric amount.
+    var valueThisWeek: Double {
+        completionsInWeek(of: Date()).reduce(0) { $0 + $1.value }
+    }
+
+    /// True once any completion exists within the same calendar week as
+    /// `date`. Weekly habits use this in place of `isCompletedToday` so the
+    /// "done" glow persists across the week.
+    var isCompletedThisWeek: Bool {
+        !completionsInWeek(of: Date()).isEmpty
+    }
+
+    func completionsInWeek(of date: Date) -> [HabitCompletion] {
         let cal = Calendar.current
         return (completions ?? []).filter {
-            cal.isDate($0.date, equalTo: Date(), toGranularity: .weekOfYear)
-        }.count
+            cal.isDate($0.date, equalTo: date, toGranularity: .weekOfYear)
+        }
     }
 }

@@ -7,13 +7,18 @@ struct HabitDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(TimerCenter.self) private var timerCenter
+    @Environment(DayTracker.self) private var dayTracker
 
     let habit: Habit
 
     @State private var showingTimer = false
 
     var body: some View {
-        NavigationStack {
+        // Re-render at midnight so the toggle button label flips back
+        // to "Log Today" when the day rolls over.
+        let _ = dayTracker.today
+
+        return NavigationStack {
             ZStack {
                 AppBackground(style: .subtle).ignoresSafeArea()
 

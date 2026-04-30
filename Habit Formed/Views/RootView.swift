@@ -13,38 +13,33 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationStack {
-                ContentView()
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar(.hidden, for: .navigationBar)
+            Tab("Home", systemImage: "house", value: AppTab.today) {
+                NavigationStack {
+                    ContentView(onAdd: { Haptics.light(); showAddHabit = true })
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.hidden, for: .navigationBar)
+                }
             }
-            .tag(AppTab.today)
-            .toolbar(.hidden, for: .tabBar)
 
-            NavigationStack {
-                HistoryView()
+            Tab("History", systemImage: "clock.arrow.circlepath", value: AppTab.history) {
+                NavigationStack {
+                    HistoryView()
+                }
             }
-            .tag(AppTab.history)
-            .toolbar(.hidden, for: .tabBar)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 8) {
-                if timerCenter.isActive {
-                    MiniTimerBanner {
-                        if let habit = lookupActiveHabit() {
-                            Haptics.medium()
-                            timerSheetHabit = habit
-                        }
+        .overlay(alignment: .bottom) {
+            if timerCenter.isActive {
+                MiniTimerBanner {
+                    if let habit = lookupActiveHabit() {
+                        Haptics.medium()
+                        timerSheetHabit = habit
                     }
-                    .padding(.horizontal, 16)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                BottomBar(selectedTab: $selectedTab) {
-                    Haptics.medium()
-                    showAddHabit = true
-                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 90)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.45, dampingFraction: 0.85), value: timerCenter.isActive)
             }
-            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: timerCenter.isActive)
         }
         .sheet(isPresented: $showAddHabit) {
             AddHabitView()
@@ -117,20 +112,7 @@ private struct MiniTimerBanner: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
-                .background {
-                    Capsule().fill(.ultraThinMaterial)
-                }
-                .overlay(
-                    Capsule().strokeBorder(
-                        LinearGradient(
-                            colors: [center.habitColor.opacity(0.5), .white.opacity(0.05)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.6
-                    )
-                )
-                .clipShape(Capsule())
-                .shadow(color: center.habitColor.opacity(0.25), radius: 10, y: 3)
+                .glassEffect(.regular.tint(center.habitColor), in: .capsule)
             }
         }
         .buttonStyle(.plain)
@@ -147,200 +129,6 @@ private struct MiniTimerBanner: View {
     }
 }
 
-// MARK: - Bottom Bar
-
-private struct BottomBar: View {
-    @Binding var selectedTab: AppTab
-    let onAdd: () -> Void
-
-    @Namespace private var tabNamespace
-    @State private var pillHeight: CGFloat = 64
-
-    private let tabs: [(AppTab, String, String)] = [
-        (.today,   "house.fill",              "Home"),
-        (.history, "clock.arrow.circlepath",  "History"),
-    ]
-
-    private var slideAnimation: Animation {
-        .spring(response: 0.45, dampingFraction: 0.78)
-    }
-
-    var body: some View {
-        if #available(iOS 26, *) {
-            glassBar
-        } else {
-            legacyBar
-        }
-    }
-
-    // MARK: - iOS 26+ Liquid Glass
-
-    @available(iOS 26, *)
-    private var glassBar: some View {
-        GlassEffectContainer(spacing: 16) {
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    ForEach(tabs, id: \.0) { tab, icon, label in
-                        glassTabButton(tab, icon: icon, label: label)
-                    }
-                }
-                .padding(6)
-                .glassEffect(.regular.interactive(), in: .capsule)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear
-                            .preference(key: PillHeightKey.self, value: geo.size.height)
-                    }
-                )
-                .gesture(
-                    DragGesture(minimumDistance: 20)
-                        .onEnded { value in
-                            let threshold: CGFloat = 40
-                            guard let idx = tabs.firstIndex(where: { $0.0 == selectedTab }) else { return }
-                            if value.translation.width < -threshold, idx < tabs.count - 1 {
-                                Haptics.selection()
-                                withAnimation(slideAnimation) { selectedTab = tabs[idx + 1].0 }
-                            } else if value.translation.width > threshold, idx > 0 {
-                                Haptics.selection()
-                                withAnimation(slideAnimation) { selectedTab = tabs[idx - 1].0 }
-                            }
-                        }
-                )
-
-                Spacer(minLength: 0)
-
-                Button(action: { Haptics.medium(); onAdd() }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .semibold))
-                        .frame(width: pillHeight, height: pillHeight)
-                }
-                .foregroundStyle(.white)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .accessibilityLabel("Add habit")
-            }
-            .onPreferenceChange(PillHeightKey.self) { newHeight in
-                if newHeight > 0 { pillHeight = newHeight }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-        }
-    }
-
-    @available(iOS 26, *)
-    private func glassTabButton(_ tab: AppTab, icon: String, label: String) -> some View {
-        let isSelected = selectedTab == tab
-        return Button {
-            Haptics.selection()
-            withAnimation(slideAnimation) { selectedTab = tab }
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon)
-                    .symbolVariant(isSelected ? .fill : .none)
-                    .font(.system(size: 20))
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(isSelected ? .white : .white.opacity(0.5))
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(.white.opacity(0.14))
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.45),
-                                            .white.opacity(0.08),
-                                            .white.opacity(0.02),
-                                            .white.opacity(0.18)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 0.6
-                                )
-                        )
-                        .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
-                        .matchedGeometryEffect(id: "selectedTab", in: tabNamespace)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .contentShape(Capsule())
-    }
-
-    // MARK: - Pre-iOS 26 fallback
-
-    private var legacyBar: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 0) {
-                ForEach(tabs, id: \.0) { tab, icon, label in
-                    legacyTabButton(tab, icon: icon, label: label)
-                }
-            }
-            .padding(4)
-            .background(Capsule().fill(.ultraThinMaterial))
-
-            Spacer()
-
-            Button(action: { Haptics.medium(); onAdd() }) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            colors: [AppColors.primary, AppColors.primary.opacity(0.75)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 48, height: 48)
-                        .shadow(color: AppColors.primary.opacity(0.45), radius: 10, y: 3)
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add habit")
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
-    }
-
-    private func legacyTabButton(_ tab: AppTab, icon: String, label: String) -> some View {
-        let isSelected = selectedTab == tab
-        return Button {
-            Haptics.selection()
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { selectedTab = tab }
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon)
-                    .symbolVariant(isSelected ? .fill : .none)
-                    .font(.system(size: 20))
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(isSelected ? .white : .white.opacity(0.45))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background {
-                if isSelected {
-                    Capsule().fill(.white.opacity(0.15))
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct PillHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
 
 #Preview {
     let notifications = NotificationService()
@@ -349,4 +137,5 @@ private struct PillHeightKey: PreferenceKey {
         .environment(HealthKitService())
         .environment(notifications)
         .environment(TimerCenter(notifications: notifications))
+        .environment(DayTracker())
 }

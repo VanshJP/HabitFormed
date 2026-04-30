@@ -26,6 +26,11 @@ final class HealthKitService {
     /// Updated every sync; tiles read from here without extra queries.
     var liveValues: [String: Double] = [:]
 
+    /// Latest week-to-date sum per source. Populated for any source that
+    /// backs at least one weekly habit so weekly tiles can show progress
+    /// without redoing the HealthKit query themselves.
+    var liveWeeklyValues: [String: Double] = [:]
+
     /// Long-running observer queries keyed by source. Kept alive for the
     /// app's lifetime so HealthKit can push updates as soon as new samples
     /// land (steps walked, exercise logged, etc.) instead of waiting for
@@ -111,6 +116,47 @@ final class HealthKitService {
         }
     }
 
+    // MARK: - Week-to-date value
+
+    /// Sum of `source` from the start of this calendar week through now.
+    /// Mirrors `todayValue(for:)` but spans the week instead of the day.
+    func weekValue(for source: HealthKitSource) async -> Double? {
+        guard isAvailable, source != .none else { return nil }
+        let (start, end) = weekBounds()
+
+        switch source {
+        case .none:
+            return nil
+        case .steps:
+            guard let t = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return nil }
+            return await sumQuantity(type: t, unit: .count(), start: start, end: end)
+        case .activeCalories:
+            guard let t = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return nil }
+            return await sumQuantity(type: t, unit: .kilocalorie(), start: start, end: end)
+        case .exerciseMinutes:
+            guard let t = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) else { return nil }
+            return await sumQuantity(type: t, unit: .minute(), start: start, end: end)
+        case .walkingDistance:
+            guard let t = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return nil }
+            let meters = await sumQuantity(type: t, unit: .meter(), start: start, end: end)
+            return meters.map { $0 / 1000.0 }
+        case .flightsClimbed:
+            guard let t = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) else { return nil }
+            return await sumQuantity(type: t, unit: .count(), start: start, end: end)
+        case .mindfulMinutes:
+            guard let t = HKCategoryType.categoryType(forIdentifier: .mindfulSession) else { return nil }
+            let secs = await sumCategoryDuration(type: t, start: start, end: end)
+            return secs.map { $0 / 60.0 }
+        case .sleepHours:
+            guard let t = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return nil }
+            let secs = await sumSleepAsleep(type: t, start: start, end: end)
+            return secs.map { $0 / 3600.0 }
+        case .standHours:
+            guard let t = HKCategoryType.categoryType(forIdentifier: .appleStandHour) else { return nil }
+            return await countStoodHours(type: t, start: start, end: end)
+        }
+    }
+
     // MARK: - Sync
 
     @MainActor
@@ -119,22 +165,36 @@ final class HealthKitService {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.sourceRaw != "none" })
         guard let habits = try? context.fetch(descriptor) else { return }
 
-        var fetchedSources = Set<String>()
+        var fetchedDailySources = Set<String>()
+        var fetchedWeeklySources = Set<String>()
 
         for habit in habits {
             let key = habit.source.rawValue
-            if !fetchedSources.contains(key) {
-                if let value = await todayValue(for: habit.source) {
-                    liveValues[key] = value
+            let isWeekly = habit.frequency == .weekly
+
+            if isWeekly {
+                if !fetchedWeeklySources.contains(key) {
+                    if let value = await weekValue(for: habit.source) {
+                        liveWeeklyValues[key] = value
+                    }
+                    fetchedWeeklySources.insert(key)
                 }
-                fetchedSources.insert(key)
+                guard let value = liveWeeklyValues[key] else { continue }
+                guard value >= habit.targetValue else { continue }
+                guard !habit.isCompletedThisWeek else { continue }
+                context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
+            } else {
+                if !fetchedDailySources.contains(key) {
+                    if let value = await todayValue(for: habit.source) {
+                        liveValues[key] = value
+                    }
+                    fetchedDailySources.insert(key)
+                }
+                guard let value = liveValues[key] else { continue }
+                guard value >= habit.targetValue else { continue }
+                guard !habit.isCompletedToday else { continue }
+                context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
             }
-
-            guard let value = liveValues[key] else { continue }
-            guard value >= habit.targetValue else { continue }
-            guard !habit.isCompletedToday else { continue }
-
-            context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
         }
 
         try? context.save()
@@ -202,6 +262,16 @@ final class HealthKitService {
         let start = cal.startOfDay(for: Date())
         let end = cal.date(byAdding: .day, value: 1, to: start) ?? Date()
         return (start, end)
+    }
+
+    /// (start of the current calendar week, now). Honors the user's locale —
+    /// e.g. weeks start Sunday in en_US, Monday in most of Europe.
+    private func weekBounds() -> (Date, Date) {
+        let cal = Calendar.current
+        let now = Date()
+        let interval = cal.dateInterval(of: .weekOfYear, for: now)
+        let start = interval?.start ?? cal.startOfDay(for: now)
+        return (start, now)
     }
 
     private func sumQuantity(type: HKQuantityType, unit: HKUnit, start: Date, end: Date) async -> Double? {
