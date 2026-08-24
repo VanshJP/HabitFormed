@@ -96,6 +96,7 @@ struct SlideToLogTrack: View {
                 let x = max(0, min(maxX, value.translation.width))
                 if x >= maxX * triggerRatio {
                     Haptics.success()
+                    SoundEffects.logChime()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { dragX = maxX }
                     onComplete()
                 } else {

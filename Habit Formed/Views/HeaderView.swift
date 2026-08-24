@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Top-of-screen header — date, day-of-week, and a small completion summary
+/// Top-of-screen header: date, day-of-week, and a small completion summary
 /// for the selected date. Tap the date to browse past days; the "Today" pill
 /// appears whenever the user has scrolled away from today.
 struct HeaderView: View {

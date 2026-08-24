@@ -3,7 +3,7 @@ import SwiftData
 
 /// Foreground UI for the global `TimerCenter`. The ring + countdown text
 /// live inside a `TimelineView(.animation)` so the trim animates against
-/// the screen's refresh rate rather than a discrete tick — that way
+/// the screen's refresh rate rather than a discrete tick. That way,
 /// pressing Start / Pause / Resume never snaps the ring forward or
 /// backward.
 struct TimerView: View {
@@ -71,6 +71,7 @@ struct TimerView: View {
                 if isOurTimer, center.hasFinished, !didAutoFinish {
                     didAutoFinish = true
                     Haptics.success()
+                    SoundEffects.logChime()
                     center.finish(in: modelContext, habit: habit)
                 }
             }

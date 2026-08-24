@@ -27,6 +27,9 @@ struct HabitTileView: View {
     // when the user logs via slide; snapped instantly for non-manual habits.
     @State private var sweepProgress: CGFloat = 0
     @State private var showStopConfirm: Bool = false
+    /// When true the tile expands to show a GitHub-style activity heatmap
+    /// just below the streak row. Toggled by tapping the streak label.
+    @State private var showHeatMap: Bool = false
 
     /// Completion state for the date currently being browsed. Weekly habits
     /// "stay lit" for the entire calendar week containing `selectedDate` so
@@ -46,14 +49,14 @@ struct HabitTileView: View {
             completionGlow
             content
         }
-        .frame(height: 178)
+        .frame(minHeight: 178)
         .glassCard(cornerRadius: 20, tint: tileTint)
         .contentShape(RoundedRectangle(cornerRadius: 20))
         .onTapGesture { Haptics.light(); onTap() }
         .conditionalContextMenu(isReadOnly == false) {
             Button("Edit", systemImage: "pencil")          { Haptics.light(); onEdit() }
             if !habit.isCompletedToday {
-                Button("Log Today", systemImage: "checkmark.seal.fill") { Haptics.success(); onLog() }
+                Button("Log Today", systemImage: "checkmark.seal.fill") { Haptics.success(); SoundEffects.logChime(); onLog() }
             }
             if timerIsActiveForThisHabit && timerCenter.isActive {
                 Button("Stop Timer", systemImage: "stop.circle", role: .destructive) {
@@ -88,7 +91,7 @@ struct HabitTileView: View {
                 sweepProgress = 0
             }
         }
-        .accessibilityLabel("\(habit.title), \(habit.streak) day streak")
+        .accessibilityLabel("\(habit.title), \(habit.displayStreak) \(habit.streakUnitLabel) streak")
         .accessibilityHint(isReadOnly ? "Tap to view history." : "Tap to view history. Long press for options.")
     }
 
@@ -107,8 +110,27 @@ struct HabitTileView: View {
             streakRow
             Spacer(minLength: 10)
             bottomSection
+            if showHeatMap {
+                heatMap
+                    .padding(.top, 14)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
         .padding(14)
+    }
+
+    // Inline activity heatmap revealed by tapping the streak. Fills the
+    // tile's full content width with a 12-week × 7-day grid so the chart
+    // sits compactly under the action row without overshooting the tile.
+    private var heatMap: some View {
+        ActivityHeatMap(
+            completionDates: habit.completionDates,
+            accent: habit.color,
+            weeks: 12,
+            cellSpacing: 2,
+            cornerRadius: 2
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // Always present in the hierarchy so a circular mask driven by
@@ -171,6 +193,11 @@ struct HabitTileView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 18))
                 .foregroundStyle(habit.color)
+        } else if habit.frequency == .interval && habit.source == .none {
+            // Interval cadence cue: tinted once the habit is due or overdue.
+            Image(systemName: "clock.badge.exclamationmark")
+                .font(.system(size: 14))
+                .foregroundStyle(habit.isDue ? habit.color : Color.white.opacity(0.38))
         } else if habit.source != .none {
             Image(systemName: "heart.text.square.fill")
                 .font(.system(size: 14))
@@ -185,14 +212,41 @@ struct HabitTileView: View {
     // MARK: - Streak
 
     private var streakRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text("\(habit.streak)")
-                .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(effectiveCompleted ? .white : AppColors.streakColor(for: habit.streak))
-            Text(habit.streak == 1 ? "day" : "days")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(effectiveCompleted ? .white.opacity(0.7) : .white.opacity(0.42))
+        Button {
+            Haptics.light()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                showHeatMap.toggle()
+            }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(streakReadout.value)")
+                    .font(.system(size: 19, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(streakReadout.unit)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+    }
+
+    /// Number + unit for the big row. Interval habits swap the streak for
+    /// a live day-countdown while resting between due dates.
+    private var streakReadout: (value: Int, unit: String) {
+        if let remaining = intervalCountdownDays {
+            return (remaining, remaining == 1 ? "day" : "days")
+        }
+        return (habit.displayStreak, habit.streakUnitLabel)
+    }
+
+    /// Days until a manual interval habit is next due, or nil when no
+    /// countdown is ticking (not interval, never logged, or due/overdue).
+    private var intervalCountdownDays: Int? {
+        guard habit.frequency == .interval, habit.source == .none,
+              let remaining = habit.daysUntilDue, remaining > 0 else { return nil }
+        return remaining
     }
 
     // MARK: - Bottom section (varies by habit type)
@@ -269,7 +323,7 @@ struct HabitTileView: View {
     // Timer: week dots on the left, play/start button on the right
     private var timerRow: some View {
         HStack(spacing: 0) {
-            WeekDotsView(completionDates: habit.completionDates, accent: habit.color)
+            WeekDotsView(completionDates: habit.completionDates)
             Spacer()
             Button {
                 Haptics.medium()
@@ -320,11 +374,13 @@ struct HabitTileView: View {
 
     // Manual: slide-to-log track. For weekly habits a tiny "X / N THIS WEEK"
     // caption sits above the slide so the user can see weekly progress at a
-    // glance without losing the per-day log gesture.
+    // glance; interval habits show their next-due cadence in the same slot.
     private var manualSlide: some View {
         VStack(alignment: .leading, spacing: 4) {
             if habit.frequency == .weekly {
                 weeklyCountCaption
+            } else if habit.frequency == .interval {
+                cadenceCaption
             }
             SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
                 onLog()
@@ -340,6 +396,31 @@ struct HabitTileView: View {
             .font(.system(size: 9, weight: .heavy, design: .rounded))
             .tracking(1.2)
             .foregroundStyle(met ? habit.color : .white.opacity(0.42))
+    }
+
+    // Countdown status for interval habits, mirroring the weekly caption slot.
+    private var cadenceCaption: some View {
+        let remaining = habit.daysUntilDue
+        let text: String
+        let tint: Color
+        switch remaining {
+        case nil:
+            text = "EVERY \(habit.intervalDays) DAYS"
+            tint = .white.opacity(0.42)
+        case 0?:
+            text = "DUE TODAY"
+            tint = habit.color
+        case let d? where d < 0:
+            text = "\(abs(d))D OVERDUE"
+            tint = habit.color
+        case let d?:
+            text = "NEXT IN \(d)D"
+            tint = .white.opacity(0.42)
+        }
+        return Text(text)
+            .font(.system(size: 9, weight: .heavy, design: .rounded))
+            .tracking(1.2)
+            .foregroundStyle(tint)
     }
 
     // MARK: - Helpers

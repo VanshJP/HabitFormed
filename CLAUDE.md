@@ -108,7 +108,16 @@ Cancelling the sheet before completion does **not** log.
   instantiate `UIImpactFeedbackGenerator` inline.
 - **Streak math:** call `Date.calculateStreak(from:)`; do not duplicate
   the day-grace logic. A streak survives one missed day until the
-  calendar rolls over.
+  calendar rolls over. Schedule-aware streaks go through
+  `Habit.displayStreak` (daily days / weekly target weeks / interval
+  on-time cycles) with helpers in `Date+Helpers.swift`.
+- **Scheduling:** `HabitFrequency` is `daily`, `weekly`
+  (`weeklyTarget`, N times per week), or `interval` (`intervalDays`,
+  log once every N days; logging resets the countdown). Interval is
+  manual-swipe only; auto-reset to daily when track type becomes
+  timer/health.
+- **Copy:** no em dashes anywhere (strings or comments). Keep UI copy
+  plain and short; big day-count numbers are always `.white`.
 - **HealthKit:** new HealthKit-backed habit types should extend
   `HealthKitSource` (label, defaultTarget, unitSuffix, symbol) and add a
   matching branch in `HealthKitService.todayValue(for:)`.
@@ -141,5 +150,8 @@ Cancelling the sheet before completion does **not** log.
   defined; a 1024×1024 image needs to be dropped in).
 - HealthKit auto-sync only inserts a completion when today's value
   meets the target; partial-progress UI on the tile is not yet shown.
-- No notifications / reminders. If added, use `UNUserNotificationCenter`
-  and gate behind an explicit settings toggle.
+- Notifications: reminders are cadence-aware and rebuilt by
+  `NotificationService.syncReminders(for:)` (launch, foreground, habit
+  changes). Interval habits get rolling one-shots on due dates; timer
+  taps route through `NotificationRouter`. Time Sensitive entitlement
+  is intentionally unused (`.active` level everywhere).

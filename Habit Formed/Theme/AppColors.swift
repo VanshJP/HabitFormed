@@ -3,10 +3,10 @@ import SwiftUI
 enum AppColors {
     // MARK: - Brand
 
-    /// Muted teal — primary brand accent. Mirrors SpeakUp.
+    /// Muted teal, the primary brand accent. Mirrors SpeakUp.
     static let primary = Color(red: 0.051, green: 0.518, blue: 0.533) // #0D8488
 
-    /// Warm gray — secondary accent / muted UI.
+    /// Warm gray, used for secondary accents and muted UI.
     static let accent = Color(red: 0.392, green: 0.455, blue: 0.545) // #64748B
 
     // MARK: - Semantic
@@ -18,7 +18,7 @@ enum AppColors {
 
     // MARK: - Streak heat
 
-    /// Maps a streak length to a warm color ramp — cool teal for short
+    /// Maps a streak length to a warm color ramp: cool teal for short
     /// streaks, ember orange/red for long streaks. Caller is responsible
     /// for deciding what counts as "long".
     static func streakColor(for streak: Int) -> Color {

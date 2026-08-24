@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Layered radial gradient background — deep navy base + ambient teal /
+/// Layered radial gradient background: deep navy base + ambient teal /
 /// indigo / cyan orbs. Replaces plain black for premium glass-morphism feel.
 struct AppBackground: View {
     var style: Style = .primary

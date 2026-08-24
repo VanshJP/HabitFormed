@@ -5,15 +5,31 @@ import SwiftUI
 // MARK: - Frequency
 
 enum HabitFrequency: String, Codable, CaseIterable, Identifiable {
+    /// Log any day; streak counts consecutive days.
     case daily
+    /// Goal of N logs per calendar week; streak counts consecutive
+    /// weeks that met `Habit.weeklyTarget`.
     case weekly
+    /// Once every N days (`Habit.intervalDays`). Logging resets the
+    /// countdown, like a lightweight "remind me every few days" cadence.
+    case interval
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .daily:  return "Daily"
-        case .weekly: return "Weekly"
+        case .daily:    return "Daily"
+        case .weekly:   return "Weekly"
+        case .interval: return "Interval"
+        }
+    }
+
+    /// Short segment-picker title.
+    var shortLabel: String {
+        switch self {
+        case .daily:    return "Daily"
+        case .weekly:   return "Per Week"
+        case .interval: return "Every N Days"
         }
     }
 }
@@ -120,6 +136,10 @@ final class Habit {
 
     var frequencyRaw: String = HabitFrequency.daily.rawValue
     var weeklyTarget: Int = 5
+    /// Cadence for `.interval` habits: log again this many days after
+    /// the last completion. SwiftData lightweight migration supplies the
+    /// default for existing rows.
+    var intervalDays: Int = 3
 
     var sourceRaw: String = HealthKitSource.none.rawValue
     var targetValue: Double = 1
@@ -141,6 +161,7 @@ final class Habit {
         colorHex: String = "#0D8488",
         frequency: HabitFrequency = .daily,
         weeklyTarget: Int = 5,
+        intervalDays: Int = 3,
         source: HealthKitSource = .none,
         targetValue: Double = 1,
         timerDurationSeconds: Int = 0,
@@ -156,6 +177,7 @@ final class Habit {
         self.sortOrder = sortOrder
         self.frequencyRaw = frequency.rawValue
         self.weeklyTarget = weeklyTarget
+        self.intervalDays = intervalDays
         self.sourceRaw = source.rawValue
         self.targetValue = targetValue
         self.timerDurationSeconds = timerDurationSeconds
@@ -188,7 +210,74 @@ final class Habit {
         (completions ?? []).first { $0.date.isSameDay(as: date) }
     }
 
+    // MARK: - Schedule-aware streaks
+
+    /// Consecutive-day streak. Only meaningful for `.daily`; use
+    /// `displayStreak` for the number shown in UI.
     var streak: Int { Date.calculateStreak(from: completionDates) }
+
+    /// Streak measured in the habit's own cadence: consecutive days for
+    /// daily, consecutive weeks meeting the weekly target for weekly,
+    /// and consecutive on-time cycles for interval habits.
+    var displayStreak: Int {
+        switch frequency {
+        case .daily:
+            return streak
+        case .weekly:
+            return Date.calculateWeeklyStreak(from: completionDates, target: weeklyTarget)
+        case .interval:
+            return Date.calculateIntervalStreak(from: completionDates, intervalDays: intervalDays)
+        }
+    }
+
+    /// Unit label paired with `displayStreak` ("day", "wk", "log"…).
+    var streakUnitLabel: String {
+        switch frequency {
+        case .daily:    return displayStreak == 1 ? "day" : "days"
+        case .weekly:   return displayStreak == 1 ? "wk" : "wks"
+        case .interval: return displayStreak == 1 ? "cycle" : "cycles"
+        }
+    }
+
+    /// One-line human summary of the cadence, e.g. "Daily",
+    /// "3× / week", "Every 3 days".
+    var scheduleLabel: String {
+        switch frequency {
+        case .daily:    return "Daily"
+        case .weekly:   return "\(weeklyTarget)× / week"
+        case .interval: return "Every \(intervalDays) day\(intervalDays == 1 ? "" : "s")"
+        }
+    }
+
+    // MARK: - Interval countdown
+
+    var lastCompletionDate: Date? {
+        completionDates.map { $0.startOfDay }.max()
+    }
+
+    /// First day the habit is due again (last log + cadence), or nil
+    /// while the habit has never been logged.
+    var nextDueDate: Date? {
+        lastCompletionDate?.adding(days: max(intervalDays, 1))
+    }
+
+    /// Whole days from today until `nextDueDate`. 0 = due today,
+    /// negative = overdue by that many days, nil = never logged.
+    var daysUntilDue: Int? {
+        guard let due = nextDueDate else { return nil }
+        let delta = Calendar.current.dateComponents(
+            [.day], from: Date().startOfDay, to: due
+        ).day ?? 0
+        return delta
+    }
+
+    /// True when an interval habit needs a log: never logged, due today,
+    /// or overdue.
+    var isDue: Bool {
+        guard frequency == .interval else { return false }
+        guard let remaining = daysUntilDue else { return true }
+        return remaining <= 0
+    }
 
     var completionsThisWeek: Int {
         completionsInWeek(of: Date()).count

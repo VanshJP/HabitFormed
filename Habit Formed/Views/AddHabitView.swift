@@ -4,6 +4,7 @@ import SwiftData
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(NotificationService.self) private var notifications
 
     var habit: Habit?
 
@@ -14,6 +15,7 @@ struct AddHabitView: View {
     @State private var colorHex: String = AppColors.tilePalette.first?.hexString ?? "#0D8488"
     @State private var frequency: HabitFrequency = .daily
     @State private var weeklyTarget: Int = 5
+    @State private var intervalDays: Int = 3
     @State private var source: HealthKitSource = .none
     @State private var targetValue: Double = 1
     @State private var timerDurationSeconds: Int = 1500
@@ -24,6 +26,7 @@ struct AddHabitView: View {
     ) ?? Date()
 
     @State private var inputType: InputType = .manual
+    @State private var appearanceExpanded: Bool = true
 
     @FocusState private var nameFocused: Bool
 
@@ -43,6 +46,8 @@ struct AddHabitView: View {
         ("5m", 300), ("10m", 600), ("15m", 900), ("20m", 1200),
         ("25m", 1500), ("30m", 1800), ("45m", 2700), ("60m", 3600),
     ]
+
+    private static let intervalDayOptions: [Int] = [2, 3, 4, 5, 6, 7, 10, 14, 21, 30]
 
     // MARK: - Body
 
@@ -99,7 +104,6 @@ struct AddHabitView: View {
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 16) {
 
-            // 1. Preview row — large badge + title/subtitle
             HStack(spacing: 16) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
@@ -110,10 +114,12 @@ struct AddHabitView: View {
                         .foregroundStyle(Color(hex: colorHex))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title.isEmpty ? "Habit Name" : title)
+                    TextField("Habit Name", text: $title)
                         .font(.system(size: 22, weight: .heavy, design: .rounded))
-                        .foregroundStyle(title.isEmpty ? .white.opacity(0.25) : .white)
+                        .foregroundStyle(.white)
                         .lineLimit(1)
+                        .focused($nameFocused)
+                        .submitLabel(.done)
                     Text(previewSubtitle)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.48))
@@ -123,64 +129,82 @@ struct AddHabitView: View {
 
             Divider().opacity(0.16)
 
-            // 2. Name field
-            TextField("e.g. Read, Run, Meditate…", text: $title)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .submitLabel(.done)
-                .focused($nameFocused)
+            Button {
+                Haptics.light()
+                withAnimation(.spring(response: 0.3)) { appearanceExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle().fill(Color(hex: colorHex)).frame(width: 18, height: 18)
+                    Image(systemName: symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text("Appearance")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .rotationEffect(.degrees(appearanceExpanded ? -180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
 
-            Divider().opacity(0.16)
-
-            // 3. Color chips
-            HStack(spacing: 10) {
-                ForEach(AppColors.tilePalette, id: \.hexString) { color in
-                    Button {
-                        Haptics.selection()
-                        colorHex = color.hexString
-                    } label: {
-                        ZStack {
-                            Circle().fill(color).frame(width: 32, height: 32)
-                            if colorHex == color.hexString {
-                                Circle().stroke(Color.white, lineWidth: 2.5)
-                                    .frame(width: 32, height: 32)
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white)
+            if appearanceExpanded {
+                HStack(spacing: 10) {
+                    ForEach(AppColors.tilePalette, id: \.hexString) { color in
+                        Button {
+                            Haptics.selection()
+                            colorHex = color.hexString
+                        } label: {
+                            ZStack {
+                                Circle().fill(color).frame(width: 32, height: 32)
+                                if colorHex == color.hexString {
+                                    Circle().stroke(Color.white, lineWidth: 2.5)
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        .animation(.spring(response: 0.25), value: colorHex)
                     }
-                    .buttonStyle(.plain)
-                    .animation(.spring(response: 0.25), value: colorHex)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-            }
 
-            Divider().opacity(0.16)
+                Divider().opacity(0.16)
 
-            // 4. Icon grid
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
-                spacing: 8
-            ) {
-                ForEach(Self.symbols, id: \.self) { sym in
-                    Button {
-                        Haptics.selection()
-                        symbol = sym
-                    } label: {
-                        Image(systemName: sym)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(symbol == sym
-                                        ? Color(hex: colorHex).opacity(0.52)
-                                        : Color.white.opacity(0.07))
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                    spacing: 8
+                ) {
+                    ForEach(Self.symbols, id: \.self) { sym in
+                        Button {
+                            Haptics.selection()
+                            symbol = sym
+                            // After picking an icon the user has finished the
+                            // appearance step, so collapse the section and
+                            // keep focus on the name + type.
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85).delay(0.18)) {
+                                appearanceExpanded = false
                             }
+                        } label: {
+                            Image(systemName: sym)
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(symbol == sym
+                                            ? Color(hex: colorHex).opacity(0.52)
+                                            : Color.white.opacity(0.07))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .animation(.spring(response: 0.25), value: symbol)
                     }
-                    .buttonStyle(.plain)
-                    .animation(.spring(response: 0.25), value: symbol)
                 }
             }
         }
@@ -189,6 +213,7 @@ struct AddHabitView: View {
         .animation(.spring(response: 0.3), value: colorHex)
         .animation(.spring(response: 0.3), value: symbol)
         .animation(.spring(response: 0.3), value: inputType)
+        .animation(.spring(response: 0.3), value: appearanceExpanded)
     }
 
     // MARK: - Type picker
@@ -355,7 +380,7 @@ struct AddHabitView: View {
             VStack(spacing: 12) {
                 Picker("", selection: $frequency) {
                     ForEach(HabitFrequency.allCases) { f in
-                        Text(f.label).tag(f)
+                        Text(f.shortLabel).tag(f)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -369,9 +394,42 @@ struct AddHabitView: View {
                         Stepper("", value: $weeklyTarget, in: 1...7).labelsHidden()
                     }
                 }
+
+                if frequency == .interval {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Self.intervalDayOptions, id: \.self) { days in
+                                Button {
+                                    Haptics.selection()
+                                    intervalDays = days
+                                } label: {
+                                    Text("\(days)d")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(intervalDays == days ? .white : .white.opacity(0.52))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background {
+                                            Capsule()
+                                                .fill(intervalDays == days
+                                                    ? Color(hex: colorHex).opacity(0.75)
+                                                    : Color.white.opacity(0.08))
+                                        }
+                                }
+                                .buttonStyle(.plain)
+                                .animation(.spring(response: 0.25), value: intervalDays)
+                            }
+                        }
+                    }
+
+                    Text("Swipe to log any time. Logging restarts the countdown.")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
             }
             .padding(14)
             .glassCard(cornerRadius: 16, tint: AppColors.glassTintAccent)
+            .animation(.spring(response: 0.3), value: frequency)
+            .animation(.spring(response: 0.3), value: intervalDays)
         }
     }
 
@@ -388,11 +446,11 @@ struct AddHabitView: View {
                             .foregroundStyle(reminderEnabled ? Color(hex: colorHex) : .white.opacity(0.4))
                             .frame(width: 22)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Daily Reminder")
+                            Text("Reminder")
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white)
                             Text(reminderEnabled
-                                 ? "Notify me at the time below"
+                                 ? reminderSubtitle
                                  : "Off")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.45))
@@ -400,6 +458,13 @@ struct AddHabitView: View {
                     }
                 }
                 .tint(Color(hex: colorHex))
+                .onChange(of: reminderEnabled) { _, isOn in
+                    // Ask at the moment of intent rather than app launch;
+                    // iOS silently denies repeat prompts after a refusal.
+                    if isOn && !notifications.isAuthorized {
+                        Task { await notifications.requestAuthorization() }
+                    }
+                }
 
                 if reminderEnabled {
                     Divider().opacity(0.16)
@@ -426,17 +491,37 @@ struct AddHabitView: View {
 
     // MARK: - Preview subtitle
 
+    /// Explains when the reminder will actually fire for this cadence.
+    private var reminderSubtitle: String {
+        switch frequency {
+        case .daily, .weekly:
+            return "Every day at the time below"
+        case .interval:
+            return "On each due date at the time below"
+        }
+    }
+
     private var previewSubtitle: String {
         switch inputType {
         case .manual:
-            return frequency == .daily ? "Daily · Manual" : "\(weeklyTarget)× / week · Manual"
+            switch frequency {
+            case .daily:    return "Daily · Manual"
+            case .weekly:   return "\(weeklyTarget)× / week · Manual"
+            case .interval: return "Every \(intervalDays) days · Manual"
+            }
         case .timer:
-            return "\(timerDurationSeconds / 60)min · \(frequency == .daily ? "Daily" : "\(weeklyTarget)× / week")"
+            switch frequency {
+            case .daily:    return "\(timerDurationSeconds / 60)min · Daily"
+            case .weekly:   return "\(timerDurationSeconds / 60)min · \(weeklyTarget)× / week"
+            // Cadence leads for interval since the countdown is the primary cue.
+            case .interval: return "Every \(intervalDays) days · \(timerDurationSeconds / 60)min"
+            }
         case .health:
             guard source != .none else { return "Select a metric" }
             let val = source == .steps && targetValue >= 1000
                 ? String(format: "%.0fk", targetValue / 1000)
                 : "\(Int(targetValue))\(source.unitSuffix)"
+            // Interval+health is transient (auto-resets to daily); read as "/ day".
             let cadence = frequency == .weekly ? " / week" : " / day"
             return "\(source.label) · \(val)\(cadence)"
         }
@@ -451,6 +536,7 @@ struct AddHabitView: View {
         colorHex = habit.colorHex
         frequency = habit.frequency
         weeklyTarget = habit.weeklyTarget
+        intervalDays = habit.intervalDays
         source = habit.source
         targetValue = habit.targetValue
         timerDurationSeconds = habit.timerDurationSeconds > 0 ? habit.timerDurationSeconds : 1500
@@ -469,9 +555,16 @@ struct AddHabitView: View {
         } else {
             inputType = .manual
         }
+
+        appearanceExpanded = false
     }
 
     private func handleTypeChange(_: InputType, _ new: InputType) {
+        // Interval is a manual-swipe cadence, so snap back to daily
+        // when the habit becomes timer- or HealthKit-tracked.
+        if new != .manual && frequency == .interval {
+            frequency = .daily
+        }
         switch new {
         case .manual:
             break
@@ -503,6 +596,7 @@ struct AddHabitView: View {
             habit.colorHex = colorHex
             habit.frequencyRaw = frequency.rawValue
             habit.weeklyTarget = weeklyTarget
+            habit.intervalDays = intervalDays
             habit.sourceRaw = finalSource.rawValue
             habit.targetValue = finalTarget
             habit.timerDurationSeconds = finalTimer
@@ -516,6 +610,7 @@ struct AddHabitView: View {
                 colorHex: colorHex,
                 frequency: frequency,
                 weeklyTarget: weeklyTarget,
+                intervalDays: intervalDays,
                 source: finalSource,
                 targetValue: finalTarget,
                 timerDurationSeconds: finalTimer,

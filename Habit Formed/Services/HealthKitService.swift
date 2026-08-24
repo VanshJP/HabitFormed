@@ -205,7 +205,7 @@ final class HealthKitService {
 
     /// Subscribe to HealthKit change notifications for every source we care
     /// about. As soon as new samples land (e.g. iPhone records more steps),
-    /// the observer fires and we re-run the sync — keeping tiles like the
+    /// the observer fires and we re-run the sync, keeping tiles like the
     /// step challenge up-to-date in near real-time instead of waiting on
     /// the 15s polling fallback.
     @MainActor
@@ -264,7 +264,7 @@ final class HealthKitService {
         return (start, end)
     }
 
-    /// (start of the current calendar week, now). Honors the user's locale —
+    /// (start of the current calendar week, now). Honors the user's locale:
     /// e.g. weeks start Sunday in en_US, Monday in most of Europe.
     private func weekBounds() -> (Date, Date) {
         let cal = Calendar.current

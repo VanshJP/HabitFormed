@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct Habit_FormedApp: App {
@@ -15,11 +16,18 @@ struct Habit_FormedApp: App {
     @State private var notifications: NotificationService
     @State private var timer: TimerCenter
     @State private var dayTracker = DayTracker()
+    @State private var router: NotificationRouter
 
     init() {
         let n = NotificationService()
+        let router = NotificationRouter()
         _notifications = State(initialValue: n)
+        _router = State(initialValue: router)
         _timer = State(initialValue: TimerCenter(notifications: n))
+        // Retained by the @State above; must be attached before any
+        // notification is delivered for foreground banners + tap routing.
+        UNUserNotificationCenter.current().delegate = router
+        SoundEffects.prepare()
     }
 
     let sharedModelContainer: ModelContainer = {

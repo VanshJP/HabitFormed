@@ -104,15 +104,12 @@ struct ContentView: View {
             // only on the 15s polling tick.
             health.startObservingHealthKitHabits(in: modelContext)
 
-            // Daily habit reminders.
-            await notifications.refreshAuthorizationStatus()
-            if !notifications.hasRequestedAuthorization {
-                await notifications.requestAuthorization()
-            }
-            await notifications.rescheduleHabitReminders(habits)
+            // Reminder scheduling. Permission is requested lazily when a
+            // reminder toggle is turned on (AddHabitView), not at launch.
+            await notifications.syncReminders(for: habits)
         }
-        .onChange(of: habits.map { "\($0.id)|\($0.reminderEnabled)|\($0.reminderHour):\($0.reminderMinute)|\($0.title)" }.joined()) { _, _ in
-            Task { await notifications.rescheduleHabitReminders(habits) }
+        .onChange(of: reminderSignature) { _, _ in
+            Task { await notifications.syncReminders(for: habits) }
         }
         .task(id: "health-sync") {
             while !Task.isCancelled {
@@ -127,12 +124,37 @@ struct ContentView: View {
                 Task {
                     await health.syncHealthKitHabits(in: modelContext)
                     health.startObservingHealthKitHabits(in: modelContext)
+                    // Picks up permission grants made in iOS Settings and
+                    // re-anchors interval reminder chains after time away.
+                    await notifications.syncReminders(for: habits)
                 }
             }
         }
     }
 
     // MARK: - Subviews
+
+    /// Order-insensitive fingerprint of every habit field that reminder
+    /// scheduling depends on. Includes completion counts so logging or
+    /// removing a log re-anchors interval chains and weekly bodies.
+    private var reminderSignature: String {
+        habits
+            .map { habit in
+                [
+                    habit.id.uuidString,
+                    String(habit.reminderEnabled),
+                    "\(habit.reminderHour):\(habit.reminderMinute)",
+                    habit.frequencyRaw,
+                    String(habit.weeklyTarget),
+                    String(habit.intervalDays),
+                    habit.title,
+                    String(habit.completions?.count ?? 0),
+                    String(habit.lastCompletionDate?.timeIntervalSince1970 ?? 0),
+                ].joined(separator: "|")
+            }
+            .sorted()
+            .joined(separator: ";")
+    }
 
     private var emptyState: some View {
         VStack(spacing: 14) {
@@ -169,6 +191,9 @@ struct ContentView: View {
         if timerCenter.habitID == habit.id {
             timerCenter.stop()
         }
+        // Same belt-and-braces for reminders; the signature change below
+        // would resync anyway, but this doesn't depend on observers.
+        notifications.cancelReminders(habitID: habit.id)
         modelContext.delete(habit)
         try? modelContext.save()
     }

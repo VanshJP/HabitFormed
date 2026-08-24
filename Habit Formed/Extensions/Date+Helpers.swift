@@ -25,8 +25,8 @@ nonisolated extension Date {
         formatted(.dateTime.weekday(.abbreviated))
     }
 
-    /// Calculates the consecutive-day streak ending today (or yesterday — a
-    /// streak survives one missed day's worth of grace until the calendar
+    /// Calculates the consecutive-day streak ending today (or yesterday;
+    /// a streak survives one missed day's worth of grace until the calendar
     /// rolls over). Returns 0 when no completion exists in either window.
     static func calculateStreak(from dates: [Date]) -> Int {
         guard !dates.isEmpty else { return 0 }
@@ -63,5 +63,63 @@ nonisolated extension Date {
     static func trailingDays(_ count: Int) -> [Date] {
         let today = Date().startOfDay
         return (0..<count).reversed().map { today.adding(days: -$0) }
+    }
+
+    /// Start of the calendar week (per `Calendar.current` first weekday)
+    /// containing `date`.
+    static func startOfWeek(for date: Date) -> Date {
+        Calendar.current.dateInterval(of: .weekOfYear, for: date)?.start
+            ?? date.startOfDay
+    }
+
+    /// Consecutive-week streak where each week logged at least `target`
+    /// times. The current week counts once it has met the target;
+    /// otherwise the chain is measured back from last week so an
+    /// in-progress week doesn't zero the streak mid-way.
+    static func calculateWeeklyStreak(
+        from dates: [Date], target: Int, today: Date = Date()
+    ) -> Int {
+        guard target > 0, !dates.isEmpty else { return 0 }
+
+        let counts = Dictionary(grouping: dates.map { startOfWeek(for: $0) }) { $0 }
+            .mapValues(\.count)
+
+        var week = startOfWeek(for: today.startOfDay)
+        // An unfinished current week only joins the chain if it already
+        // met the goal; otherwise start counting from last week.
+        if (counts[week] ?? 0) < target {
+            week = week.adding(days: -7)
+        }
+
+        guard (counts[week] ?? 0) >= target else { return 0 }
+
+        var streak = 0
+        while (counts[week] ?? 0) >= target {
+            streak += 1
+            week = week.adding(days: -7)
+        }
+        return streak
+    }
+
+    /// Streak of consecutive on-time logs for an every-`intervalDays`
+    /// cadence: walking backwards through unique log days, each gap must
+    /// be ≤ `intervalDays` and the most recent log must still be inside
+    /// its window (due today is fine; a day past due breaks the chain).
+    static func calculateIntervalStreak(
+        from dates: [Date], intervalDays: Int, today: Date = Date()
+    ) -> Int {
+        let interval = max(intervalDays, 1)
+        let sorted = Array(Set(dates.map { $0.startOfDay })).sorted(by: >)
+        guard let mostRecent = sorted.first else { return 0 }
+        guard today.startOfDay <= mostRecent.adding(days: interval) else { return 0 }
+
+        var streak = 1
+        var previous = mostRecent
+        for date in sorted.dropFirst() {
+            guard previous.timeIntervalSince(date) <= Double(interval) * 86400 else { break }
+            streak += 1
+            previous = date
+        }
+        return streak
     }
 }

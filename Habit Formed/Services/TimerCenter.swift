@@ -63,7 +63,7 @@ final class TimerCenter {
 
     var remainingSeconds: Int {
         // Ceil so the displayed time never shows 0:00 while there's still
-        // sub-second time remaining — it transitions cleanly from 0:01 to
+        // sub-second time remaining. It transitions cleanly from 0:01 to
         // 0:00 only on the actual hit.
         Int(remainingInterval(at: Date()).rounded(.up))
     }
@@ -94,6 +94,13 @@ final class TimerCenter {
     func start(habit: Habit) {
         let seconds = max(habit.timerDurationSeconds, 0)
         guard seconds > 0 else { return }
+        // Switching habits mid-timer: tear down the outgoing session's
+        // notification and Live Activity first, otherwise the old
+        // habit's completion alert fires with no timer behind it.
+        if isActive, let oldID = habitID, oldID != habit.id {
+            notifications.cancelTimerNotification(habitID: oldID)
+            endLiveActivity(finished: false)
+        }
         configure(from: habit, totalSeconds: seconds)
         let end = Date().addingTimeInterval(TimeInterval(seconds))
         endDate = end
@@ -104,8 +111,8 @@ final class TimerCenter {
     }
 
     /// Resume a partially-completed session that was previously paused or
-    /// is currently running on a different sheet — e.g. the user opens
-    /// `TimerView` for a habit whose timer is already mid-flight.
+    /// is currently running on a different sheet (e.g. the user opens
+    /// `TimerView` for a habit whose timer is already mid-flight).
     func resume(habit: Habit) {
         // If we have a snapshot for this habit, just refresh metadata.
         if habitID == habit.id {

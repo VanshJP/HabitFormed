@@ -21,6 +21,7 @@ struct RootView: View {
                 }
             }
 
+
             Tab("History", systemImage: "clock.arrow.circlepath", value: AppTab.history) {
                 NavigationStack {
                     HistoryView()
@@ -30,7 +31,7 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if timerCenter.isActive {
                 MiniTimerBanner {
-                    if let habit = lookupActiveHabit() {
+                    if let habit = lookupActiveTimerHabit() {
                         Haptics.medium()
                         timerSheetHabit = habit
                     }
@@ -47,14 +48,24 @@ struct RootView: View {
         .sheet(item: $timerSheetHabit) { habit in
             TimerView(habit: habit)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .habitOpenTimerFromNotification)) { note in
+            guard let habitID = note.userInfo?["habitID"] as? UUID,
+                  let habit = lookupActiveHabit(id: habitID) else { return }
+            Haptics.medium()
+            timerSheetHabit = habit
+        }
         .tint(AppColors.primary)
         .preferredColorScheme(.dark)
     }
 
-    private func lookupActiveHabit() -> Habit? {
-        guard let id = timerCenter.habitID else { return nil }
+    private func lookupActiveHabit(id: UUID) -> Habit? {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
         return try? modelContext.fetch(descriptor).first
+    }
+
+    private func lookupActiveTimerHabit() -> Habit? {
+        guard let id = timerCenter.habitID else { return nil }
+        return lookupActiveHabit(id: id)
     }
 }
 
@@ -119,7 +130,7 @@ private struct MiniTimerBanner: View {
     }
 
     private func stateLabel(isFinished: Bool) -> String {
-        if isFinished { return "DONE — TAP TO LOG" }
+        if isFinished { return "TAP TO LOG" }
         if center.isRunning { return "RUNNING" }
         return "PAUSED"
     }
