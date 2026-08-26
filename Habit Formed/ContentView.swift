@@ -43,7 +43,9 @@ struct ContentView: View {
                         selectedDate: $selectedDate,
                         isViewingToday: isViewingToday,
                         completedCount: habits.filter { $0.isCompleted(on: selectedDate) }.count,
-                        totalHabits: habits.count,
+                        // Resting interval habits (countdown still running)
+                        // aren't expected today, so keep them out of "X / Y".
+                        totalHabits: habits.filter { !$0.isRestingToday }.count,
                         onResetToToday: { selectedDate = .now },
                         onAdd: onAdd
                     )

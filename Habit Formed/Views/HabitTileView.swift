@@ -48,6 +48,9 @@ struct HabitTileView: View {
         return ZStack(alignment: .topLeading) {
             completionGlow
             content
+                // A resting interval habit recedes to half strength so it
+                // reads as "sitting out today" yet stays discoverable.
+                .opacity(intervalRestingDays == nil ? 1 : 0.55)
         }
         .frame(minHeight: 178)
         .glassCard(cornerRadius: 20, tint: tileTint)
@@ -194,8 +197,9 @@ struct HabitTileView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(habit.color)
         } else if habit.frequency == .interval && habit.source == .none {
-            // Interval cadence cue: tinted once the habit is due or overdue.
-            Image(systemName: "clock.badge.exclamationmark")
+            // Interval cadence cue: a quiet clock while the countdown
+            // runs; the exclamation tint only once due or overdue.
+            Image(systemName: habit.isDue ? "clock.badge.exclamationmark" : "clock")
                 .font(.system(size: 14))
                 .foregroundStyle(habit.isDue ? habit.color : Color.white.opacity(0.38))
         } else if habit.source != .none {
@@ -219,10 +223,10 @@ struct HabitTileView: View {
             }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text("\(streakReadout.value)")
+                Text("\(habit.displayStreak)")
                     .font(.system(size: 19, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text(streakReadout.unit)
+                Text(habit.streakUnitLabel)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                 Spacer(minLength: 0)
@@ -230,23 +234,6 @@ struct HabitTileView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    /// Number + unit for the big row. Interval habits swap the streak for
-    /// a live day-countdown while resting between due dates.
-    private var streakReadout: (value: Int, unit: String) {
-        if let remaining = intervalCountdownDays {
-            return (remaining, remaining == 1 ? "day" : "days")
-        }
-        return (habit.displayStreak, habit.streakUnitLabel)
-    }
-
-    /// Days until a manual interval habit is next due, or nil when no
-    /// countdown is ticking (not interval, never logged, or due/overdue).
-    private var intervalCountdownDays: Int? {
-        guard habit.frequency == .interval, habit.source == .none,
-              let remaining = habit.daysUntilDue, remaining > 0 else { return nil }
-        return remaining
     }
 
     // MARK: - Bottom section (varies by habit type)
@@ -374,18 +361,49 @@ struct HabitTileView: View {
 
     // Manual: slide-to-log track. For weekly habits a tiny "X / N THIS WEEK"
     // caption sits above the slide so the user can see weekly progress at a
-    // glance; interval habits show their next-due cadence in the same slot.
+    // glance; interval habits show their next-due cadence in the same slot
+    // and swap the track for a resting pill while counting down.
     private var manualSlide: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if habit.frequency == .weekly {
-                weeklyCountCaption
-            } else if habit.frequency == .interval {
-                cadenceCaption
-            }
-            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
-                onLog()
+            if let remaining = intervalRestingDays {
+                intervalRestingPill(days: remaining)
+            } else {
+                if habit.frequency == .weekly {
+                    weeklyCountCaption
+                } else if habit.frequency == .interval {
+                    cadenceCaption
+                }
+                SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
+                    onLog()
+                }
             }
         }
+    }
+
+    /// Days left on an interval countdown while the tile stays log-free;
+    /// nil whenever the slide track belongs (due today, overdue, already
+    /// logged today, never logged, or not an interval habit).
+    private var intervalRestingDays: Int? {
+        guard habit.frequency == .interval,
+              !habit.isCompletedToday,
+              let remaining = habit.daysUntilDue, remaining > 0 else { return nil }
+        return remaining
+    }
+
+    // Quiet stand-in for the slide track mid-countdown so upcoming cycles
+    // don't invite a log; manual logging stays available in detail view.
+    private func intervalRestingPill(days: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock")
+                .font(.system(size: 12, weight: .bold))
+            Text("NEXT LOG IN \(days)D")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .tracking(1.2)
+        }
+        .foregroundStyle(.white.opacity(0.55))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(Capsule().fill(Color.white.opacity(0.06)))
     }
 
     private var weeklyCountCaption: some View {

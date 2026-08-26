@@ -116,7 +116,9 @@ nonisolated extension Date {
         var streak = 1
         var previous = mostRecent
         for date in sorted.dropFirst() {
-            guard previous.timeIntervalSince(date) <= Double(interval) * 86400 else { break }
+            // Calendar-day comparison rather than raw seconds so DST
+            // shifts (23/25h days) can't split an on-time cycle.
+            guard date >= previous.adding(days: -interval) else { break }
             streak += 1
             previous = date
         }

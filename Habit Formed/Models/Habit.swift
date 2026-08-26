@@ -279,6 +279,16 @@ final class Habit {
         return remaining <= 0
     }
 
+    /// True when an interval habit asks nothing of the user right now:
+    /// mid-countdown with the next due date still ahead and nothing
+    /// logged today. Excluded from the Today progress counter.
+    var isRestingToday: Bool {
+        guard frequency == .interval,
+              !isCompletedToday,
+              let remaining = daysUntilDue, remaining > 0 else { return false }
+        return true
+    }
+
     var completionsThisWeek: Int {
         completionsInWeek(of: Date()).count
     }
