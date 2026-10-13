@@ -9,6 +9,8 @@ nonisolated enum AppPreferences {
     static let glassAppearance = "pref.glassAppearance"
     /// Plays the chime when a habit is logged. Defaults to on.
     static let logSound = "pref.logSound"
+    /// `TodayLayout` raw value: tiles or rows.
+    static let todayLayout = "pref.todayLayout"
     /// The name printed on daily report cards so a forwarded card still says
     /// whose day it was.
     static let reporterName = "report.name"
@@ -27,5 +29,29 @@ nonisolated enum AppPreferences {
 
     static var isLogSoundOn: Bool {
         UserDefaults.standard.object(forKey: logSound) as? Bool ?? true
+    }
+}
+
+/// How Today lays out its habits.
+nonisolated enum TodayLayout: String, CaseIterable, Identifiable, Sendable {
+    /// The two-column grid of tiles.
+    case tiles
+    /// One compact row per habit, so more fit on screen.
+    case rows
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .tiles: return "Tiles"
+        case .rows: return "Rows"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .tiles: return "square.grid.2x2"
+        case .rows: return "list.bullet"
+        }
     }
 }

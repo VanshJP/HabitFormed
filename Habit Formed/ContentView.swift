@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 /// The Today tab: a header with the perfect-day streak, a week strip to jump
-/// between recent days, the day's progress with the report button, and the
-/// habit grid.
+/// between recent days, the day's progress with the report button, the
+/// habits still open (as tiles or rows), and the Done shelf.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -29,11 +29,11 @@ struct ContentView: View {
     @State private var showArrange = false
     @State private var undo: UndoLog?
     @State private var celebration = 0
+    /// Habits just logged by slide, held in place a moment so their glow
+    /// plays before they move to the Done shelf.
+    @State private var lingering: Set<UUID> = []
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-    ]
+    @AppStorage(AppPreferences.todayLayout) private var layoutRaw = TodayLayout.tiles.rawValue
 
     private var isViewingToday: Bool {
         // Against `dayTracker.today` so a midnight rollover flips this.
@@ -57,6 +57,9 @@ struct ContentView: View {
 
         let shown = week.first { $0.date.isSameDay(as: selectedDate) }
             ?? DayLedger.summary(on: selectedDate, tracks: tracks)
+        let shelved = shelvedHabits
+        let shelvedIDs = Set(shelved.map(\.id))
+        let open = habits.filter { !shelvedIDs.contains($0.id) }
 
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
@@ -83,7 +86,14 @@ struct ContentView: View {
                         isViewingToday ? "Habits" : selectedDate.relativeDayName,
                         detail: shown.expected > 0 ? "\(shown.done) of \(shown.expected) done" : nil
                     ) {
-                        grid
+                        TodayHabitList(
+                            habits: open,
+                            layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
+                            selectedDate: selectedDate,
+                            isPastDay: !isViewingToday,
+                            isAllDone: open.isEmpty,
+                            actions: actions(for:)
+                        )
                     } accessory: {
                         HStack(spacing: 14) {
                             if !isViewingToday {
@@ -103,8 +113,13 @@ struct ContentView: View {
                             .buttonStyle(.textLink)
                         }
                     }
+
+                    if !shelved.isEmpty {
+                        DoneShelf(habits: shelved, actions: actions(for:))
+                    }
                 }
             }
+            .motion(AppMotion.settle, value: shelvedIDs)
             .pageContentInsets()
         }
         .refreshable { await refreshHealth() }
@@ -131,24 +146,25 @@ struct ContentView: View {
         }
     }
 
-    private var grid: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(habits) { habit in
-                HabitTileView(
-                    habit: habit,
-                    selectedDate: selectedDate,
-                    isPastDay: !isViewingToday,
-                    onTap: { sheet = .detail(habit) },
-                    onLog: { logToday(habit) },
-                    onUndoToday: { undoToday(habit) },
-                    onTogglePastDay: { togglePastDay(habit) },
-                    onEdit: { sheet = .edit(habit) },
-                    onArrange: { showArrange = true },
-                    onRequestDelete: { pendingDelete = habit },
-                    onStartTimer: { sheet = .timer(habit) }
-                )
-            }
-        }
+    /// Today, logged habits step out of the list onto the Done shelf, so the
+    /// list shows what is left. A past day keeps every habit in place, since
+    /// its tiles are for fixing logs.
+    private var shelvedHabits: [Habit] {
+        guard isViewingToday else { return [] }
+        return habits.filter { $0.isCompletedToday && !lingering.contains($0.id) }
+    }
+
+    private func actions(for habit: Habit) -> HabitActions {
+        HabitActions(
+            open: { sheet = .detail(habit) },
+            log: { logToday(habit) },
+            undoToday: { undoToday(habit) },
+            togglePastDay: { togglePastDay(habit) },
+            edit: { sheet = .edit(habit) },
+            arrange: { showArrange = true },
+            requestDelete: { pendingDelete = habit },
+            startTimer: { sheet = .timer(habit) }
+        )
     }
 
     @ViewBuilder
@@ -372,6 +388,11 @@ struct ContentView: View {
     private func logToday(_ habit: Habit) {
         guard isViewingToday, habit.log(on: Date(), in: modelContext) != nil else { return }
         undo = UndoLog(habit: habit, day: Date(), wasLogged: true)
+        lingering.insert(habit.id)
+        Task {
+            try? await Task.sleep(for: .seconds(1.1))
+            lingering.remove(habit.id)
+        }
     }
 
     private func undoToday(_ habit: Habit) {

@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.appCanvas) private var canvasRaw = AppCanvas.classic.rawValue
     @AppStorage(AppPreferences.glassAppearance) private var glassRaw = GlassAppearance.light.rawValue
     @AppStorage(AppPreferences.logSound) private var logSound = true
+    @AppStorage(AppPreferences.todayLayout) private var layoutRaw = TodayLayout.tiles.rawValue
     @AppStorage(AppPreferences.reporterName) private var reporterName = ""
     @AppStorage(AppPreferences.reportReminderEnabled) private var reminderOn = false
     @AppStorage(AppPreferences.reportReminderHour) private var reminderHour = 21
@@ -143,17 +144,33 @@ struct SettingsView: View {
 
     private var habitsSection: some View {
         GlassSection("Habits") {
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                Button {
-                    Haptics.light()
-                    showArrange = true
-                } label: {
-                    SettingsRow("Arrange habits", icon: "arrow.up.arrow.down", caption: "The order of the Today grid.", trailing: .chevron)
-                }
-                .buttonStyle(RowPressStyle())
-
-                SettingsRow("Log sound", icon: "speaker.wave.2", caption: "A soft chime when you log a habit.", isOn: $logSound)
+            VStack(alignment: .leading, spacing: 8) {
+                SectionPicker(
+                    sections: TodayLayout.allCases,
+                    selection: Binding(
+                        get: { TodayLayout(rawValue: layoutRaw) ?? .tiles },
+                        set: { layoutRaw = $0.rawValue }
+                    ),
+                    label: { $0.title },
+                    icon: { $0.icon },
+                    style: .compact
+                )
+                habitRows
             }
+        }
+    }
+
+    private var habitRows: some View {
+        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
+            Button {
+                Haptics.light()
+                showArrange = true
+            } label: {
+                SettingsRow("Arrange habits", icon: "arrow.up.arrow.down", caption: "The order of habits on Today.", trailing: .chevron)
+            }
+            .buttonStyle(RowPressStyle())
+
+            SettingsRow("Log sound", icon: "speaker.wave.2", caption: "A soft chime when you log a habit.", isOn: $logSound)
         }
     }
 

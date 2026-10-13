@@ -438,11 +438,15 @@ final class Habit {
     /// True when an interval habit asks nothing of the user right now:
     /// mid-countdown with the next due date still ahead and nothing
     /// logged today. Excluded from the Today progress counter.
-    var isRestingToday: Bool {
+    var isRestingToday: Bool { restingDaysLeft != nil }
+
+    /// Days left on a resting interval countdown, or nil when the habit can
+    /// be logged today.
+    var restingDaysLeft: Int? {
         guard frequency == .interval,
               !isCompletedToday,
-              let remaining = daysUntilDue, remaining > 0 else { return false }
-        return true
+              let remaining = daysUntilDue, remaining > 0 else { return nil }
+        return remaining
     }
 
     var completionsThisWeek: Int {

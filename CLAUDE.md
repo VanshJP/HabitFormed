@@ -58,7 +58,7 @@ the one sanctioned `pbxproj` edit for files.
 ```
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
-├── ContentView.swift         # Today tab: month control, week strip, tile grid, undo toast
+├── ContentView.swift         # Today tab: month control, week strip, open habits, Done shelf, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report builder/renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
@@ -66,13 +66,16 @@ Habit Formed/
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
 └── Views/
     ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, StatTile, PageTitle, ...)
-    ├── Today/                # WeekStrip, DateBrowserSheet, ArrangeHabitsSheet
+    ├── Today/                # WeekStrip, TodayHabitList, DoneShelf, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
     ├── Report/               # DailyReportSheet, ReportCardView
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
+    ├── HabitRowView.swift    # One compact row (the Rows layout)
+    ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
+    ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
     ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
@@ -105,6 +108,12 @@ the header):
   titled "Habits" for today or the browsed day's name, with the day's count
   beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
   while browsing another day). Progress is said once, in that header.
+  The section lists the habits still open, as tiles or rows
+  (`TodayLayout`, picked in Settings). Today, logged habits step out onto
+  the **Done shelf** under it (`DoneShelf`, one chip each); a habit logged
+  by slide lingers about a second first so its glow plays. With everything
+  logged the list becomes one "Everything is logged today." line. A past day
+  keeps every habit in place, since its tiles are for fixing logs.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap
   opens the detail sheet); Log is day by day, each day header carrying a
@@ -114,8 +123,9 @@ The rule across screens: say each fact once, keep captions for what is not
 obvious, paint only the selected choice in a grid, and prefer one line of
 text over another card.
 
-Each habit tile responds to three gestures. Keep this consistent across
-new surfaces:
+Each habit tile responds to three gestures, and so do rows and done chips
+(which have no slide). They all take one `HabitActions` and share
+`HabitContextMenu`; keep it that way for new surfaces:
 
 | Gesture                  | Action                                |
 |--------------------------|---------------------------------------|

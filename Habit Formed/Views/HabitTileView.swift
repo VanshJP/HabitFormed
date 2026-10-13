@@ -15,14 +15,7 @@ struct HabitTileView: View {
     var selectedDate: Date = .now
     /// True when the grid is showing a day before today.
     var isPastDay: Bool = false
-    let onTap: () -> Void
-    let onLog: () -> Void
-    let onUndoToday: () -> Void
-    let onTogglePastDay: () -> Void
-    let onEdit: () -> Void
-    let onArrange: () -> Void
-    let onRequestDelete: () -> Void
-    let onStartTimer: () -> Void
+    let actions: HabitActions
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
@@ -61,8 +54,10 @@ struct HabitTileView: View {
             tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
         )
         .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
-        .onTapGesture { Haptics.light(); onTap() }
-        .contextMenu { menu }
+        .onTapGesture { Haptics.light(); actions.open() }
+        .contextMenu {
+            HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
+        }
         .confirmationDialog(
             "Stop the timer for \(habit.title)?",
             isPresented: $showStopConfirm,
@@ -89,40 +84,6 @@ struct HabitTileView: View {
         .accessibilityHint("Opens history. Long press for options.")
     }
 
-    // MARK: - Menu
-
-    @ViewBuilder
-    private var menu: some View {
-        if isPastDay {
-            let label = habit.isCompleted(on: selectedDate) ? "Remove this day's log" : "Log this day"
-            Button(label, systemImage: habit.isCompleted(on: selectedDate) ? "minus.circle" : "checkmark.circle") {
-                onTogglePastDay()
-            }
-        } else if habit.isCompletedToday {
-            Button("Undo today's log", systemImage: "arrow.uturn.backward") { onUndoToday() }
-        } else {
-            Button("Log today", systemImage: "checkmark.circle") {
-                Haptics.success()
-                SoundEffects.logChime()
-                onLog()
-            }
-        }
-        if habit.timerDurationSeconds > 0, !isPastDay {
-            if timerIsActiveForThisHabit {
-                Button("Stop timer", systemImage: "stop.circle", role: .destructive) {
-                    Haptics.warning()
-                    timerCenter.stop()
-                }
-            } else {
-                Button("Start timer", systemImage: "timer") { onStartTimer() }
-            }
-        }
-        Divider()
-        Button("Edit", systemImage: "pencil") { Haptics.light(); onEdit() }
-        Button("Arrange habits", systemImage: "arrow.up.arrow.down") { onArrange() }
-        Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); onRequestDelete() }
-    }
-
     // MARK: - Layout
 
     private var content: some View {
@@ -135,7 +96,7 @@ struct HabitTileView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
-            statusLine
+            HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay)
                 .padding(.top, 3)
             Spacer(minLength: 12)
             bottomSection
@@ -190,54 +151,6 @@ struct HabitTileView: View {
         }
     }
 
-    // MARK: - Status line
-
-    /// One quiet line under the name: the streak once there is one, and the
-    /// cadence fact that matters today ("2 of 5 this week", "Due today").
-    private var statusLine: some View {
-        let streak = habit.displayStreak
-        let cadence = cadenceStatus
-
-        return HStack(spacing: 4) {
-            if streak > 0 {
-                Text("\(streak) \(habit.streakUnit(for: streak))")
-                    .foregroundStyle(.white.opacity(0.9))
-                    .layoutPriority(1)
-            }
-            if streak > 0, cadence != nil {
-                Text("·")
-                    .foregroundStyle(.tertiary)
-            }
-            if let cadence {
-                Text(cadence.text)
-                    .foregroundStyle(cadence.highlighted ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
-            }
-        }
-        .font(.caption.weight(.medium).monospacedDigit())
-        .lineLimit(1)
-        .minimumScaleFactor(0.85)
-    }
-
-    /// The schedule fact for this tile, or nil when the streak says enough.
-    /// Highlighted means it asks for attention (due) or celebrates (target met).
-    private var cadenceStatus: (text: String, highlighted: Bool)? {
-        switch habit.frequency {
-        case .daily:
-            return habit.displayStreak > 0 ? nil : ("Daily", false)
-        case .weekly:
-            let count = habit.completionsInWeek(of: selectedDate).count
-            return ("\(count) of \(habit.weeklyTarget) this week", count >= habit.weeklyTarget)
-        case .interval:
-            let every = "Every \(habit.intervalDays) days"
-            guard !isPastDay, intervalRestingDays == nil, !habit.isCompletedToday else { return (every, false) }
-            switch habit.daysUntilDue {
-            case 0?: return ("Due today", true)
-            case let d? where d < 0: return (d == -1 ? "1 day overdue" : "\(-d) days overdue", true)
-            default: return (every, false)
-            }
-        }
-    }
-
     // MARK: - Bottom section
 
     @ViewBuilder
@@ -257,7 +170,7 @@ struct HabitTileView: View {
     /// wrong one. The toast on Today offers the way back.
     private var pastDayPill: some View {
         let logged = habit.isCompleted(on: selectedDate)
-        return Button(action: onTogglePastDay) {
+        return Button(action: actions.togglePastDay) {
             HStack(spacing: 6) {
                 Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")
                     .font(.footnote.weight(.semibold))
@@ -311,7 +224,7 @@ struct HabitTileView: View {
             Spacer(minLength: 6)
             Button {
                 Haptics.medium()
-                onStartTimer()
+                actions.startTimer()
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: timerIcon)
@@ -366,19 +279,14 @@ struct HabitTileView: View {
             intervalRestingPill(days: remaining)
         } else {
             SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
-                onLog()
+                actions.log()
             }
         }
     }
 
     /// Days left on an interval countdown while the tile stays log-free; nil
     /// whenever the slide track belongs.
-    private var intervalRestingDays: Int? {
-        guard habit.frequency == .interval,
-              !habit.isCompletedToday,
-              let remaining = habit.daysUntilDue, remaining > 0 else { return nil }
-        return remaining
-    }
+    private var intervalRestingDays: Int? { habit.restingDaysLeft }
 
     private func intervalRestingPill(days: Int) -> some View {
         HStack(spacing: 6) {
