@@ -27,6 +27,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     /// The app's store, set at launch so a reminder's action can log.
     var modelContainer: ModelContainer?
 
+    /// A report or recap tap that may have arrived before any view was
+    /// listening. `RootView` takes it when it appears, so a cold launch from
+    /// the reminder still lands on the sheet.
+    static var pendingRoute: Notification.Name?
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -56,12 +61,14 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
 
         if identifier == "report-reminder" {
             Task { @MainActor in
+                Self.pendingRoute = .habitOpenReportFromNotification
                 NotificationCenter.default.post(name: .habitOpenReportFromNotification, object: nil)
             }
         }
 
         if identifier == "recap-reminder" {
             Task { @MainActor in
+                Self.pendingRoute = .habitOpenRecapFromNotification
                 NotificationCenter.default.post(name: .habitOpenRecapFromNotification, object: nil)
             }
         }

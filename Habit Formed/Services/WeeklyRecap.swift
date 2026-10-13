@@ -24,9 +24,11 @@ nonisolated struct WeeklyRecap: Sendable, Hashable {
     let days: [DaySummary]
     let previousPerfectDays: Int
     let rows: [Row]
-    /// The longest running streak at the end of the week.
+    /// The longest running streak at the end of the week, measured in days
+    /// so a weekly or interval streak compares fairly with a daily one.
     let longestStreak: Headline?
-    /// The habit logged most more often than the week before.
+    /// The habit logged most more often than the week before, among habits
+    /// that existed for all of it.
     let climber: Headline?
 
     var perfectDays: Int { days.filter(\.isPerfect).count }
@@ -69,18 +71,22 @@ enum WeeklyRecapBuilder {
         let previousDates = previous.map(\.date)
 
         var rows: [WeeklyRecap.Row] = []
-        var longest: (habit: Habit, streak: Int)?
+        var longest: (habit: Habit, streak: Int, days: Int)?
         var climb: (habit: Habit, gain: Int)?
         for (habit, track) in zip(included, tracks) {
-            let statuses = dates.map { track.status(on: $0) }
             // A habit made after the week ended has nothing to show.
-            guard statuses.contains(where: { $0 != .resting }) else { continue }
+            guard track.firstDay <= end else { continue }
+            let statuses = dates.map { track.status(on: $0) }
             rows.append(WeeklyRecap.Row(id: habit.id, title: habit.title, colorHex: habit.colorHex, days: statuses))
 
             let streak = habit.displayStreak(asOf: end)
-            if streak > (longest?.streak ?? 1) {
-                longest = (habit, streak)
+            let streakDays = streak * daysPerStreakUnit(habit)
+            if streak > 1, streakDays > (longest?.days ?? 0) {
+                longest = (habit, streak, streakDays)
             }
+
+            // A habit newer than the week before would climb from nothing.
+            guard let previousStart = previousDates.first, track.firstDay <= previousStart else { continue }
             let gain = dates.filter(track.logDays.contains).count - previousDates.filter(track.logDays.contains).count
             if gain > (climb?.gain ?? 0) {
                 climb = (habit, gain)
@@ -97,5 +103,14 @@ enum WeeklyRecapBuilder {
             },
             climber: climb.map { WeeklyRecap.Headline(title: $0.habit.title, value: "+\($0.gain)") }
         )
+    }
+
+    /// How many days one step of a habit's streak spans.
+    private static func daysPerStreakUnit(_ habit: Habit) -> Int {
+        switch habit.frequency {
+        case .daily: return 1
+        case .weekly: return 7
+        case .interval: return max(habit.intervalDays, 1)
+        }
     }
 }

@@ -91,7 +91,7 @@ struct ContentView: View {
                             layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
                             selectedDate: selectedDate,
                             isPastDay: !isViewingToday,
-                            isAllDone: open.isEmpty,
+                            isAllDone: isViewingToday && todayIsPerfect,
                             actions: actions(for:)
                         )
                     } accessory: {

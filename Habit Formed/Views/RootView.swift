@@ -98,6 +98,7 @@ struct RootView: View {
             sheet = .timer(habit)
         }
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenReportFromNotification)) { _ in
+            NotificationRouter.pendingRoute = nil
             openReport(for: Date())
         }
         .onOpenURL { url in
@@ -109,9 +110,20 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenRecapFromNotification)) { _ in
+            NotificationRouter.pendingRoute = nil
             openRecap()
         }
         .task {
+            // A reminder tapped on a cold launch, before onReceive listened.
+            if let route = NotificationRouter.pendingRoute {
+                NotificationRouter.pendingRoute = nil
+                if route == .habitOpenRecapFromNotification {
+                    openRecap()
+                } else {
+                    openReport(for: Date())
+                }
+            }
+
             // Re-anchors the repeating report nudge after a reinstall or a
             // permission change made in iOS Settings.
             if reportReminderOn {

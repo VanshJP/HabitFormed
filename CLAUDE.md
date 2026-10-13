@@ -70,12 +70,12 @@ Habit Formed/
     ├── Today/                # WeekStrip, TodayHabitList, DoneShelf, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
-    ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView,
+    ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
-    ├── HabitRowView.swift    # One compact row (the Rows layout)
+    ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
     ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
@@ -113,8 +113,9 @@ the header):
   The section lists the habits still open, as tiles or rows
   (`TodayLayout`, picked in Settings). Today, logged habits step out onto
   the **Done shelf** under it (`DoneShelf`, one chip each); a habit logged
-  by slide lingers about a second first so its glow plays. With everything
-  logged the list becomes one "Everything is logged today." line. A past day
+  by slide lingers about a second first so its glow plays. Once today is
+  perfect, one "Everything is logged today." line sits above whatever is
+  still optional (a weekly habit's free day, a resting interval). A past day
   keeps every habit in place, since its tiles are for fixing logs.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap

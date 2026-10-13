@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// The habits Today shows for the selected day, as tiles or rows. When every
-/// habit is logged today the list gives way to one line, since the Done
-/// shelf under it already holds them and the header already offers the
-/// report.
+/// The habits Today shows for the selected day, as tiles or rows. Once today
+/// is perfect one line says so above whatever is still optional (a weekly
+/// habit's free day, a resting interval); the Done shelf under it holds the
+/// rest and the header already offers the report.
 struct TodayHabitList: View {
     let habits: [Habit]
     let layout: TodayLayout
     let selectedDate: Date
     let isPastDay: Bool
-    /// True when today's habits are all on the Done shelf.
+    /// True when every habit today expects is logged.
     let isAllDone: Bool
     let actions: (Habit) -> HabitActions
 
@@ -19,21 +19,29 @@ struct TodayHabitList: View {
     ]
 
     var body: some View {
-        if isAllDone {
-            allDone
-        } else {
-            switch layout {
-            case .tiles:
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(habits) { habit in
-                        HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            if isAllDone {
+                allDone
+            }
+            if !habits.isEmpty {
+                list
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var list: some View {
+        switch layout {
+        case .tiles:
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(habits) { habit in
+                    HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
                 }
-            case .rows:
-                LazyVStack(spacing: 8) {
-                    ForEach(habits) { habit in
-                        HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
-                    }
+            }
+        case .rows:
+            LazyVStack(spacing: 8) {
+                ForEach(habits) { habit in
+                    HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
                 }
             }
         }
