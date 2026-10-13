@@ -15,11 +15,6 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
-    @Query(sort: [SortDescriptor(\ReportTemplate.sortOrder), SortDescriptor(\ReportTemplate.createdAt)])
-    private var templates: [ReportTemplate]
-
-    @AppStorage(AppPreferences.lastTemplateID) private var lastTemplateID = ""
-
     var onAdd: () -> Void = {}
     var onShareReport: (Date) -> Void = { _ in }
 
@@ -52,14 +47,13 @@ struct ContentView: View {
 
     private var page: some View {
         let tracks = habits.map(\.track)
-        let week = DayLedger.summaries(endingOn: dayTracker.today, count: 7, tracks: tracks)
-        let selected = DayLedger.summary(on: selectedDate, tracks: tracks)
-        let todayIsPerfect = (week.last ?? selected).isPerfect
+        let week = DayLedger.summaries(endingOn: stripEnd, count: 7, tracks: tracks)
+        let todayIsPerfect = DayLedger.summary(on: dayTracker.today, tracks: tracks).isPerfect
         let streak = DayLedger.perfectStreak(tracks: tracks)
 
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                header(selected: selected, streak: streak, todayIsPerfect: todayIsPerfect)
+                topBar(streak: streak, todayIsPerfect: todayIsPerfect)
 
                 if habits.isEmpty {
                     EmptyStateCard(
@@ -70,30 +64,18 @@ struct ContentView: View {
                         buttonAction: onAdd
                     )
                 } else {
-                    WeekStrip(
-                        summaries: week,
-                        selectedDate: $selectedDate,
-                        onOpenCalendar: { showDatePicker = true }
-                    )
+                    WeekStrip(summaries: week, selectedDate: $selectedDate)
 
-                    GlassSection("Habits") {
+                    // Names the day the grid shows once it is not today.
+                    GlassSection(isViewingToday ? "Habits" : selectedDate.relativeDayName) {
                         grid
                     } accessory: {
                         Button {
                             onShareReport(selectedDate)
                         } label: {
-                            HeaderLinkLabel(isViewingToday ? "Share report" : "Share this day", icon: "square.and.arrow.up")
+                            HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
                         }
                         .buttonStyle(.textLink)
-                        .contextMenu {
-                            // A long press goes straight to a chosen template.
-                            ForEach(templates) { template in
-                                Button(template.name, systemImage: template.style.symbol) {
-                                    lastTemplateID = template.id.uuidString
-                                    onShareReport(selectedDate)
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -225,16 +207,30 @@ struct ContentView: View {
 
     // MARK: - Header
 
-    private func header(selected: DaySummary, streak: Int, todayIsPerfect: Bool) -> some View {
-        PageTitle(kicker: kicker, title: title) {
-            if !habits.isEmpty {
-                Text(progressLine(for: selected))
-                    .font(.subheadline)
-                    .foregroundStyle(selected.isPerfect ? AnyShapeStyle(AppColors.success) : AnyShapeStyle(.secondary))
-                    .contentTransition(.numericText())
-                    .motion(AppMotion.snap, value: selected.done)
+    /// The month is the date control: tap it for the calendar. The week strip
+    /// under it does the day-to-day browsing, so there is no separate title.
+    private func topBar(streak: Int, todayIsPerfect: Bool) -> some View {
+        HStack(alignment: .center) {
+            Button {
+                Haptics.light()
+                showDatePicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text(monthTitle)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                    Image(systemName: "chevron.down")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(minHeight: AppLayout.minHitTarget)
+                .contentShape(.rect)
             }
-        } accessory: {
+            .buttonStyle(GlassPressStyle())
+            .accessibilityLabel("\(monthTitle), pick a date")
+
+            Spacer(minLength: 8)
+
             HStack(spacing: 0) {
                 // The flame earns its place: with no run going it is only noise.
                 if streak > 0 {
@@ -267,31 +263,24 @@ struct ContentView: View {
             .padding(.horizontal, 2)
             .headerGlass()
         }
+        .padding(.top, 4)
     }
 
-    /// The browsed day's full date; the title already says which day it is.
-    private var kicker: String {
-        selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day())
+    /// "October", or "October 2025" outside the current year.
+    private var monthTitle: String {
+        let sameYear = Calendar.current.isDate(selectedDate, equalTo: dayTracker.today, toGranularity: .year)
+        return sameYear
+            ? selectedDate.formatted(.dateTime.month(.wide))
+            : selectedDate.formatted(.dateTime.month(.wide).year())
     }
 
-    private var title: String {
-        if isViewingToday { return "Today" }
-        if selectedDate.isYesterday { return "Yesterday" }
-        return selectedDate.formatted(.dateTime.weekday(.wide))
-    }
-
-    /// The day in one line: what is done, what is left, and on a perfect day
-    /// the run it extends. Past days say how to fix them.
-    private func progressLine(for day: DaySummary) -> String {
-        guard isViewingToday else {
-            guard day.expected > 0 else { return "Nothing was due · tap a tile to log it" }
-            return "\(day.done) of \(day.expected) done · tap a tile to fix a log"
-        }
-        guard day.expected > 0 else { return "Nothing due today" }
-        if day.isPerfect {
-            return "All \(day.expected) done · perfect day"
-        }
-        return "\(day.done) of \(day.expected) done · \(day.remaining) to go"
+    /// The last day the week strip shows: today, unless the calendar picked a
+    /// day older than the strip, in which case the strip moves back to it.
+    private var stripEnd: Date {
+        let today = dayTracker.today
+        let selected = selectedDate.startOfDay
+        guard selected < today.adding(days: -6) else { return today }
+        return min(today, selected.adding(days: 3))
     }
 
     // MARK: - Reminder signature
@@ -417,7 +406,7 @@ enum HabitSheet: Identifiable {
         ContentView()
             .background { AppBackground() }
     }
-    .modelContainer(for: [Habit.self, HabitCompletion.self, ReportTemplate.self], inMemory: true)
+    .modelContainer(for: [Habit.self, HabitCompletion.self], inMemory: true)
     .environment(HealthKitService())
     .environment(notifications)
     .environment(TimerCenter(notifications: notifications))

@@ -200,7 +200,7 @@ private struct MiniTimerBanner: View {
 #Preview {
     let notifications = NotificationService()
     return RootView()
-        .modelContainer(for: [Habit.self, HabitCompletion.self, ReportTemplate.self], inMemory: true)
+        .modelContainer(for: [Habit.self, HabitCompletion.self], inMemory: true)
         .environment(HealthKitService())
         .environment(notifications)
         .environment(TimerCenter(notifications: notifications))

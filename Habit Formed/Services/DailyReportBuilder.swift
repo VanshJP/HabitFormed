@@ -4,13 +4,13 @@ import Foundation
 /// reads SwiftData models; everything it returns is a plain value.
 enum DailyReportBuilder {
     /// - Parameters:
-    ///   - habits: every habit, in grid order. The template picks which ones.
+    ///   - habits: every habit, in grid order. Hidden ones are left off.
     ///   - liveValues: today's HealthKit readings by source, used for health
     ///     habits on today's report. Past days use the logged value.
     static func build(
         habits: [Habit],
         day: Date,
-        content: ReportContent,
+        options: ReportOptions,
         name: String,
         health: DayHealthMetrics,
         liveValues: [String: Double] = [:],
@@ -18,17 +18,15 @@ enum DailyReportBuilder {
     ) -> DailyReport {
         let day = day.startOfDay
         let isToday = day.isToday
-        let included = content.includeAllHabits
-            ? habits
-            : habits.filter { content.selectedHabitIDs.contains($0.id) }
+        let included = habits.filter { !options.hiddenHabitIDs.contains($0.id) }
         let tracks = included.map(\.track)
         let summary = DayLedger.summary(on: day, tracks: tracks)
 
-        var allItems: [DailyReport.Item] = []
+        var items: [DailyReport.Item] = []
         for (habit, track) in zip(included, tracks) {
             let status = track.status(on: day)
             guard status != .resting else { continue }
-            allItems.append(item(
+            items.append(item(
                 for: habit,
                 track: track,
                 status: status,
@@ -39,19 +37,14 @@ enum DailyReportBuilder {
             ))
         }
 
-        let listed = content.showUnfinished ? allItems : allItems.filter(\.isDone)
-
         return DailyReport(
             date: day,
             isToday: isToday,
             name: name,
-            items: listed,
-            allItems: allItems,
+            items: items,
             done: summary.done,
             expected: summary.expected,
             perfectStreak: DayLedger.perfectStreak(tracks: tracks, today: day),
-            bestStreak: DayLedger.bestPerfectStreak(tracks: tracks, today: day),
-            week: DayLedger.summaries(endingOn: day, count: 7, tracks: tracks, today: day),
             health: health
         )
     }
@@ -77,7 +70,6 @@ enum DailyReportBuilder {
             title: habit.title,
             symbol: habit.symbol,
             colorHex: habit.colorHex,
-            kind: habit.trackKind,
             status: status,
             detail: detail(
                 for: habit,

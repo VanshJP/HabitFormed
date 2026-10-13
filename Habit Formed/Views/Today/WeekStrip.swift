@@ -1,33 +1,19 @@
 import SwiftUI
 
-/// The last seven days, today on the right: the weekday, the date, and a dot
-/// for how that day went. Tap a day to browse it; the calendar button reaches
-/// anything older. Drawn straight on the canvas, so it reads as navigation
-/// rather than another card.
+/// Seven days as the Today page's date control: the weekday, the date, and a
+/// dot for how that day went. The selected day shows its count ("2/6") in
+/// place of the dot, so the page needs no separate progress line. Drawn
+/// straight on the canvas, so it reads as navigation rather than another card.
 struct WeekStrip: View {
-    /// Seven summaries, oldest first, ending today.
+    /// Seven summaries, oldest first.
     let summaries: [DaySummary]
     @Binding var selectedDate: Date
-    let onOpenCalendar: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(summaries) { day in
                 dayCell(day)
             }
-
-            Button {
-                Haptics.light()
-                onOpenCalendar()
-            } label: {
-                Image(systemName: "calendar")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, height: AppLayout.minHitTarget)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(GlassPressStyle())
-            .accessibilityLabel("Browse an older day")
         }
     }
 
@@ -59,9 +45,18 @@ struct WeekStrip: View {
                     }
                     .transaction { $0.animation = nil }
 
-                Circle()
-                    .fill(dotColor(for: day))
-                    .frame(width: 5, height: 5)
+                if isSelected && day.expected > 0 {
+                    Text("\(day.done)/\(day.expected)")
+                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(day.isPerfect ? AppColors.success : Color.white.opacity(0.8))
+                        .contentTransition(.numericText(value: Double(day.done)))
+                        .frame(height: 12)
+                } else {
+                    Circle()
+                        .fill(dotColor(for: day))
+                        .frame(width: 5, height: 5)
+                        .frame(height: 12)
+                }
             }
             .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
             .contentShape(.rect)

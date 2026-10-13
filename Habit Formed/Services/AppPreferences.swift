@@ -12,8 +12,14 @@ nonisolated enum AppPreferences {
     /// The name printed on daily report cards so a forwarded card still says
     /// whose day it was.
     static let reporterName = "report.name"
-    /// The template the report sheet opened on last.
-    static let lastTemplateID = "report.lastTemplateID"
+    /// Daily report choices, kept so the next report starts the same way.
+    static let reportTheme = "report.theme"
+    static let reportHiddenHabits = "report.hiddenHabits"
+    static let reportShowStreaks = "report.showStreaks"
+    static let reportShowNotes = "report.showNotes"
+    static let reportShowWeek = "report.showWeek"
+    static let reportShowCalories = "report.showCalories"
+    static let reportShowActivity = "report.showActivity"
     /// Evening nudge to send the day's report.
     static let reportReminderEnabled = "report.reminder.enabled"
     static let reportReminderHour = "report.reminder.hour"

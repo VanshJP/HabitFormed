@@ -2,88 +2,335 @@ import SwiftUI
 
 // MARK: - Report Card
 
-/// The shareable card for one day, drawn in the template's style. Rendered to
-/// an image with `ImageRenderer`, so it uses painted fills only: Liquid Glass
-/// and materials do not survive the renderer.
+/// The shareable card for one day: who and when, how much got done, every
+/// included habit, and whatever extras are switched on. Rendered to an image
+/// with `ImageRenderer`, so it uses painted fills only (no glass).
 ///
-/// Fixed at `width` points with Dynamic Type pinned, so a card looks the same
-/// on every phone it is forwarded to.
+/// Fixed at `width` points with Dynamic Type pinned, so the card looks the
+/// same on every phone it is forwarded to.
 struct ReportCardView: View {
     let report: DailyReport
-    let content: ReportContent
+    let options: ReportOptions
 
     static let width: CGFloat = 390
-    /// Rows listed before "+N more", so a long habit list keeps the card a
-    /// sensible height in a chat.
-    static let maxItems = 10
+    /// Rows listed before "+N more", so a long list keeps the card a sensible
+    /// height in a chat.
+    static let maxItems = 12
 
-    var body: some View {
-        Group {
-            switch content.style {
-            case .scoreboard: ScoreboardCard(report: report, content: content)
-            case .fuel: FuelCard(report: report, content: content)
-            case .checkIn: CheckInCard(report: report, content: content)
-            case .streak: StreakCard(report: report, content: content)
-            case .receipt: ReceiptCard(report: report, content: content)
-            case .clean: CleanCard(report: report, content: content)
-            case .week: WeekGridCard(report: report, content: content)
-            }
-        }
-        .frame(width: Self.width)
-        .environment(\.dynamicTypeSize, .large)
-        .environment(\.colorScheme, .dark)
-    }
-}
-
-// MARK: - Shared: canvas
-
-/// The dark styles' poster: the template's canvas at full intensity with the
-/// content inset over it.
-struct DarkCardFrame<Content: View>: View {
-    let content: ReportContent
-    let inner: Content
-
-    init(content: ReportContent, @ViewBuilder _ inner: () -> Content) {
-        self.content = content
-        self.inner = inner()
-    }
+    private var palette: ReportPalette { ReportPalette(theme: options.theme) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            inner
+            header
+            hero
+            habitList
+            if options.showCalories {
+                calories
+            }
+            if options.showActivity {
+                activity
+            }
+            note
+            HabitFormedMark(tint: palette.accent, ink: palette.faint)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 28)
-        .frame(width: ReportCardView.width, alignment: .leading)
-        .background {
-            CanvasLookView(look: content.theme.look, mood: .session, tone: .primary)
+        .frame(width: Self.width, alignment: .leading)
+        .background { background }
+        .environment(\.dynamicTypeSize, .large)
+        .environment(\.colorScheme, palette.isLight ? .light : .dark)
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if let look = options.theme.look {
+            CanvasLookView(look: look, mood: .session)
+        } else {
+            palette.paper
         }
     }
-}
 
-// MARK: - Shared: header and footer
+    // MARK: - Header and hero
 
-/// Whose day, which day, and the app's mark. The name matters most: a card
-/// forwarded twice still says whose report it is.
-struct ReportHeader: View {
-    let report: DailyReport
-    let accent: Color
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(report.name.isEmpty ? "Daily report" : report.name)
+                .font(.title3.bold())
+                .foregroundStyle(palette.ink)
+            Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                .font(.subheadline)
+                .foregroundStyle(palette.secondary)
+        }
+    }
 
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(report.name.isEmpty ? "Daily report" : report.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.55))
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 18) {
+            ProgressRing(
+                fraction: report.fraction,
+                lineWidth: 10,
+                color: report.isPerfect ? AppColors.success : palette.accent
+            ) {
+                Text("\(report.done)/\(report.expected)")
+                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(palette.ink)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
             }
-            Spacer(minLength: 8)
-            HabitFormedMark(tint: accent, ink: .white.opacity(0.7))
+            .frame(width: 100, height: 100)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(report.verdict)
+                    .font(.title2.bold())
+                    .foregroundStyle(palette.ink)
+                Text("\(report.percentText) of the day")
+                    .font(.subheadline)
+                    .foregroundStyle(palette.secondary)
+                if options.showStreaks, report.perfectStreak > 0 {
+                    HStack(spacing: 6) {
+                        StreakFlameGlyph(heat: .of(streak: report.perfectStreak, doneToday: report.isPerfect))
+                            .frame(height: 15)
+                        Text(report.perfectStreak == 1 ? "1 perfect day" : "\(report.perfectStreak) perfect days in a row")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(palette.ink.opacity(0.85))
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Habits
+
+    private var habitList: some View {
+        let shown = Array(report.items.prefix(Self.maxItems))
+        let hidden = report.items.count - shown.count
+
+        return VStack(alignment: .leading, spacing: 0) {
+            if shown.isEmpty {
+                Text("No habits on this card.")
+                    .font(.subheadline)
+                    .foregroundStyle(palette.secondary)
+                    .padding(.vertical, 12)
+            }
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
+                if index > 0 {
+                    Rectangle()
+                        .fill(palette.rule)
+                        .frame(height: 0.5)
+                        .padding(.leading, 34)
+                }
+                row(item)
+            }
+            if hidden > 0 {
+                Text("+\(hidden) more")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.secondary)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 34)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+        .background(palette.well, in: .rect(cornerRadius: AppLayout.tileRadius, style: .continuous))
+    }
+
+    private func row(_ item: DailyReport.Item) -> some View {
+        let tint = palette.habitTint(item.colorHex)
+
+        return HStack(alignment: .center, spacing: 10) {
+            Image(systemName: item.symbol)
+                .font(.body.weight(.medium))
+                .foregroundStyle(tint)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(palette.ink.opacity(item.isDone ? 1 : 0.65))
+                    .lineLimit(1)
+                if let line = detailLine(item) {
+                    Text(line)
+                        .font(.caption)
+                        .foregroundStyle(palette.secondary)
+                        .lineLimit(1)
+                }
+                if options.showNotes, let note = item.note {
+                    Text("“\(note)”")
+                        .font(.caption.italic())
+                        .foregroundStyle(palette.ink.opacity(0.8))
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            if options.showWeek {
+                HStack(spacing: 3) {
+                    ForEach(Array(item.week.enumerated()), id: \.offset) { _, logged in
+                        Circle()
+                            .fill(logged ? tint : palette.rule)
+                            .frame(width: 5, height: 5)
+                    }
+                }
+            }
+
+            statusMark(item.status, tint: tint)
+        }
+        .padding(.vertical, 9)
+    }
+
+    private func detailLine(_ item: DailyReport.Item) -> String? {
+        var parts: [String] = []
+        if let detail = item.detail { parts.append(detail) }
+        if options.showStreaks, item.streak > 0 {
+            parts.append("\(item.streak) \(item.streakUnit)")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Done is the habit's colour; open is a dashed ring; missed is a quiet
+    /// cross; a flexible weekly day is a dash.
+    private func statusMark(_ status: DayStatus, tint: Color) -> some View {
+        Group {
+            switch status {
+            case .done:
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(tint)
+            case .open:
+                Image(systemName: "circle.dashed").foregroundStyle(palette.faint)
+            case .missed:
+                Image(systemName: "xmark.circle").foregroundStyle(AppColors.error.opacity(0.85))
+            case .flexible, .resting:
+                Image(systemName: "minus.circle").foregroundStyle(palette.faint)
+            }
+        }
+        .font(.system(size: 20, weight: .semibold))
+    }
+
+    // MARK: - Extras
+
+    private var calories: some View {
+        let health = report.health
+        let net = health.netKcal
+
+        return HStack(spacing: 0) {
+            calorieColumn("Eaten", ReportFormat.kcal(health.eatenKcal), tint: palette.ink)
+            columnRule
+            calorieColumn("Burned", ReportFormat.kcal(health.burnedKcal), tint: palette.ink)
+            columnRule
+            calorieColumn(
+                net.map { $0 <= 0 ? "Deficit" : "Surplus" } ?? "Net",
+                ReportFormat.signedKcal(net),
+                tint: net.map { $0 <= 0 ? AppColors.success : AppColors.warning } ?? palette.ink
+            )
+        }
+        .padding(.vertical, 12)
+        .background(palette.well, in: .rect(cornerRadius: AppLayout.tileRadius, style: .continuous))
+    }
+
+    private var columnRule: some View {
+        Rectangle().fill(palette.rule).frame(width: 0.5, height: 30)
+    }
+
+    private func calorieColumn(_ label: String, _ value: String, tint: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .eyebrowStyle(palette.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private struct ActivityChip: Identifiable {
+        let icon: String
+        let text: String
+        var id: String { icon }
+    }
+
+    private var activityChips: [ActivityChip] {
+        let health = report.health
+        var chips: [ActivityChip] = []
+        if let steps = health.steps { chips.append(ActivityChip(icon: "figure.walk", text: "\(ReportFormat.count(steps)) steps")) }
+        if let exercise = health.exerciseMinutes { chips.append(ActivityChip(icon: "figure.run", text: ReportFormat.minutes(exercise))) }
+        if let sleep = health.sleepHours { chips.append(ActivityChip(icon: "bed.double.fill", text: "\(ReportFormat.hours(sleep)) sleep")) }
+        if let mindful = health.mindfulMinutes { chips.append(ActivityChip(icon: "brain.head.profile", text: "\(ReportFormat.minutes(mindful)) mindful")) }
+        return chips
+    }
+
+    @ViewBuilder
+    private var activity: some View {
+        let chips = activityChips
+        if !chips.isEmpty {
+            FlowLayout(spacing: 6) {
+                ForEach(chips) { chip in
+                    HStack(spacing: 5) {
+                        Image(systemName: chip.icon)
+                            .font(.caption2.weight(.semibold))
+                        Text(chip.text)
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(palette.ink.opacity(0.85))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(palette.well, in: Capsule())
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var note: some View {
+        let text = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(palette.accent)
+                    .frame(width: 3)
+                Text(text)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(palette.ink.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
+
+// MARK: - Palette
+
+/// Ink, wells and accents for a theme: white on the canvases, near-black on
+/// paper.
+struct ReportPalette {
+    let isLight: Bool
+
+    init(theme: ReportTheme) {
+        isLight = theme.look == nil
+    }
+
+    var paper: Color { Color(red: 0.984, green: 0.980, blue: 0.965) }
+    var ink: Color { isLight ? AppColors.inkOnLight : .white }
+    var secondary: Color { ink.opacity(isLight ? 0.6 : 0.55) }
+    var faint: Color { ink.opacity(isLight ? 0.4 : 0.45) }
+    var well: Color { isLight ? AppColors.inkOnLight.opacity(0.05) : Color.white.opacity(0.07) }
+    var rule: Color { isLight ? AppColors.inkOnLight.opacity(0.12) : Color.white.opacity(0.12) }
+    var accent: Color { isLight ? AppColors.primary : AppColors.brandBright }
+
+    /// A habit's colour, lifted on dark canvases and kept deep on paper so it
+    /// clears contrast either way.
+    func habitTint(_ hex: String) -> Color {
+        let color = Color(hex: hex)
+        return isLight ? color : color.glyphTone
+    }
+}
+
+// MARK: - Mark
 
 /// The app's small wordmark: a hexagon grid glyph and the name.
 struct HabitFormedMark: View {
@@ -102,282 +349,6 @@ struct HabitFormedMark: View {
     }
 }
 
-/// The template's closing line, if it has one.
-struct ReportFooter: View {
-    let text: String
-    var ink: Color = .white.opacity(0.45)
-
-    var body: some View {
-        if !text.isEmpty {
-            Text(text)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ink)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-        }
-    }
-}
-
-/// The template's message as a quoted line.
-struct ReportMessage: View {
-    let text: String
-    let accent: Color
-
-    var body: some View {
-        if !text.isEmpty {
-            HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(accent)
-                    .frame(width: 3)
-                Text(text)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-// MARK: - Shared: items
-
-/// One habit on a dark card: glyph, name, its detail and note, the week's
-/// dots if asked for, and a done / open / missed mark.
-struct ReportItemRow: View {
-    let item: DailyReport.Item
-    let content: ReportContent
-
-    private var tint: Color { Color(hex: item.colorHex) }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: item.symbol)
-                .font(.body.weight(.medium))
-                .foregroundStyle(tint.glyphTone)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(item.isDone ? 1 : 0.7))
-                    .lineLimit(1)
-                if let line = detailLine {
-                    Text(line)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
-                }
-                if content.showNotes, let note = item.note {
-                    Text("“\(note)”")
-                        .font(.caption.italic())
-                        .foregroundStyle(.white.opacity(0.8))
-                        .lineLimit(2)
-                }
-            }
-
-            Spacer(minLength: 6)
-
-            if content.showWeek {
-                ReportWeekDots(days: item.week, tint: tint)
-            }
-
-            ReportStatusMark(status: item.status, tint: tint)
-        }
-        .padding(.vertical, 9)
-    }
-
-    private var detailLine: String? {
-        var parts: [String] = []
-        if let detail = item.detail { parts.append(detail) }
-        if content.showStreaks, item.streak > 0 {
-            parts.append("\(item.streak) \(item.streakUnit)")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-}
-
-/// Done is the habit's colour, filled; open is a dashed ring; missed is a
-/// quiet cross; a flexible weekly day is a dash.
-struct ReportStatusMark: View {
-    let status: DayStatus
-    let tint: Color
-    var size: CGFloat = 20
-
-    var body: some View {
-        Group {
-            switch status {
-            case .done:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(tint.glyphTone)
-            case .open:
-                Image(systemName: "circle.dashed")
-                    .foregroundStyle(.white.opacity(0.45))
-            case .missed:
-                Image(systemName: "xmark.circle")
-                    .foregroundStyle(AppColors.error.opacity(0.85))
-            case .flexible, .resting:
-                Image(systemName: "minus.circle")
-                    .foregroundStyle(.white.opacity(0.35))
-            }
-        }
-        .font(.system(size: size, weight: .semibold))
-    }
-}
-
-/// Seven small dots, oldest first.
-struct ReportWeekDots: View {
-    let days: [Bool]
-    let tint: Color
-    var empty: Color = .white.opacity(0.18)
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(Array(days.enumerated()), id: \.offset) { _, logged in
-                Circle()
-                    .fill(logged ? tint.glyphTone : empty)
-                    .frame(width: 5, height: 5)
-            }
-        }
-    }
-}
-
-/// The listed habits on one painted panel, with "+N more" past the cap.
-struct ReportItemList: View {
-    let report: DailyReport
-    let content: ReportContent
-
-    var body: some View {
-        let shown = Array(report.items.prefix(ReportCardView.maxItems))
-        let hidden = report.items.count - shown.count
-
-        VStack(alignment: .leading, spacing: 0) {
-            if shown.isEmpty {
-                Text(content.showUnfinished ? "No habits for this day." : "Nothing logged yet.")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.55))
-                    .padding(.vertical, 10)
-            }
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
-                if index > 0 {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.07))
-                        .frame(height: 0.5)
-                        .padding(.leading, 34)
-                }
-                ReportItemRow(item: item, content: content)
-            }
-            if hidden > 0 {
-                Text("+\(hidden) more")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .padding(.top, 8)
-                    .padding(.leading, 34)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background {
-            RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-                }
-        }
-    }
-}
-
-// MARK: - Shared: health
-
-/// Activity numbers as small chips, only the ones Health had.
-struct ReportActivityChips: View {
-    let health: DayHealthMetrics
-
-    private struct Chip: Identifiable {
-        let icon: String
-        let text: String
-        var id: String { icon }
-    }
-
-    private var chips: [Chip] {
-        var list: [Chip] = []
-        if let steps = health.steps { list.append(Chip(icon: "figure.walk", text: "\(ReportFormat.count(steps)) steps")) }
-        if let exercise = health.exerciseMinutes { list.append(Chip(icon: "figure.run", text: ReportFormat.minutes(exercise))) }
-        if let sleep = health.sleepHours { list.append(Chip(icon: "bed.double.fill", text: "\(ReportFormat.hours(sleep)) sleep")) }
-        if let mindful = health.mindfulMinutes { list.append(Chip(icon: "brain.head.profile", text: "\(ReportFormat.minutes(mindful)) mindful")) }
-        return list
-    }
-
-    var body: some View {
-        if !chips.isEmpty {
-            FlowLayout(spacing: 6) {
-                ForEach(chips) { chip in
-                    HStack(spacing: 5) {
-                        Image(systemName: chip.icon)
-                            .font(.caption2.weight(.semibold))
-                        Text(chip.text)
-                            .font(.caption.weight(.semibold))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.white.opacity(0.08)))
-                }
-            }
-        }
-    }
-}
-
-/// Eaten, burned and net in one line of three numbers.
-struct ReportCalorieStrip: View {
-    let health: DayHealthMetrics
-    let goal: Double
-    let accent: Color
-
-    var body: some View {
-        HStack(spacing: 0) {
-            column("Eaten", ReportFormat.kcal(health.eatenKcal))
-            divider
-            column("Burned", ReportFormat.kcal(health.burnedKcal))
-            divider
-            column(netLabel, ReportFormat.signedKcal(health.netKcal), tint: netTint)
-        }
-        .padding(.vertical, 12)
-        .background {
-            RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-        }
-    }
-
-    private var netLabel: String {
-        guard let net = health.netKcal else { return "Net" }
-        return net <= 0 ? "Deficit" : "Surplus"
-    }
-
-    private var netTint: Color {
-        guard let net = health.netKcal else { return .white }
-        return net <= 0 ? AppColors.success : AppColors.warning
-    }
-
-    private var divider: some View {
-        Rectangle().fill(Color.white.opacity(0.08)).frame(width: 0.5, height: 30)
-    }
-
-    private func column(_ label: String, _ value: String, tint: Color = .white) -> some View {
-        VStack(spacing: 3) {
-            Text(value)
-                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .eyebrowStyle(Color.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 // MARK: - Previews
 
 #if DEBUG
@@ -386,38 +357,42 @@ extension DailyReport {
     static var sample: DailyReport {
         func item(_ title: String, _ symbol: String, _ hex: String, _ status: DayStatus, _ detail: String?, _ streak: Int, note: String? = nil) -> Item {
             Item(
-                id: UUID(), title: title, symbol: symbol, colorHex: hex, kind: .manual, status: status,
+                id: UUID(), title: title, symbol: symbol, colorHex: hex, status: status,
                 detail: detail, streak: streak, streakUnit: streak == 1 ? "day" : "days", note: note,
                 week: [true, true, false, true, true, true, status == .done]
             )
         }
-        let items = [
-            item("Read", "book.fill", "#5966A6", .done, nil, 12, note: "Finished chapter 4"),
-            item("Practice piano", "pianokeys", "#8C5C84", .done, "30 min", 5),
-            item("10k steps", "figure.walk", "#2BA8A8", .done, "11.2k of 10k steps", 3),
-            item("Meditate", "brain.head.profile", "#739F80", .open, "10 min", 0),
-            item("Workout", "dumbbell.fill", "#BF7866", .flexible, "2/4 this week", 2),
-        ]
-        let week = (0..<7).map { offset in
-            DaySummary(date: Date().adding(days: offset - 6), done: offset == 3 ? 2 : 4, expected: 4)
-        }
         return DailyReport(
-            date: Date(), isToday: true, name: "Vansh", items: items, allItems: items,
-            done: 3, expected: 4, perfectStreak: 4, bestStreak: 9, week: week,
+            date: Date(),
+            isToday: true,
+            name: "Vansh",
+            items: [
+                item("Read", "book.fill", "#5966A6", .done, nil, 12, note: "Finished chapter 4"),
+                item("Practice piano", "pianokeys", "#8C5C84", .done, "30 min", 5),
+                item("10k steps", "figure.walk", "#2BA8A8", .done, "11.2k of 10k steps", 3),
+                item("Meditate", "brain.head.profile", "#739F80", .open, "10 min", 0),
+                item("Workout", "dumbbell.fill", "#BF7866", .flexible, "2/4 this week", 2),
+            ],
+            done: 3,
+            expected: 4,
+            perfectStreak: 4,
             health: DayHealthMetrics(
                 steps: 11_240, activeKcal: 610, restingKcal: 1_790, eatenKcal: 1_850,
                 exerciseMinutes: 42, sleepHours: 7.4, mindfulMinutes: nil,
-                protein: 128, carbs: 190, fat: 62
+                protein: nil, carbs: nil, fat: nil
             )
         )
     }
 }
 
-#Preview("All styles") {
+#Preview("Themes") {
     ScrollView {
         VStack(spacing: 24) {
-            ForEach(ReportPreset.all) { preset in
-                ReportCardView(report: .sample, content: preset.content)
+            ForEach(ReportTheme.allCases) { theme in
+                ReportCardView(
+                    report: .sample,
+                    options: ReportOptions(theme: theme, showCalories: true, showActivity: true, note: "Rest day tomorrow.")
+                )
             }
         }
         .padding()

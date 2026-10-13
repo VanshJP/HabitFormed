@@ -135,8 +135,8 @@ extension Color {
 // MARK: - Hex
 
 extension Color {
-    /// Nonisolated so value types such as `ReportContent` can resolve a stored
-    /// hex off the main actor.
+    /// Nonisolated so plain value types can resolve a stored hex off the main
+    /// actor.
     nonisolated init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0

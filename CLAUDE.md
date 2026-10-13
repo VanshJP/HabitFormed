@@ -9,7 +9,8 @@ is SpeakUp's design system, ported (deep-navy canvas, Liquid Glass plates,
 colour only in data and identity, one loud CTA per screen). Inspired
 functionally by the Streaks app: a small grid of tiles, each representing one
 habit, with streak counts and 7-day completion dots. The signature feature is
-the **daily report**: a customizable card plus text that you send to friends.
+the **daily report**: one card plus text that you send to friends, with a
+theme and switches for what to leave out.
 
 - **Platform:** iOS 26.0+ (single target, iPhone + iPad).
 - **Language:** Swift 5 with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
@@ -17,10 +18,11 @@ the **daily report**: a customizable card plus text that you send to friends.
   `nonisolated` (see `DayLedger`, `DailyReport`, `ReportContent`).
 - **UI:** SwiftUI. UIKit only for haptics (`Extensions/Haptics.swift`), the
   share sheet (`SharePresenter`), and Messages (`MessageComposer`).
-- **Persistence:** SwiftData (`@Model`): `Habit`, `HabitCompletion`,
-  `ReportTemplate`. Do **not** introduce CoreData, `FileManager`, or
-  `UserDefaults` for habit data. Preferences (app look, report name, report
-  reminder) use `@AppStorage` with keys in `Services/AppPreferences.swift`.
+- **Persistence:** SwiftData (`@Model`): `Habit`, `HabitCompletion`. Do
+  **not** introduce CoreData, `FileManager`, or `UserDefaults` for habit
+  data. Preferences (app look, report name, report theme and switches,
+  report reminder) use `@AppStorage` with keys in
+  `Services/AppPreferences.swift`.
 - **Health data:** HealthKit, wrapped in `Services/HealthKitService.swift`
   (`@Observable`, injected via `.environment`).
 
@@ -46,9 +48,9 @@ are needed when adding new Swift files.
 
 ```
 Habit Formed/
-├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion, ReportTemplate) + services
-├── ContentView.swift         # Today tab: header with progress line, week strip, tile grid, undo toast
-├── Models/                   # Habit, HabitCompletion, ReportTemplate (+ presets), DayLedger
+├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
+├── ContentView.swift         # Today tab: month control, week strip, tile grid, undo toast
+├── Models/                   # Habit, HabitCompletion, DayLedger, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, report builder/renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
@@ -58,7 +60,7 @@ Habit Formed/
     ├── Today/                # WeekStrip, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
-    ├── Report/               # DailyReportSheet, ReportTemplateEditor, ReportCardView + styles
+    ├── Report/               # DailyReportSheet, ReportCardView
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
@@ -73,14 +75,14 @@ Habit Formed/
 `RootView` hosts two tabs, each with no navigation bar (the page title is
 the header):
 
-- **Today**: `ContentView`. `PageTitle` with the browsed day's progress as
-  one line ("2 of 6 done · 4 to go") and a capsule holding the perfect-day
-  `StreakChip` (only once a streak exists), add (+) and Settings (gear,
-  pushed). Under it the `WeekStrip` (last 7 days as dates with a completion
-  dot, drawn on the canvas; tap to browse, calendar for older), then the
-  "Habits" section whose header carries the "Share report" link (long-press
-  it to jump to a template). Keep the top of Today light: progress is said
-  once, in the header line.
+- **Today**: `ContentView`. No page title: the top row is the month
+  ("October ⌄", which opens the calendar) and a capsule holding the
+  perfect-day `StreakChip` (only once a streak exists), add (+) and Settings
+  (gear, pushed). Under it the `WeekStrip` is the date control: 7 days drawn
+  on the canvas, a completion dot under each, and the selected day's count
+  ("2/6") in place of its dot. Then the grid's section, titled "Habits" for
+  today or the browsed day's name, with the "Share report" link. Progress is
+  said once, in the strip.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap
   opens the detail sheet); Log is day by day, each day header carrying a
@@ -132,25 +134,23 @@ already logged today). Closing before completion does **not** log.
 
 ### Daily report
 
-- `ReportTemplate` (SwiftData) holds one way of reporting a day: a
-  `ReportStyle` layout (scoreboard, receipt, fuel, check-in, streak, clean,
-  week grid),
-  a `ReportTheme` canvas, an accent, words (title, message, footer, caption)
-  and toggles (which habits, unfinished, streaks, 7-day dots, notes,
-  perfect-day streak, calories, activity). `ReportPreset.all` seeds one
-  template per preset the first time the sheet opens.
-- Words accept tokens (`ReportToken.all`: `{name}`, `{done}`, `{total}`,
-  `{checklist}`, `{eaten}`, `{net}`...), expanded by `ReportText` at send
-  time. The editor offers them on the keyboard bar while a word field has
-  focus.
-- `DailyReportBuilder` turns habits + a template into a `DailyReport` value;
+Keep it simple: one report, everything on by default, switches to take
+things out. No templates, layouts or placeholder tokens.
+
+- `ReportOptions` is the whole configuration: a `ReportTheme` (six canvases
+  or paper), hidden habits, and switches for streaks, notes, last 7 days,
+  calories in vs out, and activity. The sheet keeps them in `@AppStorage`;
+  the optional note is for one card only.
+- `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
-  (no glass: `ImageRenderer` cannot draw it); `ReportCardRenderer` renders
-  it (scale 2 for previews, 3 for sending).
-- `DailyReportSheet` previews the exact output in three kinds (Card, Story
-  for a 9:16 Instagram or Snapchat story via `ReportStoryView`, or Text),
-  then Save / Copy / Text it (`MessageComposer`, Messages with the image
-  attached) / Share (`SharePresenter`). The card prints the reporter's name
+  (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
+  on canvas or paper; `ReportCardRenderer` renders it (scale 2 for the
+  preview, 3 for sending). `ReportText.caption` writes the message that goes
+  with it.
+- `DailyReportSheet`: live preview, theme row, "Habits" and "Also show"
+  switches, a note, then Text it (`MessageComposer`, Messages with the image
+  attached) and Share (`SharePresenter`; Save and Copy live in the share
+  sheet). The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
@@ -205,12 +205,11 @@ The design system is SpeakUp's; when in doubt, match
   `HealthKitService.todayValue(for:)`. Report-only numbers live in
   `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`.
 - **SwiftData:** persist enums as `String` raw values (`frequencyRaw`,
-  `sourceRaw`, `styleRaw`, `themeRaw`) with a computed property exposing
-  the enum. New stored properties always get a default so lightweight
+  `sourceRaw`) with a computed property exposing the enum. New stored properties always get a default so lightweight
   migration keeps working.
 - **Dark mode only:** the app is locked to `.preferredColorScheme(.dark)`.
-  Do not introduce light-mode color variants (the Clean and Receipt report
-  cards are paper on purpose; they are images, not UI).
+  Do not introduce light-mode color variants (the Paper report theme is
+  light on purpose; it is an image, not UI).
 
 ## Editing rules for AI agents
 
@@ -225,8 +224,8 @@ The design system is SpeakUp's; when in doubt, match
 5. **Don't create README/docs files** unless asked. CLAUDE.md is the
    sanctioned doc surface.
 6. **Tests:** there is no test target yet. If adding logic that benefits
-   from tests (streak math, `DayLedger`, `ReportText` token expansion,
-   HealthKit value mapping), surface the suggestion to the user before
+   from tests (streak math, `DayLedger`, `ReportText`, HealthKit value
+   mapping), surface the suggestion to the user before
    scaffolding a target.
 
 ## Known gaps / future work
@@ -242,4 +241,3 @@ The design system is SpeakUp's; when in doubt, match
   taps route through `NotificationRouter`, as does the report reminder.
   Time Sensitive entitlement is intentionally unused (`.active` level
   everywhere).
-- The report card's barcode is decorative, not scannable.

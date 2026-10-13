@@ -34,7 +34,6 @@ struct Habit_FormedApp: App {
         let schema = Schema([
             Habit.self,
             HabitCompletion.self,
-            ReportTemplate.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
