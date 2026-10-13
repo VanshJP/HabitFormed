@@ -1,13 +1,18 @@
 import SwiftUI
 
-/// Seven days as the Today page's date control: the weekday, the date, and a
-/// dot for how that day went. The selected day shows its count ("2/6") in
-/// place of the dot, so the page needs no separate progress line. Drawn
-/// straight on the canvas, so it reads as navigation rather than another card.
+/// Seven days as the Today page's date control, in one row. Each day is its
+/// weekday and date inside a ring that fills as the day's habits are logged
+/// and closes green on a perfect day. The selected day sits on a soft fill
+/// rather than solid white, so the strip stays quieter than the tiles under
+/// it; its count lives in the grid's header. Drawn straight on the canvas, so
+/// it reads as navigation rather than another card.
 struct WeekStrip: View {
     /// Seven summaries, oldest first.
     let summaries: [DaySummary]
     @Binding var selectedDate: Date
+
+    private let ringSize: CGFloat = 44
+    private let lineWidth: CGFloat = 3
 
     var body: some View {
         HStack(spacing: 0) {
@@ -15,6 +20,9 @@ struct WeekStrip: View {
                 dayCell(day)
             }
         }
+        // Seven 44pt rings fill an iPhone row; larger text would push the
+        // letters out of them.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 
     private func dayCell(_ day: DaySummary) -> some View {
@@ -26,38 +34,27 @@ struct WeekStrip: View {
             Haptics.selection()
             withAnimation(AppMotion.snap) { selectedDate = day.date }
         } label: {
-            VStack(spacing: 6) {
-                Text(day.date.formatted(.dateTime.weekday(.narrow)))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            ZStack {
+                ring(for: day)
 
-                Text(day.date.formatted(.dateTime.day()))
-                    .font(.subheadline.weight(isSelected || isToday ? .bold : .medium).monospacedDigit())
-                    .foregroundStyle(isSelected ? AppColors.inkOnLight : Color.white.opacity(isToday ? 1 : 0.8))
-                    .frame(width: 34, height: 34)
-                    .background {
-                        // Selection is a hard cut, never an animated fill.
-                        if isSelected {
-                            Circle().fill(AppColors.solidWhite)
-                        } else if isToday {
-                            Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
-                        }
-                    }
+                // Selection is a hard cut, never an animated fill.
+                Circle()
+                    .fill(Color.white.opacity(isSelected ? 0.16 : 0))
+                    .padding(lineWidth + 2)
                     .transaction { $0.animation = nil }
 
-                if isSelected && day.expected > 0 {
-                    Text("\(day.done)/\(day.expected)")
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(day.isPerfect ? AppColors.success : Color.white.opacity(0.85))
-                        .contentTransition(.numericText(value: Double(day.done)))
-                        .frame(height: 16)
-                } else {
-                    Circle()
-                        .fill(dotColor(for: day))
-                        .frame(width: 5, height: 5)
-                        .frame(height: 16)
+                VStack(spacing: 0) {
+                    Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(isSelected || isToday ? Color.white.opacity(0.8) : Color.secondary)
+                    Text(day.date.formatted(.dateTime.day()))
+                        .font(.subheadline.weight(isSelected || isToday ? .bold : .medium).monospacedDigit())
+                        .foregroundStyle(Color.white.opacity(isSelected || isToday ? 1 : 0.8))
                 }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             }
+            .frame(width: ringSize, height: ringSize)
             .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
             .contentShape(.rect)
         }
@@ -66,14 +63,28 @@ struct WeekStrip: View {
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// Green for a perfect day, the progress ramp for a partial one, a faint
-    /// dot for a day with nothing logged, and nothing for a day that asked
-    /// nothing.
-    private func dotColor(for day: DaySummary) -> Color {
-        guard day.expected > 0 else { return .clear }
-        if day.isPerfect { return AppColors.success }
-        if day.done == 0 { return Color.white.opacity(day.date.isToday ? 0 : 0.18) }
-        return AppColors.progressColor(for: day.fraction)
+    /// A faint track for a day that expected something, filled by the share
+    /// logged. A day that asked nothing has no ring at all.
+    @ViewBuilder
+    private func ring(for day: DaySummary) -> some View {
+        if day.expected > 0 {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.12), lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: day.fraction)
+                    .stroke(ringColor(for: day), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .opacity(day.done > 0 ? 1 : 0)
+            }
+            .padding(lineWidth / 2)
+            .motion(AppMotion.settle, value: day.done)
+        }
+    }
+
+    /// Green for a perfect day, the progress ramp for a partial one.
+    private func ringColor(for day: DaySummary) -> Color {
+        day.isPerfect ? AppColors.success : AppColors.progressColor(for: day.fraction)
     }
 
     private func accessibilityLabel(for day: DaySummary) -> String {

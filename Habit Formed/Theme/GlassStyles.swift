@@ -114,24 +114,36 @@ extension View {
 // MARK: - Glass Section Header
 
 /// A page chapter's name. Text only, headline weight, with an optional
-/// trailing fact (`HeaderMeta`) or door (`HeaderLinkLabel`).
+/// detail right after it ("2 of 6 done") and an optional trailing fact
+/// (`HeaderMeta`) or door (`HeaderLinkLabel`).
 struct GlassSectionHeader<Accessory: View>: View {
     let title: String
+    var detail: String?
     var accessory: Accessory
 
-    init(_ title: String, @ViewBuilder accessory: () -> Accessory) {
+    init(_ title: String, detail: String? = nil, @ViewBuilder accessory: () -> Accessory) {
         self.title = title
+        self.detail = detail
         self.accessory = accessory()
     }
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .accessibilityAddTraits(.isHeader)
+                if let detail {
+                    Text(detail)
+                        .font(.subheadline.weight(.medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                }
+            }
             Spacer()
             accessory
         }
@@ -206,10 +218,11 @@ struct GlassSection<Accessory: View, Content: View>: View {
 
     init(
         _ title: String,
+        detail: String? = nil,
         @ViewBuilder content: () -> Content,
         @ViewBuilder accessory: () -> Accessory
     ) {
-        self.header = GlassSectionHeader(title, accessory: accessory)
+        self.header = GlassSectionHeader(title, detail: detail, accessory: accessory)
         self.content = content()
     }
 

@@ -78,13 +78,15 @@ the header):
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄", which opens the calendar) and a capsule holding the
   perfect-day `StreakChip` (only once a streak exists), add (+) and Settings
-  (gear, pushed). Under it the `WeekStrip` is the date control: 7 days drawn
-  on the canvas, a completion dot under each, and the selected day's count
-  ("2/6") in place of its dot. Strip taps only change the selected day; the
-  strip itself moves only when the calendar picks an older day
-  (`stripAnchor`). Then the grid's section, titled "Habits" for today or the
-  browsed day's name, with "Share report" (and a "Today" link while browsing
-  another day). Progress is said once, in the strip.
+  (gear, pushed). Right under it the `WeekStrip` is the date control: one
+  row of 7 rings drawn on the canvas, each holding its weekday and date and
+  filling as that day's habits are logged (closed and green on a perfect
+  day). The selected day sits on a soft fill, never solid white. Strip taps
+  only change the selected day; the strip itself moves only when the
+  calendar picks an older day (`stripAnchor`). Then the grid's section,
+  titled "Habits" for today or the browsed day's name, with the day's count
+  beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
+  while browsing another day). Progress is said once, in that header.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap
   opens the detail sheet); Log is day by day, each day header carrying a
@@ -185,12 +187,14 @@ The design system is SpeakUp's; when in doubt, match
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);
   words-only buttons use `.buttonStyle(.textLink)`. Selected chips and
-  segments are solid white with `AppColors.inkOnLight` text.
+  segments are solid white with `AppColors.inkOnLight` text. The week
+  strip is the exception: its selected day is a soft 0.16 white fill.
 - **Type:** text styles that scale (`.subheadline.weight(.semibold)` etc.);
   numerals use `.displayNumeral`, `.ringNumeral`, `.metricValue`,
   `.statValue`. Small caps labels use `.eyebrowStyle()`; never hand-roll
   uppercase + tracking.
-- **Sections:** `GlassSection("Title", meta:)` with a sentence-case header.
+- **Sections:** `GlassSection("Title", meta:)` with a sentence-case header;
+  `detail:` puts one fact right after the title.
 - **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
   close with `Button(role: .close)` top leading; deletes confirm with an
   `.alert("Delete this X?")`.

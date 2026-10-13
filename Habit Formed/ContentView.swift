@@ -55,9 +55,18 @@ struct ContentView: View {
         let todayIsPerfect = DayLedger.summary(on: dayTracker.today, tracks: tracks).isPerfect
         let streak = DayLedger.perfectStreak(tracks: tracks)
 
+        let shown = week.first { $0.date.isSameDay(as: selectedDate) }
+            ?? DayLedger.summary(on: selectedDate, tracks: tracks)
+
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                topBar(streak: streak, todayIsPerfect: todayIsPerfect)
+                // The strip belongs to the header, so it sits close under it.
+                VStack(alignment: .leading, spacing: 12) {
+                    topBar(streak: streak, todayIsPerfect: todayIsPerfect)
+                    if !habits.isEmpty {
+                        WeekStrip(summaries: week, selectedDate: $selectedDate)
+                    }
+                }
 
                 if habits.isEmpty {
                     EmptyStateCard(
@@ -68,10 +77,12 @@ struct ContentView: View {
                         buttonAction: onAdd
                     )
                 } else {
-                    WeekStrip(summaries: week, selectedDate: $selectedDate)
-
-                    // Names the day the grid shows once it is not today.
-                    GlassSection(isViewingToday ? "Habits" : selectedDate.relativeDayName) {
+                    // Names the day the grid shows once it is not today, and
+                    // says its count once, here.
+                    GlassSection(
+                        isViewingToday ? "Habits" : selectedDate.relativeDayName,
+                        detail: shown.expected > 0 ? "\(shown.done) of \(shown.expected) done" : nil
+                    ) {
                         grid
                     } accessory: {
                         HStack(spacing: 14) {
