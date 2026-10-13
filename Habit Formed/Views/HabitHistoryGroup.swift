@@ -1,24 +1,17 @@
 import SwiftUI
 
-/// One month of a habit's logs inside `HabitDetailView`: a header and one row
-/// group. Long-press a row to remove a log.
+/// A habit's latest logs inside `HabitDetailView`, on one row group: the day,
+/// the time, and the note if there is one. Long-press a row to remove it.
 struct HabitHistoryGroup: View {
-    let title: String
     let completions: [HabitCompletion]
     let accent: Color
     let onDelete: (HabitCompletion) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .eyebrowStyle()
-                .padding(.horizontal, 4)
-
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                ForEach(completions) { completion in
-                    HabitHistoryRow(completion: completion, accent: accent) {
-                        onDelete(completion)
-                    }
+        GlassRowGroup(dividerInset: RowLayout.horizontalPadding) {
+            ForEach(completions) { completion in
+                HabitHistoryRow(completion: completion, accent: accent) {
+                    onDelete(completion)
                 }
             }
         }
@@ -31,33 +24,21 @@ private struct HabitHistoryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: RowLayout.spacing) {
-            Text(completion.date.formatted(.dateTime.day()))
-                .font(.subheadline.weight(.bold).monospacedDigit())
-                .foregroundStyle(accent.glyphTone)
-                .frame(width: RowLayout.glyphColumn)
-
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline) {
                 Text(completion.date.relativeDayName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                if !completion.note.isEmpty {
-                    Text(completion.note)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineLimit(3)
-                }
-                Text("Logged \(completion.loggedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption2.weight(.medium))
+                Spacer(minLength: 8)
+                Text(trailing)
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-
-            Spacer(minLength: 8)
-
-            if completion.value != 1 {
-                Text(formattedValue)
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
+            if !completion.note.isEmpty {
+                Text(completion.note)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(3)
             }
         }
         .padding(.horizontal, RowLayout.horizontalPadding)
@@ -71,11 +52,17 @@ private struct HabitHistoryRow: View {
         }
     }
 
-    private var formattedValue: String {
-        let v = completion.value
-        if v.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f", v)
+    /// The logged time, plus the amount when a health log carried one. A log
+    /// added later for a past day shows no time, since it was not done then.
+    private var trailing: String {
+        var parts: [String] = []
+        if completion.loggedAt.isSameDay(as: completion.date) {
+            parts.append(completion.loggedAt.formatted(date: .omitted, time: .shortened))
         }
-        return String(format: "%.1f", v)
+        if completion.value != 1 {
+            let v = completion.value
+            parts.append(v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v))
+        }
+        return parts.joined(separator: " · ")
     }
 }

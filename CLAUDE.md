@@ -62,8 +62,8 @@ Habit Formed/
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
-    ├── HabitDetailView.swift # Per-habit page: log + note, stats, tappable calendar, history
-    ├── HistoryView.swift     # Stats, 12-week map, streaks, day-by-day log with Share
+    ├── HabitDetailView.swift # Per-habit page: streak hero, log + note, tappable calendar, recent logs
+    ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
 ```
@@ -78,11 +78,17 @@ the header):
   `StreakChip` (only once a streak exists), add (+) and Settings (gear,
   pushed). Under it the `WeekStrip` (last 7 days as dates with a completion
   dot, drawn on the canvas; tap to browse, calendar for older), then the
-  "Habits" section whose header carries the "Share report" link. Keep the
-  top of Today light: progress is said once, in the header line.
-- **History**: `HistoryView`. Lifetime stats, a 12-week consistency map,
-  per-habit streak rows (tap opens the detail sheet), and a day-by-day log
-  where each day header has a Share button for that day's report.
+  "Habits" section whose header carries the "Share report" link (long-press
+  it to jump to a template). Keep the top of Today light: progress is said
+  once, in the header line.
+- **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
+  one stats strip, a 12-week consistency map and per-habit streak rows (tap
+  opens the detail sheet); Log is day by day, each day header carrying a
+  Share link for that day's report.
+
+The rule across screens: say each fact once, keep captions for what is not
+obvious, paint only the selected choice in a grid, and prefer one line of
+text over another card.
 
 Each habit tile responds to three gestures. Keep this consistent across
 new surfaces:
@@ -135,7 +141,8 @@ already logged today). Closing before completion does **not** log.
   template per preset the first time the sheet opens.
 - Words accept tokens (`ReportToken.all`: `{name}`, `{done}`, `{total}`,
   `{checklist}`, `{eaten}`, `{net}`...), expanded by `ReportText` at send
-  time.
+  time. The editor offers them on the keyboard bar while a word field has
+  focus.
 - `DailyReportBuilder` turns habits + a template into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it); `ReportCardRenderer` renders

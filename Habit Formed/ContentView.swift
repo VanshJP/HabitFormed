@@ -15,6 +15,11 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
+    @Query(sort: [SortDescriptor(\ReportTemplate.sortOrder), SortDescriptor(\ReportTemplate.createdAt)])
+    private var templates: [ReportTemplate]
+
+    @AppStorage(AppPreferences.lastTemplateID) private var lastTemplateID = ""
+
     var onAdd: () -> Void = {}
     var onShareReport: (Date) -> Void = { _ in }
 
@@ -80,6 +85,15 @@ struct ContentView: View {
                             HeaderLinkLabel(isViewingToday ? "Share report" : "Share this day", icon: "square.and.arrow.up")
                         }
                         .buttonStyle(.textLink)
+                        .contextMenu {
+                            // A long press goes straight to a chosen template.
+                            ForEach(templates) { template in
+                                Button(template.name, systemImage: template.style.symbol) {
+                                    lastTemplateID = template.id.uuidString
+                                    onShareReport(selectedDate)
+                                }
+                            }
+                        }
                     }
                 }
             }

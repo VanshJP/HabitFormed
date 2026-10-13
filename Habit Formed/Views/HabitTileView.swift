@@ -55,7 +55,7 @@ struct HabitTileView: View {
                 // today" yet stays discoverable.
                 .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
         }
-        .frame(minHeight: 168)
+        .frame(minHeight: 152)
         .glassCard(
             cornerRadius: AppLayout.tileRadius,
             tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)

@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// One habit's page: today's log and note, the numbers, a calendar that fixes
-/// history with a tap, and the month-by-month log. Opened by tapping a tile.
+/// One habit's page: the streak, today's log and note, a calendar that fixes
+/// history with a tap, and the latest logs. Opened by tapping a tile.
 struct HabitDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -15,7 +15,9 @@ struct HabitDetailView: View {
     @State private var showingTimer = false
     @State private var showingEdit = false
     @State private var confirmDelete = false
-    @State private var calendarWeeks = 12
+    private let calendarWeeks = 12
+    /// The latest logs listed under the calendar, which already shows every day.
+    private let recentCount = 10
     /// Set by Delete. The habit goes once this page is off screen, because a
     /// page still drawing would read a model whose data no longer exists.
     @State private var deleteOnClose = false
@@ -29,10 +31,9 @@ struct HabitDetailView: View {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     hero
-                    statsRow
                     todaySection
                     calendarSection
-                    historySection
+                    recentSection
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, AppLayout.pageBottom)
@@ -79,33 +80,52 @@ struct HabitDetailView: View {
 
     // MARK: - Hero
 
+    /// The streak as the page's one big number, with the facts in one line
+    /// under it. The name is in the navigation bar, so it is not repeated.
     private var hero: some View {
-        VStack(spacing: 10) {
-            IconChip(icon: habit.symbol, tint: habit.color, size: 56)
+        let streak = habit.displayStreak
 
-            Text(habit.title)
-                .font(.title2.bold())
-                .foregroundStyle(.white)
+        return VStack(spacing: 8) {
+            IconChip(icon: habit.symbol, tint: habit.color, size: 44)
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(streak)")
+                    .font(.displayNumeral)
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText(value: Double(streak)))
+                Text("\(habit.streakUnit(for: streak)) streak")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+            .motion(AppMotion.snap, value: streak)
+            .accessibilityElement(children: .combine)
+
+            Text(factLine)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            HStack(spacing: 8) {
-                StatusPill(text: habit.scheduleLabel, color: .white, glyph: .icon(habit.trackKind.symbol), textColor: .secondary)
-                if habit.frequency == .interval {
-                    let status = nextDueStatus
-                    StatusPill(
-                        text: status.text,
-                        color: status.isUrgent ? habit.color.glyphTone : .white,
-                        glyph: .dot,
-                        textColor: status.isUrgent ? nil : Color.secondary
-                    )
-                }
+            if habit.frequency == .interval {
+                let status = nextDueStatus
+                Text(status.text)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(status.isUrgent ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
-    /// Copy for the interval next-due pill; urgent means due or overdue.
+    /// "Daily · 48 logs · 3 this week". Weekly habits count toward the target.
+    private var factLine: String {
+        let logs = totalCompletions == 1 ? "1 log" : "\(totalCompletions) logs"
+        let week = habit.frequency == .weekly
+            ? "\(habit.completionsThisWeek) of \(habit.weeklyTarget) this week"
+            : "\(habit.completionsThisWeek) this week"
+        return [habit.scheduleLabel, logs, week].joined(separator: " · ")
+    }
+
+    /// Copy for the interval next-due line; urgent means due or overdue.
     private var nextDueStatus: (text: String, isUrgent: Bool) {
         switch habit.daysUntilDue {
         case nil:
@@ -119,43 +139,24 @@ struct HabitDetailView: View {
         }
     }
 
-    // MARK: - Stats
-
-    private var statsRow: some View {
-        HStack(spacing: 12) {
-            StatTile(icon: "flame.fill", value: "\(habit.displayStreak)", label: "\(habit.streakUnitLabel.capitalized) streak", tint: AppColors.warning)
-            StatTile(icon: "checkmark.circle.fill", value: "\(totalCompletions)", label: "Total logs", tint: habit.color.glyphTone)
-            StatTile(icon: "calendar", value: thisWeekStat, label: "This week", tint: AppColors.info)
-        }
-    }
-
-    /// Weekly habits show progress toward the target.
-    private var thisWeekStat: String {
-        habit.frequency == .weekly
-            ? "\(habit.completionsThisWeek)/\(habit.weeklyTarget)"
-            : "\(habit.completionsThisWeek)"
-    }
-
     // MARK: - Today
 
     private var todaySection: some View {
-        GlassSection("Today") {
-            VStack(spacing: 12) {
-                if let entry = habit.todayCompletion {
-                    loggedCard(entry)
-                } else {
-                    GlassButton(title: "Log today", icon: "checkmark", style: .primary, size: .large, fullWidth: true) {
-                        Haptics.success()
-                        SoundEffects.logChime()
-                        habit.log(in: modelContext)
-                    }
+        VStack(spacing: 12) {
+            if let entry = habit.todayCompletion {
+                loggedCard(entry)
+            } else {
+                GlassButton(title: "Log today", icon: "checkmark", style: .primary, size: .large, fullWidth: true) {
+                    Haptics.success()
+                    SoundEffects.logChime()
+                    habit.log(in: modelContext)
                 }
+            }
 
-                if habit.timerDurationSeconds > 0 && !habit.isCompletedToday {
-                    GlassButton(title: timerButtonLabel, icon: timerIcon, style: .secondary, size: .medium, fullWidth: true) {
-                        Haptics.medium()
-                        showingTimer = true
-                    }
+            if habit.timerDurationSeconds > 0 && !habit.isCompletedToday {
+                GlassButton(title: timerButtonLabel, icon: timerIcon, style: .secondary, size: .medium, fullWidth: true) {
+                    Haptics.medium()
+                    showingTimer = true
                 }
             }
         }
@@ -167,7 +168,7 @@ struct HabitDetailView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(habit.color.glyphTone)
-                    Text("Logged at \(entry.loggedAt.formatted(date: .omitted, time: .shortened))")
+                    Text("Logged today at \(entry.loggedAt.formatted(date: .omitted, time: .shortened))")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                     Spacer()
@@ -195,10 +196,6 @@ struct HabitDetailView: View {
                 .onChange(of: noteFocused) { _, focused in
                     if !focused { try? modelContext.save() }
                 }
-
-                Text("Notes show up in History and on your daily report.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -236,7 +233,7 @@ struct HabitDetailView: View {
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("Tap a day to add a forgotten log or remove a wrong one.")
+                    Text("Tap a day to add or remove its log.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -254,23 +251,15 @@ struct HabitDetailView: View {
         }
     }
 
-    // MARK: - History
+    // MARK: - Recent
 
-    private var historySection: some View {
-        GlassSection("History", meta: totalCompletions == 1 ? "1 log" : "\(totalCompletions) logs") {
-            if groupedHistory.isEmpty {
-                EmptyStateCard(
-                    icon: "clock.arrow.circlepath",
-                    title: "No logs yet",
-                    message: "Log today to start your streak."
-                )
-            } else {
-                VStack(alignment: .leading, spacing: AppLayout.listSpacing) {
-                    ForEach(groupedHistory) { group in
-                        HabitHistoryGroup(title: group.title, completions: group.items, accent: habit.color) { completion in
-                            delete(completion)
-                        }
-                    }
+    @ViewBuilder
+    private var recentSection: some View {
+        let recent = Array(sortedCompletions.prefix(recentCount))
+        if !recent.isEmpty {
+            GlassSection("Recent logs") {
+                HabitHistoryGroup(completions: recent, accent: habit.color) { completion in
+                    delete(completion)
                 }
             }
         }
@@ -284,22 +273,6 @@ struct HabitDetailView: View {
 
     private var totalCompletions: Int { habit.completions?.count ?? 0 }
 
-    private var groupedHistory: [HistorySection] {
-        let calendar = Calendar.current
-        let groups = Dictionary(grouping: sortedCompletions) { entry in
-            calendar.dateInterval(of: .month, for: entry.date)?.start ?? entry.date.startOfDay
-        }
-        return groups
-            .map { month, items in
-                HistorySection(
-                    month: month,
-                    title: month.formatted(.dateTime.month(.wide).year()),
-                    items: items.sorted { $0.date > $1.date }
-                )
-            }
-            .sorted { $0.month > $1.month }
-    }
-
     // MARK: - Actions
 
     private func delete(_ completion: HabitCompletion) {
@@ -307,11 +280,4 @@ struct HabitDetailView: View {
         modelContext.delete(completion)
         try? modelContext.save()
     }
-}
-
-private struct HistorySection: Identifiable {
-    let month: Date
-    let title: String
-    let items: [HabitCompletion]
-    var id: Date { month }
 }

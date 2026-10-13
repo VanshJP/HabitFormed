@@ -42,33 +42,17 @@ struct SettingsView: View {
 
     private var reportSection: some View {
         GlassSection("Daily report") {
-            VStack(alignment: .leading, spacing: 10) {
-                GlassCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Your name")
-                            .font(.subheadline.weight(.semibold))
-                        TextField(
-                            "",
-                            text: $reporterName,
-                            prompt: Text("Shown on every card you send").foregroundStyle(.white.opacity(0.4))
-                        )
-                        .textContentType(.givenName)
-                        .submitLabel(.done)
-                        .focused($nameFocused)
-                        .inputWell(isFocused: nameFocused)
-                        Text("A forwarded card still says whose day it was.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
+            VStack(alignment: .leading, spacing: 8) {
                 GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                    SettingsRow(
-                        "Evening nudge",
-                        icon: "bell.badge",
-                        caption: "A reminder to send the day's report.",
-                        isOn: $reminderOn
-                    )
+                    SettingsRow("Your name", icon: "person") {
+                        TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
+                            .textContentType(.givenName)
+                            .submitLabel(.done)
+                            .multilineTextAlignment(.trailing)
+                            .focused($nameFocused)
+                            .frame(maxWidth: 160)
+                    }
+                    SettingsRow("Evening nudge", icon: "bell.badge", isOn: $reminderOn)
                     if reminderOn {
                         SettingsRow("Time", icon: "clock") {
                             DatePicker("Nudge time", selection: reminderTime, displayedComponents: .hourAndMinute)
@@ -77,6 +61,11 @@ struct SettingsView: View {
                     }
                 }
                 .motion(AppMotion.settle, value: reminderOn)
+
+                Text("Your name prints on every card, so a forwarded card still says whose day it was.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
             }
         }
     }

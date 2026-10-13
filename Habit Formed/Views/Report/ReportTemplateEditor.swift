@@ -45,6 +45,15 @@ struct ReportTemplateEditor: View {
         .background { AppBackground(style: .subtle) }
         .navigationTitle("Edit template")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Tokens ride on the keyboard, only while typing words that take
+            // them, instead of sitting on the page as two clouds of chips.
+            if acceptsTokens {
+                ToolbarItem(placement: .keyboard) {
+                    TokenRail(onInsert: insert)
+                }
+            }
+        }
         .task(id: EditorRenderKey(report: report, content: content)) {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
@@ -134,14 +143,10 @@ struct ReportTemplateEditor: View {
                     .font(.title3.weight(.semibold))
                 Text(style.displayName)
                     .font(.subheadline.weight(.semibold))
-                Text(style.summary)
-                    .font(.caption2)
-                    .opacity(0.7)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
             }
             .foregroundStyle(isSelected ? AppColors.inkOnLight : .white)
-            .frame(width: 118, height: 108, alignment: .topLeading)
+            .frame(width: 92, height: 64, alignment: .topLeading)
             .padding(12)
             .background {
                 if isSelected {
@@ -152,6 +157,7 @@ struct ReportTemplateEditor: View {
             .glassCardIf(!isSelected)
         }
         .buttonStyle(.plain)
+        .accessibilityHint(style.summary)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -186,20 +192,13 @@ struct ReportTemplateEditor: View {
             Haptics.selection()
             template.theme = theme
         } label: {
-            VStack(spacing: 4) {
-                CanvasLookView(look: theme.look, mood: .session)
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                            .strokeBorder(isSelected ? Color.white.opacity(0.95) : AppColors.cardStroke, lineWidth: isSelected ? 2 : 1)
-                    }
-                Text(theme.displayName)
-                    .font(.caption2)
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+            CanvasLookView(look: theme.look, mood: .session)
+                .frame(height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
+                        .strokeBorder(isSelected ? Color.white.opacity(0.95) : AppColors.cardStroke, lineWidth: isSelected ? 2 : 1)
+                }
         }
         .buttonStyle(GlassPressStyle())
         .accessibilityLabel(theme.displayName)
@@ -239,8 +238,9 @@ struct ReportTemplateEditor: View {
                     wordField("Title", text: $template.title, prompt: "Daily report", field: .title)
                     wordField("Message", text: $template.message, prompt: "A promise, a dare, a quote", field: .message)
                     wordField("Footer", text: $template.footer, prompt: "Tracked with Habit Formed", field: .footer)
-                    MetricRowDivider()
-                    TokenBar(target: tokenTargetName, onInsert: insert)
+                    Text("Add live numbers like {done} or {streak} from the bar above the keyboard.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -274,8 +274,6 @@ struct ReportTemplateEditor: View {
                         .focused($focused, equals: .caption)
                         .inputWell(isFocused: focused == .caption)
 
-                        TokenBar(target: tokenTargetName, onInsert: insert)
-
                         if !template.caption.isEmpty {
                             Button("Use the standard message") {
                                 Haptics.light()
@@ -300,7 +298,7 @@ struct ReportTemplateEditor: View {
                 Text("Sends as: \(ReportText.caption(report: report, content: content))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(6)
+                    .lineLimit(4)
                     .padding(.horizontal, 4)
             }
         }
@@ -308,19 +306,16 @@ struct ReportTemplateEditor: View {
 
     // MARK: - Tokens
 
-    private var tokenTargetName: String {
-        switch lastWordField {
-        case .title: return "title"
-        case .message: return "message"
-        case .footer: return "footer"
-        case .caption: return "text message"
-        case .name, .goal: return "title"
+    private var acceptsTokens: Bool {
+        switch focused {
+        case .title?, .message?, .footer?, .caption?: return true
+        default: return false
         }
     }
 
     private func insert(_ token: ReportToken) {
         Haptics.selection()
-        switch lastWordField {
+        switch focused ?? lastWordField {
         case .title, .name, .goal: template.title = appending(token, to: template.title)
         case .message: template.message = appending(token, to: template.message)
         case .footer: template.footer = appending(token, to: template.footer)
@@ -411,41 +406,34 @@ struct ReportTemplateEditor: View {
     }
 }
 
-// MARK: - Token Bar
+// MARK: - Token Rail
 
-/// Placeholders as chips. A tap adds one to the field you were last typing in.
-private struct TokenBar: View {
-    let target: String
+/// Placeholders as chips on the keyboard bar. A tap adds one to the field
+/// being typed in; it fills in with the day's number when the card is made.
+private struct TokenRail: View {
     let onInsert: (ReportToken) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Tap to add to the \(target)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            FlowLayout(spacing: 6) {
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
                 ForEach(ReportToken.all) { token in
                     Button {
                         onInsert(token)
                     } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "curlybraces")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.secondary)
-                            Text(token.label)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(minHeight: 30)
-                        .plateChrome(in: Capsule())
-                        .contentShape(Capsule())
+                        Text(token.label)
+                            .font(.footnote.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 32)
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(GlassPressStyle())
                     .accessibilityLabel("Insert \(token.label)")
                 }
             }
+            .padding(.horizontal, 4)
         }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity)
     }
 }
 

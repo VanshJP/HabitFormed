@@ -101,8 +101,6 @@ struct HabitAppearanceSection: View {
         "guitars.fill", "globe", "sparkles", "hand.raised.fill", "nosign", "circle.hexagongrid",
     ]
 
-    private var color: Color { Color(hex: draft.colorHex) }
-
     var body: some View {
         GlassSection("Look") {
             GlassCard {
@@ -186,11 +184,14 @@ struct HabitAppearanceSection: View {
         } label: {
             Image(systemName: symbol)
                 .font(.body)
-                .foregroundStyle(isSelected ? AppColors.inkOnLight : color.glyphTone)
+                .foregroundStyle(isSelected ? AppColors.inkOnLight : Color.white.opacity(0.75))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
-                    RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                        .fill(isSelected ? AppColors.solidWhite : Color.white.opacity(0.06))
+                    // Only the choice is painted; the rest are bare glyphs.
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
+                            .fill(AppColors.solidWhite)
+                    }
                 }
                 .contentShape(.rect)
         }
@@ -222,10 +223,7 @@ struct HabitTrackSection: View {
 
                 switch draft.kind {
                 case .manual:
-                    Text("Slide the tile to log it. Nothing to set up.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                    EmptyView()
                 case .timer:
                     timerCard
                 case .health:
@@ -247,9 +245,6 @@ struct HabitTrackSection: View {
                         }
                     }
                 }
-                Text("The habit logs itself when the timer finishes.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -269,7 +264,7 @@ struct HabitTrackSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(draft.frequency == .weekly ? "Weekly target" : "Daily target")
                             .font(.subheadline.weight(.semibold))
-                        Text("Logs itself once Apple Health reaches it.")
+                        Text("Logs itself when reached")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -346,10 +341,7 @@ struct HabitScheduleSection: View {
 
                 switch draft.frequency {
                 case .daily:
-                    Text("Counts every day. Miss one and the streak gets a day of grace.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                    EmptyView()
                 case .weekly:
                     if draft.kind != .health {
                         GlassCard {
@@ -358,7 +350,7 @@ struct HabitScheduleSection: View {
                                     Text("\(draft.weeklyTarget)× per week")
                                         .font(.subheadline.weight(.semibold))
                                         .monospacedDigit()
-                                    Text("Any days you like. Weeks never count as missed days.")
+                                    Text("Any days you like")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

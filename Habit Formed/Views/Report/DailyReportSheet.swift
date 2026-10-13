@@ -32,6 +32,8 @@ struct DailyReportSheet: View {
     @State private var confirmation: String?
     @State private var didSeed = false
     @State private var askedHealth = false
+    /// Decided once on open, so the field does not vanish after one letter.
+    @State private var askForName = false
     @FocusState private var focusedField: Field?
 
     private enum Field { case name, eaten }
@@ -118,7 +120,10 @@ struct DailyReportSheet: View {
         } message: { template in
             Text("This permanently deletes the \(template.name) template. Your habits are not touched.")
         }
-        .task { seedIfNeeded() }
+        .task {
+            askForName = reporterName.trimmingCharacters(in: .whitespaces).isEmpty
+            seedIfNeeded()
+        }
         .task(id: HealthKey(day: reportDay, needsHealth: selected?.content.needsHealth ?? false)) {
             await loadHealth()
         }
@@ -146,20 +151,19 @@ struct DailyReportSheet: View {
                 switch kind {
                 case .card, .story:
                     cardPreview(caption: caption)
-                    Text(kind == .story
-                         ? "Full screen 9:16, sized for Instagram and Snapchat stories."
-                         : "The card plus your message, ready for a group chat.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
+                    if kind == .story {
+                        Text("Sized for Instagram and Snapchat stories")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
                 case .text:
                     textPreview(caption)
                 }
 
                 templateStrip(selectedID: template.id)
 
-                if reporterName.trimmingCharacters(in: .whitespaces).isEmpty {
+                if askForName {
                     namePrompt
                 }
 
@@ -195,16 +199,10 @@ struct DailyReportSheet: View {
     // MARK: - Day
 
     private var dayRow: some View {
-        HStack(spacing: 8) {
-            Button {
-                Haptics.selection()
+        HStack(spacing: 0) {
+            dayButton(icon: "chevron.left", label: "Previous day", enabled: true) {
                 reportDay = reportDay.adding(days: -1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .headerIconChrome()
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Previous day")
 
             VStack(spacing: 1) {
                 Text(reportDay.relativeDayName)
@@ -216,18 +214,26 @@ struct DailyReportSheet: View {
             }
             .frame(maxWidth: .infinity)
 
-            Button {
-                Haptics.selection()
+            dayButton(icon: "chevron.right", label: "Next day", enabled: !reportDay.isToday) {
                 reportDay = reportDay.adding(days: 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .headerIconChrome()
             }
-            .buttonStyle(.plain)
-            .disabled(reportDay.isToday)
-            .opacity(reportDay.isToday ? 0.35 : 1)
-            .accessibilityLabel("Next day")
         }
+    }
+
+    private func dayButton(icon: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.selection()
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.textLink)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.3)
+        .accessibilityLabel(label)
     }
 
     // MARK: - Previews
@@ -322,65 +328,42 @@ struct DailyReportSheet: View {
             .scrollIndicators(.hidden)
             .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
             .padding(.horizontal, -AppLayout.pageHorizontal)
-        } accessory: {
-            Text("Long-press to edit")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
     }
 
     // MARK: - Name and calories
 
     private var namePrompt: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Put your name on it")
-                    .font(.subheadline.weight(.semibold))
-                TextField("", text: $reporterName, prompt: Text("Your name").foregroundStyle(.white.opacity(0.4)))
+        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
+            SettingsRow("Your name", icon: "person", caption: "So a forwarded card says whose day it was") {
+                TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
                     .textContentType(.givenName)
                     .submitLabel(.done)
+                    .multilineTextAlignment(.trailing)
                     .focused($focusedField, equals: .name)
-                    .inputWell(isFocused: focusedField == .name)
-                Text("So a friend who forwards your card still knows whose day it was.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 140)
             }
         }
     }
 
     private var caloriesCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Calories eaten")
-                            .font(.subheadline.weight(.semibold))
-                        Text(metrics.eatenKcal == nil
-                             ? "Not in Apple Health for this day. Type a total to include it."
-                             : "From Apple Health. Type a number to override it.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 8)
-                    TextField(
-                        "",
-                        text: $eatenText,
-                        prompt: Text(metrics.eatenKcal.map { $0.safeRounded.formatted() } ?? "kcal")
-                            .foregroundStyle(.white.opacity(0.4))
-                    )
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .font(.statValue)
-                    .frame(width: 86)
-                    .focused($focusedField, equals: .eaten)
-                    .inputWell(isFocused: focusedField == .eaten)
-                }
-                if let burned = metrics.burnedKcal {
-                    Text("Burned \(burned.safeRounded.formatted()) kcal so far (active + resting).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
+            SettingsRow(
+                "Calories eaten",
+                icon: "fork.knife",
+                caption: metrics.eatenKcal == nil ? "Not in Apple Health. Type a total." : "From Apple Health. Type to override."
+            ) {
+                TextField(
+                    "",
+                    text: $eatenText,
+                    prompt: Text(metrics.eatenKcal.map { $0.safeRounded.formatted() } ?? "kcal")
+                        .foregroundStyle(.white.opacity(0.4))
+                )
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .focused($focusedField, equals: .eaten)
+                .frame(maxWidth: 90)
             }
         }
     }

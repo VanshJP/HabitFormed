@@ -24,8 +24,13 @@ struct TimerView: View {
             VStack(spacing: 28) {
                 Spacer()
 
-                Text(habit.title)
-                    .eyebrowStyle()
+                HStack(spacing: 8) {
+                    Image(systemName: habit.symbol)
+                        .foregroundStyle(habit.color.glyphTone)
+                    Text(habit.title)
+                        .foregroundStyle(.white)
+                }
+                .font(.headline)
 
                 ring
 
@@ -129,7 +134,6 @@ struct TimerView: View {
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 6) {
-                    IconChip(icon: isFinished ? "checkmark.seal.fill" : habit.symbol, tint: habit.color, size: 34)
                     Text(formatted(displaySeconds))
                         .font(.displayNumeral)
                         .foregroundStyle(.white)
