@@ -9,6 +9,9 @@ final class HabitCompletion {
     var date: Date = Date().startOfDay
     var value: Double = 1
     var loggedAt: Date = Date()
+    /// What the day's log was about ("Chopin nocturne", "5k in the rain").
+    /// Optional context for history and the daily report.
+    var note: String = ""
 
     var habit: Habit?
 

@@ -1,0 +1,36 @@
+import SwiftUI
+
+struct StatPair: View {
+    let value: String
+    let label: String
+    var valueColor: Color = .white
+    var valueFont: Font = .statValue
+    var alignment: HorizontalAlignment = .center
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 4) {
+            Text(value)
+                .font(valueFont)
+                .foregroundStyle(valueColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+#Preview {
+    HStack(spacing: 20) {
+        StatPair(value: "84%", label: "Today", valueColor: AppColors.success)
+        StatPair(value: "142", label: "Logs")
+        StatPair(value: "12", label: "Streak")
+    }
+    .padding(40)
+    .background(AppBackground())
+}

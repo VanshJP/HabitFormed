@@ -4,19 +4,23 @@ Guidance for Claude Code (and other AI agents) working in this repo.
 
 ## Project
 
-**Habit Formed** — a minimalist, gesture-driven iOS habit tracker. Aesthetic
-borrows from the SpeakUp app (deep-navy background, ultra-thin glass
-materials, oversized rounded typography). Inspired functionally by the
-Streaks app: a small grid of tiles, each representing one habit, with
-streak counts and 7-day completion dots.
+**Habit Formed**: a minimalist, gesture-driven iOS habit tracker. Its look
+is SpeakUp's design system, ported (deep-navy canvas, Liquid Glass plates,
+colour only in data and identity, one loud CTA per screen). Inspired
+functionally by the Streaks app: a small grid of tiles, each representing one
+habit, with streak counts and 7-day completion dots. The signature feature is
+the **daily report**: a customizable card plus text that you send to friends.
 
 - **Platform:** iOS 26.0+ (single target, iPhone + iPad).
 - **Language:** Swift 5 with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-  and `SWIFT_APPROACHABLE_CONCURRENCY = YES`.
-- **UI:** SwiftUI only — no UIKit views (UIKit is used solely for
-  `UIImpactFeedbackGenerator` in `Extensions/Haptics.swift`).
-- **Persistence:** SwiftData (`@Model`). Do **not** introduce CoreData,
-  `FileManager`, or `UserDefaults` for habit data.
+  and `SWIFT_APPROACHABLE_CONCURRENCY = YES`. Mark new pure types
+  `nonisolated` (see `DayLedger`, `DailyReport`, `ReportContent`).
+- **UI:** SwiftUI. UIKit only for haptics (`Extensions/Haptics.swift`), the
+  share sheet (`SharePresenter`), and Messages (`MessageComposer`).
+- **Persistence:** SwiftData (`@Model`): `Habit`, `HabitCompletion`,
+  `ReportTemplate`. Do **not** introduce CoreData, `FileManager`, or
+  `UserDefaults` for habit data. Preferences (app look, report name, report
+  reminder) use `@AppStorage` with keys in `Services/AppPreferences.swift`.
 - **Health data:** HealthKit, wrapped in `Services/HealthKitService.swift`
   (`@Observable`, injected via `.environment`).
 
@@ -35,34 +39,47 @@ open "Habit Formed.xcodeproj"
 
 The Xcode project uses `objectVersion = 77` with
 `PBXFileSystemSynchronizedRootGroup`, so any file dropped into the
-`Habit Formed/` folder is picked up automatically — no `pbxproj` edits
+`Habit Formed/` folder is picked up automatically; no `pbxproj` edits
 are needed when adding new Swift files.
 
 ## Folder layout
 
 ```
 Habit Formed/
-├── Habit_FormedApp.swift     # App entry — wires ModelContainer + HealthKitService, mounts RootView
-├── ContentView.swift         # Today-tab grid of HabitTileView + sheet routing (HabitSheet enum)
-├── Habit_Formed.entitlements # HealthKit capability
-├── Models/                   # @Model types (Habit, HabitCompletion)
-├── Services/                 # HealthKitService
-├── Theme/                    # AppColors, AppBackground, GlassStyles (glass card modifier)
+├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion, ReportTemplate) + services
+├── ContentView.swift         # Today tab: header, week strip, progress card, tile grid, undo toast
+├── Models/                   # Habit, HabitCompletion, ReportTemplate (+ presets), DayLedger
+├── Services/                 # HealthKit, notifications, timer, report builder/renderer, share, Messages
+├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
+│                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
-├── Views/                    # All SwiftUI views (one View per file when reasonable)
-│   ├── RootView.swift        # TabView host: Today + History
-│   ├── HistoryView.swift     # Cross-habit log feed + lifetime stats
-│   ├── TimerView.swift       # Per-habit countdown sheet (auto-logs on finish)
-│   └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
-└── Assets.xcassets/          # AppIcon (universal iOS), AccentColor
+└── Views/
+    ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, StatTile, PageTitle, ...)
+    ├── Today/                # WeekStrip, DayProgressCard, DateBrowserSheet, ArrangeHabitsSheet
+    ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
+    ├── History/              # ConsistencyHeatMap
+    ├── Report/               # DailyReportSheet, ReportTemplateEditor, ReportCardView + styles
+    ├── Settings/             # SettingsView
+    ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
+    ├── HabitTileView.swift   # One grid tile
+    ├── HabitDetailView.swift # Per-habit page: log + note, stats, tappable calendar, history
+    ├── HistoryView.swift     # Stats, 12-week map, streaks, day-by-day log with Share
+    ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
+    └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
 ```
 
-## Interaction model (the spec, in one place)
+## Interaction model
 
-The app is a two-tab `TabView` (`RootView`):
+`RootView` hosts two tabs, each with no navigation bar (the page title is
+the header):
 
-- **Today** — `ContentView` grid of `HabitTileView`.
-- **History** — `HistoryView` lifetime stats + day-grouped completion feed.
+- **Today**: `ContentView`. `PageTitle` with a capsule holding the
+  perfect-day `StreakChip`, add (+) and Settings (gear, pushed). Under it the
+  `WeekStrip` (last 7 days as rings; tap to browse, calendar for older), the
+  `DayProgressCard` (ring, verdict, "Share today's report"), and the grid.
+- **History**: `HistoryView`. Lifetime stats, a 12-week consistency map,
+  per-habit streak rows (tap opens the detail sheet), and a day-by-day log
+  where each day header has a Share button for that day's report.
 
 Each habit tile responds to three gestures. Keep this consistent across
 new surfaces:
@@ -70,62 +87,116 @@ new surfaces:
 | Gesture                  | Action                                |
 |--------------------------|---------------------------------------|
 | **Single tap**           | Open `HabitDetailView` (history + log) |
-| **Slide knob right**     | Log a completion in place (`SlideToLogTrack`) |
-| **Long-press**           | `contextMenu` → Edit / Log Today / Delete |
+| **Slide knob right**     | Log today in place (`SlideToLogTrack`) |
+| **Long-press**           | `contextMenu`: Log / Undo today, Start timer, Edit, Arrange, Delete |
 
-The slide-to-log knob mirrors iOS's slide-to-answer affordance: drag
-past ~75% of the track and release to log; release earlier to cancel.
-Once the habit is logged for the day the track collapses into a
-"LOGGED TODAY" pill.
+The slide-to-log knob mirrors iOS's slide-to-answer: drag past ~75% and
+release to log; release earlier to cancel. The track is 44pt tall. Once
+logged it collapses into a "Logged" pill. Every log from the grid shows an
+`UndoToast` for four seconds.
 
-The detail view (`HabitDetailView`) is the canonical place to log
-manually and to start a timer:
+When the grid shows a **past day**, the bottom row of every tile becomes a
+pill that toggles that day's log (fixing a forgotten day is one tap). The
+detail sheet's calendar does the same per day.
 
-- "Log Today" toggle button.
-- "Start N min Timer" button when `habit.timerDurationSeconds > 0`,
-  presenting `TimerView`.
-- Three stat tiles (streak / total / this week).
-- Month-grouped history list with per-row "Remove Log" context action.
+All log writes go through `Habit.log(on:in:)` and `Habit.removeLog(on:in:)`
+so a day never holds two completions. Deleting a habit goes through
+`HabitLifecycle.delete` (stops its timer and reminders first).
+
+### Day ledger
+
+`Models/DayLedger.swift` is the one source for "X of Y done", the week strip
+rings, the perfect-day streak and the report's counts. Per habit and day a
+`DayStatus` is `done`, `open` (today, not yet), `missed` (past day),
+`flexible` (weekly habits on an unlogged day: never a miss), or `resting`
+(interval countdown running, or before the habit existed). Only done, open
+and missed count toward the total. A perfect day logged everything expected;
+days that expected nothing are skipped by the streak.
 
 ### Timers
 
 Habits can carry an optional countdown timer
-(`Habit.timerDurationSeconds`, set in `AddHabitView`'s "Timer" section
-— Off / 1 / 5 / 10 / 15 / 25 / 30 / 45 / 60 min). `TimerView` is a
-foreground sheet with a circular progress ring, pause/resume/reset, and
-auto-logs the habit on completion (only if not already logged today).
-Cancelling the sheet before completion does **not** log.
+(`Habit.timerDurationSeconds`, set in the add sheet's Track by → Timer).
+`TimerView` is a foreground session with a circular progress ring,
+pause/resume/reset, and auto-logs the habit on completion (only if not
+already logged today). Closing before completion does **not** log.
+
+### Daily report
+
+- `ReportTemplate` (SwiftData) holds one way of reporting a day: a
+  `ReportStyle` layout (scoreboard, receipt, fuel, check-in, streak, clean),
+  a `ReportTheme` canvas, an accent, words (title, message, footer, caption)
+  and toggles (which habits, unfinished, streaks, 7-day dots, notes,
+  perfect-day streak, calories, activity). `ReportPreset.all` seeds one
+  template per preset the first time the sheet opens.
+- Words accept tokens (`ReportToken.all`: `{name}`, `{done}`, `{total}`,
+  `{checklist}`, `{eaten}`, `{net}`...), expanded by `ReportText` at send
+  time.
+- `DailyReportBuilder` turns habits + a template into a `DailyReport` value;
+  `ReportCardView` draws it at a fixed 390pt width with painted fills only
+  (no glass: `ImageRenderer` cannot draw it); `ReportCardRenderer` renders
+  it (scale 2 for previews, 3 for sending).
+- `DailyReportSheet` previews the exact card, then Save / Copy / Text it
+  (`MessageComposer`, Messages with the image attached) / Share
+  (`SharePresenter`). The card prints the reporter's name
+  (`AppPreferences.reporterName`) so a forwarded card still says whose day
+  it was. Calories eaten come from Apple Health and can be typed over before
+  sending.
+- An optional evening nudge (`report-reminder`) opens today's report.
 
 ## Conventions
 
-- **Styling:** wrap any glass surface with `.glassCard(cornerRadius:tint:)`.
-  Use `AppColors.tilePalette` for habit colors and
-  `AppColors.streakColor(for:)` for the warm streak-heat ramp.
-- **Typography:** rounded SF (`.system(..., design: .rounded)`); tile
-  titles are `.heavy`/`.black` weights; labels use uppercase small caps
-  with `tracking(1.2)`.
+The design system is SpeakUp's; when in doubt, match
+`../SpeakUp-App/docs/features/ui-design-system.md`.
+
+- **Surfaces:** cards are `GlassCard` / `.glassCard(cornerRadius:tint:)`
+  (Liquid Glass). Never stack glass on glass: inside a card use
+  `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
+  branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
+  (card 20 / 16, tile 16 / 12, well 12).
+- **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
+  (`AppColors.identityTint`) and 0.10 when featured or done
+  (`featuredTint`). A habit's glyph uses `color.glyphTone` (lifted toward
+  white). Habit colors come from `AppColors.tilePalette`.
+- **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
+- **Buttons:** `GlassButton` (primary is solid white, one per screen);
+  words-only buttons use `.buttonStyle(.textLink)`. Selected chips and
+  segments are solid white with `AppColors.inkOnLight` text.
+- **Type:** text styles that scale (`.subheadline.weight(.semibold)` etc.);
+  numerals use `.displayNumeral`, `.ringNumeral`, `.metricValue`,
+  `.statValue`. Small caps labels use `.eyebrowStyle()`; never hand-roll
+  uppercase + tracking.
+- **Sections:** `GlassSection("Title", meta:)` with a sentence-case header.
+- **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
+  close with `Button(role: .close)` top leading; deletes confirm with an
+  `.alert("Delete this X?")`.
+- **Motion:** `AppMotion` tokens and `.motion(_:value:)`, which respects
+  Reduce Motion.
 - **Haptics:** route every tactile moment through `Haptics.*`. Don't
   instantiate `UIImpactFeedbackGenerator` inline.
-- **Streak math:** call `Date.calculateStreak(from:)`; do not duplicate
-  the day-grace logic. A streak survives one missed day until the
-  calendar rolls over. Schedule-aware streaks go through
-  `Habit.displayStreak` (daily days / weekly target weeks / interval
-  on-time cycles) with helpers in `Date+Helpers.swift`.
+- **Streak math:** call `Date.calculateStreak(from:today:)`; do not
+  duplicate the day-grace logic. Schedule-aware streaks go through
+  `Habit.displayStreak` (or `displayStreak(asOf:)` for a past day). The
+  perfect-day streak is `DayLedger.perfectStreak`.
 - **Scheduling:** `HabitFrequency` is `daily`, `weekly`
   (`weeklyTarget`, N times per week), or `interval` (`intervalDays`,
   log once every N days; logging resets the countdown). Interval is
   manual-swipe only; auto-reset to daily when track type becomes
-  timer/health.
-- **Copy:** no em dashes anywhere (strings or comments). Keep UI copy
-  plain and short; big day-count numbers are always `.white`.
+  timer/health (`HabitDraft.setKind`).
+- **Copy:** no em dashes anywhere (strings or comments). Sentence case.
+  Keep UI copy plain and short.
 - **HealthKit:** new HealthKit-backed habit types should extend
-  `HealthKitSource` (label, defaultTarget, unitSuffix, symbol) and add a
-  matching branch in `HealthKitService.todayValue(for:)`.
-- **SwiftData enums:** persist as `String` raw values
-  (`frequencyRaw`, `sourceRaw`) with a computed property exposing the
-  enum. This keeps migrations painless.
+  `HealthKitSource` (label, defaultTarget, unitSuffix, symbol,
+  compactValue) and add a matching branch in
+  `HealthKitService.todayValue(for:)`. Report-only numbers live in
+  `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`.
+- **SwiftData:** persist enums as `String` raw values (`frequencyRaw`,
+  `sourceRaw`, `styleRaw`, `themeRaw`) with a computed property exposing
+  the enum. New stored properties always get a default so lightweight
+  migration keeps working.
 - **Dark mode only:** the app is locked to `.preferredColorScheme(.dark)`.
-  Do not introduce light-mode color variants.
+  Do not introduce light-mode color variants (the Clean and Receipt report
+  cards are paper on purpose; they are images, not UI).
 
 ## Editing rules for AI agents
 
@@ -133,15 +204,16 @@ Cancelling the sheet before completion does **not** log.
    (e.g. `HabitDetailView` + `HabitHistoryGroup`).
 2. **Match surrounding comment density.** Brief doc comments on types
    and non-obvious gestures; no rationale-for-this-change comments.
-3. **Never edit `project.pbxproj` to add files** — synchronized groups
+3. **Never edit `project.pbxproj` to add files**; synchronized groups
    handle that. Only touch it for build-setting / capability changes.
 4. **Preserve the gesture contract** above when adding new tile-like
    surfaces.
 5. **Don't create README/docs files** unless asked. CLAUDE.md is the
    sanctioned doc surface.
 6. **Tests:** there is no test target yet. If adding logic that benefits
-   from tests (streak math, HealthKit value mapping), surface the
-   suggestion to the user before scaffolding a target.
+   from tests (streak math, `DayLedger`, `ReportText` token expansion,
+   HealthKit value mapping), surface the suggestion to the user before
+   scaffolding a target.
 
 ## Known gaps / future work
 
@@ -149,9 +221,11 @@ Cancelling the sheet before completion does **not** log.
   `Assets.xcassets/AppIcon.appiconset/` (the `Contents.json` slot is
   defined; a 1024×1024 image needs to be dropped in).
 - HealthKit auto-sync only inserts a completion when today's value
-  meets the target; partial-progress UI on the tile is not yet shown.
+  meets the target; partial progress shows on the tile's meter.
 - Notifications: reminders are cadence-aware and rebuilt by
   `NotificationService.syncReminders(for:)` (launch, foreground, habit
   changes). Interval habits get rolling one-shots on due dates; timer
-  taps route through `NotificationRouter`. Time Sensitive entitlement
-  is intentionally unused (`.active` level everywhere).
+  taps route through `NotificationRouter`, as does the report reminder.
+  Time Sensitive entitlement is intentionally unused (`.active` level
+  everywhere).
+- The report card's barcode is decorative, not scannable.

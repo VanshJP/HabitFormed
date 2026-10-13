@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Simplified slide-to-log track. Drag the knob past 75% and release to log;
-/// releasing earlier snaps back. Once logged, collapses into a confirmation pill.
+/// Slide-to-log track, mirroring iOS's slide-to-answer. Drag the knob past 75%
+/// and release to log; releasing earlier snaps back. Once logged it collapses
+/// into a confirmation pill. 44pt tall so the knob meets the hit target.
 struct SlideToLogTrack: View {
     let accent: Color
     let isLogged: Bool
@@ -10,74 +11,75 @@ struct SlideToLogTrack: View {
     @State private var dragX: CGFloat = 0
     @State private var didFire = false
 
-    private let knobSize: CGFloat = 30
-    private let trackHeight: CGFloat = 34
+    static let trackHeight: CGFloat = 44
+    static let knobSize: CGFloat = 36
     private let triggerRatio: CGFloat = 0.75
+
+    private var inset: CGFloat { (Self.trackHeight - Self.knobSize) / 2 }
 
     var body: some View {
         GeometryReader { proxy in
-            let maxX = max(proxy.size.width - knobSize, 1)
+            let maxX = max(proxy.size.width - Self.knobSize - inset * 2, 1)
             let progress = min(max(dragX / maxX, 0), 1)
 
             ZStack(alignment: .leading) {
-                // Track background
                 Capsule()
-                    .fill(isLogged ? accent.opacity(0.28) : Color.white.opacity(0.08))
+                    .fill(isLogged ? accent.opacity(0.24) : Color.white.opacity(0.08))
 
-                // Fill trail
                 if !isLogged {
                     Capsule()
-                        .fill(accent.opacity(0.45))
-                        .frame(width: dragX + knobSize)
+                        .fill(accent.opacity(0.40))
+                        .frame(width: dragX + Self.knobSize + inset * 2)
                 }
 
-                // Labels
                 if isLogged {
-                    Label("Logged", systemImage: "checkmark.seal.fill")
-                        .font(.system(size: 8, weight: .heavy, design: .rounded))
-                        .tracking(0.6)
-                        .foregroundStyle(.white.opacity(0.8))
+                    Label("Logged", systemImage: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.9))
                         .frame(maxWidth: .infinity)
                 } else {
-                    Text(progress > 0.6 ? "RELEASE" : "SLIDE TO LOG")
-                        .font(.system(size: 7, weight: .heavy, design: .rounded))
-                        .tracking(1.0)
-                        .foregroundStyle(.white.opacity(max(0.2, 0.55 - progress * 0.35)))
+                    Text(progress > 0.6 ? "Release" : "Slide to log")
+                        .eyebrowStyle(Color.white.opacity(max(0.25, 0.6 - progress * 0.4)))
+                        .padding(.leading, Self.knobSize * 0.6)
                         .frame(maxWidth: .infinity)
                         .allowsHitTesting(false)
                 }
 
-                // Knob
                 if !isLogged {
                     Circle()
                         .fill(accent)
                         .overlay(
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .black))
+                                .font(.footnote.weight(.black))
                                 .foregroundStyle(.white)
                         )
-                        .shadow(color: accent.opacity(0.4), radius: 5, y: 1)
-                        .frame(width: knobSize, height: knobSize)
-                        .offset(x: dragX)
+                        .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
+                        .frame(width: Self.knobSize, height: Self.knobSize)
+                        .offset(x: inset + dragX)
                         .gesture(drag(maxX: maxX))
-                        .accessibilityLabel("Slide to log habit")
                 }
             }
-            .frame(height: trackHeight)
+            .frame(height: Self.trackHeight)
         }
-        .frame(height: trackHeight)
+        .frame(height: Self.trackHeight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isLogged ? "Logged today" : "Slide to log")
+        .accessibilityAddTraits(isLogged ? [] : .isButton)
+        .accessibilityAction {
+            guard !isLogged else { return }
+            Haptics.success()
+            SoundEffects.logChime()
+            onComplete()
+        }
         .onChange(of: isLogged) { _, newValue in
-            // Snap the knob back to the start whenever the habit is
-            // un-logged so the next slide doesn't begin pre-completed.
+            // Snap the knob home whenever the log is removed so the next
+            // slide doesn't begin pre-completed.
             if !newValue {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    dragX = 0
-                }
-                didFire = false
+                withAnimation(AppMotion.snap) { dragX = 0 }
             } else {
                 dragX = 0
-                didFire = false
             }
+            didFire = false
         }
     }
 
@@ -97,11 +99,11 @@ struct SlideToLogTrack: View {
                 if x >= maxX * triggerRatio {
                     Haptics.success()
                     SoundEffects.logChime()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { dragX = maxX }
+                    withAnimation(AppMotion.snap) { dragX = maxX }
                     onComplete()
                 } else {
                     Haptics.light()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { dragX = 0 }
+                    withAnimation(AppMotion.snap) { dragX = 0 }
                 }
                 didFire = false
             }

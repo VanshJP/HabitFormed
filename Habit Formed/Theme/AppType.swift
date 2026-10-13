@@ -1,0 +1,54 @@
+import SwiftUI
+
+/// The app's type scale.
+///
+/// Two families, and the split is deliberate:
+///
+/// **Numerals are fixed.** A hero number is a graphic element, not running
+/// text: a 68pt numeral scaled to AX5 would be wider than the screen. These
+/// keep a fixed size and rely on the accessibility label for non-visual users.
+///
+/// **Everything else scales.** Text tokens are built on `Font.TextStyle`, so
+/// Dynamic Type works without a `@ScaledMetric` at every call site.
+extension Font {
+
+    // MARK: - Numerals (fixed by design)
+    //
+    // Tabular figures on every changing value so timers, scores, and streak
+    // chips do not shift layout as digits update.
+
+    /// The one hero numeral on a screen. Never two.
+    static let displayNumeral = Font.system(size: 68, weight: .bold, design: .rounded).monospacedDigit()
+
+    /// The number inside a large progress ring. 44 leaves room for a caption
+    /// under the number inside the ring.
+    static let ringNumeral = Font.system(size: 44, weight: .bold, design: .rounded).monospacedDigit()
+
+    /// Big number in a metric tile or gauge.
+    static let metricValue = Font.system(size: 21, weight: .bold, design: .rounded).monospacedDigit()
+
+    /// Number inside a small ring or a compact stat pair.
+    static let statValue = Font.system(size: 17, weight: .bold, design: .rounded).monospacedDigit()
+
+    // MARK: - Text (scales with Dynamic Type)
+
+    /// Small-caps section label. Prefer `.eyebrowStyle()`, which also applies
+    /// the casing, tracking, and color this token is always paired with.
+    static let eyebrow = Font.system(.caption2).weight(.semibold)
+}
+
+extension View {
+    /// Uppercase, tracked, secondary section label.
+    func eyebrowStyle() -> some View {
+        eyebrowStyle(.secondary)
+    }
+
+    /// The same label in a colour of its own: a habit tint, a pass or fail.
+    /// Size, weight, and tracking stay put, and it scales with Dynamic Type.
+    func eyebrowStyle<S: ShapeStyle>(_ style: S) -> some View {
+        self.font(.eyebrow)
+            .foregroundStyle(style)
+            .textCase(.uppercase)
+            .tracking(0.7)
+    }
+}

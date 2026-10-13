@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+/// The Today tab: a header with the perfect-day streak, a week strip to jump
+/// between recent days, the day's progress with the report button, and the
+/// habit grid.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -13,10 +16,15 @@ struct ContentView: View {
     private var habits: [Habit]
 
     var onAdd: () -> Void = {}
+    var onShareReport: (Date) -> Void = { _ in }
 
     @State private var sheet: HabitSheet?
     @State private var pendingDelete: Habit?
     @State private var selectedDate: Date = .now
+    @State private var showDatePicker = false
+    @State private var showArrange = false
+    @State private var undo: UndoLog?
+    @State private var celebration = 0
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -24,117 +32,238 @@ struct ContentView: View {
     ]
 
     private var isViewingToday: Bool {
-        // Compare against `dayTracker.today` so a midnight rollover correctly
-        // flips this from true → false (and the read-only banner appears).
+        // Against `dayTracker.today` so a midnight rollover flips this.
         selectedDate.isSameDay(as: dayTracker.today)
     }
 
     var body: some View {
-        // Re-render when the calendar day rolls over so `isCompletedToday`
-        // checks (header counter, tile state) reflect reality at midnight.
+        // Re-render when the calendar day rolls over so today's state
+        // (header counter, tile state) reflects reality at midnight.
         let _ = dayTracker.today
+        return lifecycle(presentations(page))
+    }
 
-        return ZStack {
-            AppBackground(style: .primary).ignoresSafeArea()
+    // MARK: - Page
 
-            ScrollView {
-                VStack(spacing: 18) {
-                    HeaderView(
-                        selectedDate: $selectedDate,
-                        isViewingToday: isViewingToday,
-                        completedCount: habits.filter { $0.isCompleted(on: selectedDate) }.count,
-                        // Resting interval habits (countdown still running)
-                        // aren't expected today, so keep them out of "X / Y".
-                        totalHabits: habits.filter { !$0.isRestingToday }.count,
-                        onResetToToday: { selectedDate = .now },
-                        onAdd: onAdd
+    private var page: some View {
+        let tracks = habits.map(\.track)
+        let week = DayLedger.summaries(endingOn: dayTracker.today, count: 7, tracks: tracks)
+        let selected = DayLedger.summary(on: selectedDate, tracks: tracks)
+        let todayIsPerfect = (week.last ?? selected).isPerfect
+        let streak = DayLedger.perfectStreak(tracks: tracks)
+
+        return PageScrollView {
+            VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+                header(streak: streak, todayIsPerfect: todayIsPerfect)
+
+                if habits.isEmpty {
+                    EmptyStateCard(
+                        icon: "circle.hexagongrid",
+                        title: "No habits yet",
+                        message: "Pick a template or start from scratch. Slide a tile to log it each day.",
+                        buttonTitle: "Add a habit",
+                        buttonAction: onAdd
                     )
-                    .padding(.horizontal, 4)
+                } else {
+                    WeekStrip(
+                        summaries: week,
+                        selectedDate: $selectedDate,
+                        onOpenCalendar: { showDatePicker = true }
+                    )
 
-                    if habits.isEmpty {
-                        emptyState
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(habits) { habit in
-                                HabitTileView(
-                                    habit: habit,
-                                    selectedDate: selectedDate,
-                                    isReadOnly: !isViewingToday,
-                                    onTap:           { sheet = .detail(habit) },
-                                    onLog:           { logCompletion(for: habit) },
-                                    onEdit:          { sheet = .edit(habit) },
-                                    onRequestDelete: { pendingDelete = habit },
-                                    onStartTimer:    { sheet = .timer(habit) }
-                                )
-                            }
-                        }
-                    }
+                    DayProgressCard(
+                        summary: selected,
+                        isToday: isViewingToday,
+                        onShare: { onShareReport(selectedDate) },
+                        onBackToToday: { selectedDate = .now }
+                    )
 
-                    Spacer(minLength: 20)
+                    grid
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 24)
             }
-            .refreshable { await refreshHealth() }
+            .pageContentInsets()
         }
-        .sheet(item: $sheet) { s in
-            switch s {
-            case .edit(let h):   AddHabitView(habit: h)
-            case .detail(let h): HabitDetailView(habit: h)
-            case .timer(let h):  TimerView(habit: h)
+        .refreshable { await refreshHealth() }
+        .overlay(alignment: .top) { undoToast }
+        .overlay {
+            if celebration > 0 {
+                ConfettiView(origin: UnitPoint(x: 0.5, y: 0.2))
+                    .id(celebration)
+                    .ignoresSafeArea()
             }
         }
-        .confirmationDialog(
-            "Delete \(pendingDelete?.title ?? "habit")?",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: { if !$0 { pendingDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let habit = pendingDelete { delete(habit) }
-                pendingDelete = nil
-            }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        .motion(AppMotion.settle, value: undo?.id)
+        .onChange(of: todayIsPerfect) { wasPerfect, isPerfect in
+            // Celebrate the log that finishes the day, never a page load.
+            guard isPerfect, !wasPerfect, isViewingToday else { return }
+            Haptics.success()
+            celebration += 1
         }
-        .task {
-            try? await health.requestAuthorization()
-            await health.syncHealthKitHabits(in: modelContext)
-            // Subscribe to HealthKit change notifications so the step
-            // challenge & friends update in near real-time instead of
-            // only on the 15s polling tick.
-            health.startObservingHealthKitHabits(in: modelContext)
+    }
 
-            // Reminder scheduling. Permission is requested lazily when a
-            // reminder toggle is turned on (AddHabitView), not at launch.
-            await notifications.syncReminders(for: habits)
-        }
-        .onChange(of: reminderSignature) { _, _ in
-            Task { await notifications.syncReminders(for: habits) }
-        }
-        .task(id: "health-sync") {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { break }
-                await health.syncHealthKitHabits(in: modelContext)
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                dayTracker.refresh()
-                Task {
-                    await health.syncHealthKitHabits(in: modelContext)
-                    health.startObservingHealthKitHabits(in: modelContext)
-                    // Picks up permission grants made in iOS Settings and
-                    // re-anchors interval reminder chains after time away.
-                    await notifications.syncReminders(for: habits)
-                }
+    private var grid: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(habits) { habit in
+                HabitTileView(
+                    habit: habit,
+                    selectedDate: selectedDate,
+                    isPastDay: !isViewingToday,
+                    onTap: { sheet = .detail(habit) },
+                    onLog: { logToday(habit) },
+                    onUndoToday: { undoToday(habit) },
+                    onTogglePastDay: { togglePastDay(habit) },
+                    onEdit: { sheet = .edit(habit) },
+                    onArrange: { showArrange = true },
+                    onRequestDelete: { pendingDelete = habit },
+                    onStartTimer: { sheet = .timer(habit) }
+                )
             }
         }
     }
 
-    // MARK: - Subviews
+    @ViewBuilder
+    private var undoToast: some View {
+        if let undo {
+            UndoToast(message: undo.message, tint: undo.tint) { revert(undo) }
+                .padding(.horizontal, AppLayout.pageHorizontal)
+                .padding(.top, 4)
+                .readableColumn()
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .task(id: undo.id) {
+                    try? await Task.sleep(for: .seconds(4))
+                    if self.undo?.id == undo.id { self.undo = nil }
+                }
+        }
+    }
+
+    // MARK: - Presentations
+
+    private func presentations<V: View>(_ content: V) -> some View {
+        content
+            .sheet(item: $sheet) { item in
+                switch item {
+                case .edit(let habit): AddHabitView(habit: habit)
+                case .detail(let habit): HabitDetailView(habit: habit)
+                case .timer(let habit): TimerView(habit: habit)
+                }
+            }
+            .sheet(isPresented: $showDatePicker) {
+                DateBrowserSheet(selectedDate: $selectedDate)
+                    .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showArrange) {
+                ArrangeHabitsSheet()
+            }
+            .alert(
+                "Delete this habit?",
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }
+                ),
+                presenting: pendingDelete
+            ) { habit in
+                Button("Delete", role: .destructive) { delete(habit) }
+                Button("Cancel", role: .cancel) {}
+            } message: { habit in
+                Text("This permanently deletes \(habit.title) and its history.")
+            }
+    }
+
+    // MARK: - Lifecycle
+
+    private func lifecycle<V: View>(_ content: V) -> some View {
+        content
+            .task {
+                try? await health.requestAuthorization()
+                await health.syncHealthKitHabits(in: modelContext)
+                // HealthKit change notifications keep health tiles near
+                // real-time instead of waiting on the polling tick.
+                health.startObservingHealthKitHabits(in: modelContext)
+
+                // Permission is requested lazily when a reminder is turned on.
+                await notifications.syncReminders(for: habits)
+            }
+            .onChange(of: reminderSignature) { _, _ in
+                Task { await notifications.syncReminders(for: habits) }
+            }
+            .task(id: "health-sync") {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(15))
+                    guard !Task.isCancelled else { break }
+                    await health.syncHealthKitHabits(in: modelContext)
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    dayTracker.refresh()
+                    Task {
+                        await health.syncHealthKitHabits(in: modelContext)
+                        health.startObservingHealthKitHabits(in: modelContext)
+                        // Picks up permission grants made in iOS Settings and
+                        // re-anchors interval reminder chains after time away.
+                        await notifications.syncReminders(for: habits)
+                    }
+                }
+            }
+    }
+
+    // MARK: - Header
+
+    private func header(streak: Int, todayIsPerfect: Bool) -> some View {
+        PageTitle(kicker: kicker, title: title) {
+            if streak > 0 {
+                Text(streakLine(streak: streak, todayIsPerfect: todayIsPerfect))
+                    .font(.caption)
+                    .foregroundStyle(todayIsPerfect ? AnyShapeStyle(AppColors.success) : AnyShapeStyle(.secondary))
+            }
+        } accessory: {
+            HStack(spacing: 0) {
+                StreakChip(streak: streak, doneToday: todayIsPerfect)
+
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .accessibilityLabel("Add habit")
+
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+                .accessibilityLabel("Settings")
+            }
+            .padding(.trailing, 2)
+            .headerGlass()
+        }
+    }
+
+    private var kicker: String {
+        dayTracker.today.formatted(.dateTime.weekday(.wide).month(.wide).day())
+    }
+
+    private var title: String {
+        isViewingToday ? "Today" : selectedDate.relativeDayName
+    }
+
+    /// Never claims a day the user has not earned: before today is perfect it
+    /// names the stake.
+    private func streakLine(streak: Int, todayIsPerfect: Bool) -> String {
+        let days = streak == 1 ? "1 perfect day" : "\(streak) perfect days"
+        return todayIsPerfect ? "\(days) in a row · nice work" : "\(days) in a row · finish today to keep it"
+    }
+
+    // MARK: - Reminder signature
 
     /// Order-insensitive fingerprint of every habit field that reminder
     /// scheduling depends on. Includes completion counts so logging or
@@ -158,51 +287,80 @@ struct ContentView: View {
             .joined(separator: ";")
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "circle.hexagongrid")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.white.opacity(0.35))
-            Text("No habits yet")
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Tap + to add your first one.")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 70)
-    }
-
     // MARK: - Actions
 
-    private func logCompletion(for habit: Habit) {
-        // Logging only ever applies to today; the tile suppresses the
-        // slide/contextMenu when browsing a past date, this is a fallback.
-        guard isViewingToday, !habit.isCompletedToday else { return }
-        let completion = HabitCompletion(date: Date(), value: habit.targetValue, habit: habit)
-        modelContext.insert(completion)
-        try? modelContext.save()
+    private func logToday(_ habit: Habit) {
+        guard isViewingToday, habit.log(on: Date(), in: modelContext) != nil else { return }
+        undo = UndoLog(habit: habit, day: Date(), wasLogged: true)
+    }
+
+    private func undoToday(_ habit: Habit) {
+        Haptics.warning()
+        habit.removeLog(on: Date(), in: modelContext)
+    }
+
+    /// Past days are fixed with one tap rather than a slide: a forgotten log
+    /// is the most common correction, and the toast offers the way back.
+    private func togglePastDay(_ habit: Habit) {
+        let day = selectedDate
+        if habit.isCompleted(on: day) {
+            Haptics.warning()
+            habit.removeLog(on: day, in: modelContext)
+            undo = UndoLog(habit: habit, day: day, wasLogged: false)
+        } else {
+            Haptics.success()
+            SoundEffects.logChime()
+            habit.log(on: day, in: modelContext)
+            undo = UndoLog(habit: habit, day: day, wasLogged: true)
+        }
+    }
+
+    private func revert(_ change: UndoLog) {
+        undo = nil
+        guard let habit = habits.first(where: { $0.id == change.habitID }) else { return }
+        if change.wasLogged {
+            habit.removeLog(on: change.day, in: modelContext)
+        } else {
+            habit.log(on: change.day, in: modelContext)
+        }
     }
 
     private func delete(_ habit: Habit) {
-        Haptics.error()
-        // Tear down any active timer for this habit BEFORE the model
-        // is deleted so `TimerCenter.stop()` can dismiss the Live
-        // Activity while the snapshot still references a real habit.
-        if timerCenter.habitID == habit.id {
-            timerCenter.stop()
-        }
-        // Same belt-and-braces for reminders; the signature change below
-        // would resync anyway, but this doesn't depend on observers.
-        notifications.cancelReminders(habitID: habit.id)
-        modelContext.delete(habit)
-        try? modelContext.save()
+        if undo?.habitID == habit.id { undo = nil }
+        HabitLifecycle.delete(habit, in: modelContext, timer: timerCenter, notifications: notifications)
+        pendingDelete = nil
     }
 
     private func refreshHealth() async {
         Haptics.light()
         await health.syncHealthKitHabits(in: modelContext)
+    }
+}
+
+// MARK: - Undo
+
+/// The last change made from the grid, kept for four seconds so the toast can
+/// take it back.
+struct UndoLog: Equatable {
+    let id = UUID()
+    let habitID: UUID
+    let title: String
+    let tint: Color
+    let day: Date
+    /// True when the change added a log; false when it removed one.
+    let wasLogged: Bool
+
+    init(habit: Habit, day: Date, wasLogged: Bool) {
+        self.habitID = habit.id
+        self.title = habit.title
+        self.tint = habit.color
+        self.day = day.startOfDay
+        self.wasLogged = wasLogged
+    }
+
+    var message: String {
+        let when = day.isToday ? "" : " for \(day.relativeDayName)"
+        return wasLogged ? "\(title) logged\(when)" : "\(title) unlogged\(when)"
     }
 }
 
@@ -224,10 +382,13 @@ enum HabitSheet: Identifiable {
 
 #Preview {
     let notifications = NotificationService()
-    return ContentView()
-        .modelContainer(for: [Habit.self, HabitCompletion.self], inMemory: true)
-        .environment(HealthKitService())
-        .environment(notifications)
-        .environment(TimerCenter(notifications: notifications))
-        .environment(DayTracker())
+    return NavigationStack {
+        ContentView()
+            .background { AppBackground() }
+    }
+    .modelContainer(for: [Habit.self, HabitCompletion.self, ReportTemplate.self], inMemory: true)
+    .environment(HealthKitService())
+    .environment(notifications)
+    .environment(TimerCenter(notifications: notifications))
+    .environment(DayTracker())
 }

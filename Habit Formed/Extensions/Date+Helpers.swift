@@ -28,13 +28,13 @@ nonisolated extension Date {
     /// Calculates the consecutive-day streak ending today (or yesterday;
     /// a streak survives one missed day's worth of grace until the calendar
     /// rolls over). Returns 0 when no completion exists in either window.
-    static func calculateStreak(from dates: [Date]) -> Int {
+    static func calculateStreak(from dates: [Date], today: Date = Date()) -> Int {
         guard !dates.isEmpty else { return 0 }
 
         let unique = Set(dates.map { $0.startOfDay })
         let sorted = unique.sorted(by: >)
 
-        let today = Date().startOfDay
+        let today = today.startOfDay
         let yesterday = today.adding(days: -1)
 
         guard let mostRecent = sorted.first,
@@ -60,9 +60,16 @@ nonisolated extension Date {
 
     /// Returns the dates for the trailing `count` days (oldest first),
     /// anchored to the start of today.
-    static func trailingDays(_ count: Int) -> [Date] {
-        let today = Date().startOfDay
-        return (0..<count).reversed().map { today.adding(days: -$0) }
+    static func trailingDays(_ count: Int, endingOn last: Date = Date()) -> [Date] {
+        let end = last.startOfDay
+        return (0..<count).reversed().map { end.adding(days: -$0) }
+    }
+
+    /// "Today", "Yesterday", or a short weekday and date ("Mon, Oct 12").
+    var relativeDayName: String {
+        if isToday { return "Today" }
+        if isYesterday { return "Yesterday" }
+        return formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
     /// Start of the calendar week (per `Calendar.current` first weekday)

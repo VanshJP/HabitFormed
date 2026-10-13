@@ -34,6 +34,7 @@ struct Habit_FormedApp: App {
         let schema = Schema([
             Habit.self,
             HabitCompletion.self,
+            ReportTemplate.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -56,7 +57,6 @@ struct Habit_FormedApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
-                .tint(AppColors.primary)
                 .environment(health)
                 .environment(notifications)
                 .environment(timer)

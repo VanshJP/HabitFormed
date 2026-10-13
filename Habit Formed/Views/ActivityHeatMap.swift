@@ -1,18 +1,21 @@
 import SwiftUI
 
-/// GitHub-contributions-style heatmap. Columns are weeks (oldest left → newest
-/// right), rows are days of the week. Cells are filled with the habit's accent
-/// color on completed days and dimmed otherwise. Future days in the current
-/// week render as a fully transparent placeholder so the grid stays rectangular.
+/// Contributions-style heat map: columns are weeks (oldest left), rows are
+/// days of the week. Logged days take the habit's colour; future days in the
+/// current week are blank so the grid stays rectangular.
+///
+/// With `onToggleDay` set, every past cell is a button that adds or removes
+/// that day's log, which is how the detail sheet fixes history.
 struct ActivityHeatMap: View {
     let completionDates: [Date]
     let accent: Color
     var weeks: Int = 5
     var cellSpacing: CGFloat = 3
     var cornerRadius: CGFloat = 3
-    /// When nil, cells stretch to fill the container's width using a fixed
-    /// `weeks × 7` aspect ratio. When set, cells render at that exact size.
+    /// When nil, cells stretch to fill the width; when set, cells render at
+    /// exactly this size.
     var cellSize: CGFloat? = nil
+    var onToggleDay: ((Date) -> Void)? = nil
 
     var body: some View {
         let grid = Self.buildGrid(weeks: weeks)
@@ -47,26 +50,37 @@ struct ActivityHeatMap: View {
     private func cell(date: Date?, completed: Set<Date>, size: CGFloat) -> some View {
         if let date {
             let isCompleted = completed.contains(date)
-            let isToday = date.isToday
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(isCompleted ? accent : Color.white.opacity(0.08))
+            let face = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(isCompleted ? accent.glyphTone : Color.white.opacity(0.08))
                 .overlay {
-                    if isToday {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                    if date.isToday {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
                     }
                 }
                 .frame(width: size, height: size)
+
+            if let onToggleDay {
+                Button {
+                    onToggleDay(date)
+                } label: {
+                    face.contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
+                .accessibilityValue(isCompleted ? "Logged" : "Not logged")
+                .accessibilityHint(isCompleted ? "Removes this day's log" : "Logs this day")
+            } else {
+                face
+            }
         } else {
-            // Future day in the current week: keep the grid rectangular.
             Color.clear.frame(width: size, height: size)
         }
     }
 
-    /// 2-D matrix of dates: `grid[column][row]` where column 0 is the oldest
-    /// week and column `weeks-1` is the current week. Days beyond today are
-    /// nil so the consumer can render them as placeholders.
-    private static func buildGrid(weeks: Int) -> [[Date?]] {
+    /// `grid[column][row]`: column 0 is the oldest week, column `weeks - 1`
+    /// the current one. Days after today are nil.
+    static func buildGrid(weeks: Int) -> [[Date?]] {
         let cal = Calendar.current
         let today = Date().startOfDay
         guard let thisWeekStart = cal.dateInterval(of: .weekOfYear, for: today)?.start else {

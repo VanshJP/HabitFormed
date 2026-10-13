@@ -1,20 +1,25 @@
 import SwiftUI
 
-/// Habit tile with three display modes:
-/// - Manual: icon, title, streak, slide-to-log track
-/// - HealthKit: icon, title, streak, live progress bar ("5.3k / 10k steps")
-/// - Timer: icon, title, streak, week dots + play button
+/// One habit on the Today grid. Three bottom rows by type:
+/// - Manual: the slide-to-log track
+/// - HealthKit: today's reading against the target, with a meter
+/// - Timer: the week's dots and a play capsule
+///
+/// Gestures: tap opens the detail sheet, the slide logs today, a long press
+/// opens the context menu. On a past day the bottom row is a pill that
+/// toggles that day's log, so a forgotten day is one tap to fix.
 struct HabitTileView: View {
     let habit: Habit
-    /// Date the home grid is currently displaying. Tile visuals (status badge,
-    /// glow, bottom action) all reflect this date. Equals `.now` in normal use.
+    /// The day the grid is showing. Equals today in normal use.
     var selectedDate: Date = .now
-    /// True when the user is browsing a non-today date. Suppresses the context
-    /// menu, slide-to-log, and timer start so past-day browsing is read-only.
-    var isReadOnly: Bool = false
+    /// True when the grid is showing a day before today.
+    var isPastDay: Bool = false
     let onTap: () -> Void
     let onLog: () -> Void
+    let onUndoToday: () -> Void
+    let onTogglePastDay: () -> Void
     let onEdit: () -> Void
+    let onArrange: () -> Void
     let onRequestDelete: () -> Void
     let onStartTimer: () -> Void
 
@@ -22,18 +27,17 @@ struct HabitTileView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
 
-    // Drives the radial reveal of `completionGlow`. 0 = empty, 1 = card fully
-    // bathed in the habit color. Animated from the slide track's release end
-    // when the user logs via slide; snapped instantly for non-manual habits.
+    // Drives the radial reveal of `completionGlow`: 0 is empty, 1 bathes the
+    // tile. Swept from the slide knob when the user logs by slide.
     @State private var sweepProgress: CGFloat = 0
-    @State private var showStopConfirm: Bool = false
-    /// When true the tile expands to show a GitHub-style activity heatmap
-    /// just below the streak row. Toggled by tapping the streak label.
-    @State private var showHeatMap: Bool = false
+    @State private var showStopConfirm = false
+    /// Expands a 12-week heat map under the streak. Toggled by the streak.
+    @State private var showHeatMap = false
 
-    /// Completion state for the date currently being browsed. Weekly habits
-    /// "stay lit" for the entire calendar week containing `selectedDate` so
-    /// the glow doesn't flicker on/off as you scrub between days.
+    private let padding = AppLayout.tilePadding
+
+    /// Completion for the day being shown. Weekly habits stay lit for the
+    /// whole week once logged, so the glow doesn't flicker between days.
     private var effectiveCompleted: Bool {
         if habit.frequency == .weekly {
             return !habit.completionsInWeek(of: selectedDate).isEmpty
@@ -42,35 +46,26 @@ struct HabitTileView: View {
     }
 
     var body: some View {
-        // Re-render at midnight so `isCompletedToday`-driven UI updates.
+        // Re-render at midnight so today-driven state updates.
         let _ = dayTracker.today
 
         return ZStack(alignment: .topLeading) {
             completionGlow
             content
-                // A resting interval habit recedes to half strength so it
-                // reads as "sitting out today" yet stays discoverable.
-                .opacity(intervalRestingDays == nil ? 1 : 0.55)
+                // A resting interval habit recedes so it reads as "sitting out
+                // today" yet stays discoverable.
+                .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
         }
-        .frame(minHeight: 178)
-        .glassCard(cornerRadius: 20, tint: tileTint)
-        .contentShape(RoundedRectangle(cornerRadius: 20))
+        .frame(minHeight: 184)
+        .glassCard(
+            cornerRadius: AppLayout.tileRadius,
+            tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
+        )
+        .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
         .onTapGesture { Haptics.light(); onTap() }
-        .conditionalContextMenu(isReadOnly == false) {
-            Button("Edit", systemImage: "pencil")          { Haptics.light(); onEdit() }
-            if !habit.isCompletedToday {
-                Button("Log Today", systemImage: "checkmark.seal.fill") { Haptics.success(); SoundEffects.logChime(); onLog() }
-            }
-            if timerIsActiveForThisHabit && timerCenter.isActive {
-                Button("Stop Timer", systemImage: "stop.circle", role: .destructive) {
-                    Haptics.warning()
-                    timerCenter.stop()
-                }
-            }
-            Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); onRequestDelete() }
-        }
+        .contextMenu { menu }
         .confirmationDialog(
-            "Stop timer for \(habit.title)?",
+            "Stop the timer for \(habit.title)?",
             isPresented: $showStopConfirm,
             titleVisibility: .visible
         ) {
@@ -80,22 +75,53 @@ struct HabitTileView: View {
             }
             Button("Keep going", role: .cancel) {}
         } message: {
-            Text("Progress won't be logged.")
+            Text("This session won't be logged.")
         }
         .onAppear { sweepProgress = effectiveCompleted ? 1 : 0 }
         .onChange(of: effectiveCompleted) { _, isLogged in
-            if isLogged {
-                if isManualHabit && !isReadOnly {
-                    withAnimation(.easeOut(duration: 0.5)) { sweepProgress = 1 }
-                } else {
-                    sweepProgress = 1
-                }
+            if isLogged, habit.trackKind == .manual, !isPastDay {
+                withAnimation(.easeOut(duration: 0.5)) { sweepProgress = 1 }
             } else {
-                sweepProgress = 0
+                sweepProgress = isLogged ? 1 : 0
             }
         }
-        .accessibilityLabel("\(habit.title), \(habit.displayStreak) \(habit.streakUnitLabel) streak")
-        .accessibilityHint(isReadOnly ? "Tap to view history." : "Tap to view history. Long press for options.")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Opens history. Long press for options.")
+    }
+
+    // MARK: - Menu
+
+    @ViewBuilder
+    private var menu: some View {
+        if isPastDay {
+            let label = habit.isCompleted(on: selectedDate) ? "Remove this day's log" : "Log this day"
+            Button(label, systemImage: habit.isCompleted(on: selectedDate) ? "minus.circle" : "checkmark.circle") {
+                onTogglePastDay()
+            }
+        } else if habit.isCompletedToday {
+            Button("Undo today's log", systemImage: "arrow.uturn.backward") { onUndoToday() }
+        } else {
+            Button("Log today", systemImage: "checkmark.circle") {
+                Haptics.success()
+                SoundEffects.logChime()
+                onLog()
+            }
+        }
+        if habit.timerDurationSeconds > 0, !isPastDay {
+            if timerIsActiveForThisHabit {
+                Button("Stop timer", systemImage: "stop.circle", role: .destructive) {
+                    Haptics.warning()
+                    timerCenter.stop()
+                }
+            } else {
+                Button("Start timer", systemImage: "timer") { onStartTimer() }
+            }
+        }
+        Divider()
+        Button("Edit", systemImage: "pencil") { Haptics.light(); onEdit() }
+        Button("Arrange habits", systemImage: "arrow.up.arrow.down") { onArrange() }
+        Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); onRequestDelete() }
     }
 
     // MARK: - Layout
@@ -103,90 +129,66 @@ struct HabitTileView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             topRow
-            Spacer(minLength: 8)
+            Spacer(minLength: 10)
             Text(habit.title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 4)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
             streakRow
+                .padding(.top, 2)
             Spacer(minLength: 10)
             bottomSection
             if showHeatMap {
-                heatMap
-                    .padding(.top, 14)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                ActivityHeatMap(
+                    completionDates: habit.completionDates,
+                    accent: habit.color,
+                    weeks: 12,
+                    cellSpacing: 2,
+                    cornerRadius: 2
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .padding(14)
+        .padding(padding)
     }
 
-    // Inline activity heatmap revealed by tapping the streak. Fills the
-    // tile's full content width with a 12-week × 7-day grid so the chart
-    // sits compactly under the action row without overshooting the tile.
-    private var heatMap: some View {
-        ActivityHeatMap(
-            completionDates: habit.completionDates,
-            accent: habit.color,
-            weeks: 12,
-            cellSpacing: 2,
-            cornerRadius: 2
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // Always present in the hierarchy so a circular mask driven by
-    // `sweepProgress` can animate it in. For manual habits the reveal sweeps
-    // from the slide track's release point (bottom-right of the card); for
-    // HealthKit / Timer habits it snaps in instantly via `sweepProgress = 1`.
+    // Always present so a circular mask driven by `sweepProgress` can animate
+    // it in. For manual habits the reveal sweeps from the slide knob's resting
+    // end (bottom trailing); for health and timer habits it snaps in.
     private var completionGlow: some View {
         GeometryReader { proxy in
             let w = proxy.size.width
             let h = proxy.size.height
-            // Anchor: 14pt card padding + 15pt knob radius from the right;
-            // 14pt bottom padding + half of the 34pt slide track from the bottom.
-            let origin = CGPoint(x: w - 29, y: h - 31)
-            // Diameter must reach the farthest corner (top-left) when full.
+            let half = SlideToLogTrack.trackHeight / 2
+            let origin = CGPoint(x: w - padding - half, y: h - padding - half)
             let maxRadius = hypot(origin.x, origin.y)
 
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
                 .fill(LinearGradient(
-                    colors: [habit.color.opacity(0.42), habit.color.opacity(0.12)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
+                    colors: [habit.color.opacity(0.30), habit.color.opacity(0.06)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 ))
                 .mask(
                     Circle()
-                        .frame(width: maxRadius * 2 * sweepProgress,
-                               height: maxRadius * 2 * sweepProgress)
+                        .frame(width: maxRadius * 2 * sweepProgress, height: maxRadius * 2 * sweepProgress)
                         .position(origin)
                 )
         }
         .allowsHitTesting(false)
     }
 
-    private var isManualHabit: Bool {
-        habit.source == .none && habit.timerDurationSeconds == 0
-    }
-
     // MARK: - Header
 
     private var topRow: some View {
         HStack(alignment: .top) {
-            iconBadge
+            IconChip(icon: habit.symbol, tint: habit.color, size: 30)
             Spacer()
             statusBadge
-        }
-    }
-
-    private var iconBadge: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(habit.color.opacity(0.28))
-                .frame(width: 36, height: 36)
-            Image(systemName: habit.symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
         }
     }
 
@@ -194,22 +196,23 @@ struct HabitTileView: View {
     private var statusBadge: some View {
         if effectiveCompleted {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(habit.color)
-        } else if habit.frequency == .interval && habit.source == .none {
-            // Interval cadence cue: a quiet clock while the countdown
-            // runs; the exclamation tint only once due or overdue.
+                .font(.body)
+                .foregroundStyle(habit.color.glyphTone)
+                .transition(.scale.combined(with: .opacity))
+        } else if habit.frequency == .interval && habit.source == .none && !isPastDay {
+            // Interval cue: a quiet clock while the countdown runs, tinted
+            // once due or overdue.
             Image(systemName: habit.isDue ? "clock.badge.exclamationmark" : "clock")
-                .font(.system(size: 14))
-                .foregroundStyle(habit.isDue ? habit.color : Color.white.opacity(0.38))
+                .font(.footnote)
+                .foregroundStyle(habit.isDue ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.tertiary))
         } else if habit.source != .none {
-            Image(systemName: "heart.text.square.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.38))
+            Image(systemName: "heart.text.square")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
         } else if habit.timerDurationSeconds > 0 {
             Image(systemName: "timer")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.38))
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
         }
     }
 
@@ -218,59 +221,68 @@ struct HabitTileView: View {
     private var streakRow: some View {
         Button {
             Haptics.light()
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                showHeatMap.toggle()
-            }
+            withAnimation(AppMotion.settle) { showHeatMap.toggle() }
         } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("\(habit.displayStreak)")
-                    .font(.system(size: 19, weight: .black, design: .rounded))
+                    .font(.statValue)
                     .foregroundStyle(.white)
                 Text(habit.streakUnitLabel)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(showHeatMap ? -180 : 0))
                 Spacer(minLength: 0)
             }
+            .frame(minHeight: 28)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(habit.displayStreak) \(habit.streakUnitLabel) streak")
+        .accessibilityHint(showHeatMap ? "Hides the last 12 weeks" : "Shows the last 12 weeks")
     }
 
-    // MARK: - Bottom section (varies by habit type)
+    // MARK: - Bottom section
 
     @ViewBuilder
     private var bottomSection: some View {
-        if isReadOnly {
-            // Past-day browse: collapse all interactive controls into a single
-            // read-only pill that reflects the selected date.
-            readOnlyStatusPill
-        } else if habit.source != .none {
-            healthProgressView
-        } else if habit.timerDurationSeconds > 0 {
-            timerRow
+        if isPastDay {
+            pastDayPill
         } else {
-            manualSlide
+            switch habit.trackKind {
+            case .health: healthProgressView
+            case .timer: timerRow
+            case .manual: manualSlide
+            }
         }
     }
 
-    private var readOnlyStatusPill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: effectiveCompleted ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 12, weight: .bold))
-            Text(effectiveCompleted ? "LOGGED" : "NOT LOGGED")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(1.2)
+    /// A past day's log as a toggle: tap to add a forgotten log or remove a
+    /// wrong one. The toast on Today offers the way back.
+    private var pastDayPill: some View {
+        let logged = habit.isCompleted(on: selectedDate)
+        return Button(action: onTogglePastDay) {
+            HStack(spacing: 6) {
+                Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.footnote.weight(.semibold))
+                Text(logged ? "Logged" : "Tap to log")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+            .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
+            .background(
+                Capsule().fill(logged ? habit.color.opacity(0.28) : Color.white.opacity(0.08))
+            )
+            .contentShape(Capsule())
         }
-        .foregroundStyle(effectiveCompleted ? .white : .white.opacity(0.55))
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 9)
-        .background(
-            Capsule().fill(effectiveCompleted ? habit.color.opacity(0.45) : Color.white.opacity(0.06))
-        )
+        .buttonStyle(GlassPressStyle())
+        .accessibilityLabel(logged ? "Logged on \(selectedDate.relativeDayName)" : "Log \(selectedDate.relativeDayName)")
     }
 
-    // HealthKit: progress bar + value / target. Switches between daily and
-    // weekly aggregates based on the habit's frequency.
+    /// Today's HealthKit reading against the target; weekly habits show the
+    /// week-to-date sum.
     private var healthProgressView: some View {
         let isWeekly = habit.frequency == .weekly
         let liveValue = (isWeekly
@@ -278,62 +290,55 @@ struct HabitTileView: View {
             : health.liveValues[habit.source.rawValue]) ?? 0
         let progress = min(liveValue / max(habit.targetValue, 1), 1.0)
 
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 2) {
-                Text(formattedValue(liveValue))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(habit.source.compactValue(liveValue))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
-                Text(" / \(formattedTarget)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.42))
+                Text("of \(habit.source.compactValue(habit.targetValue))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 if isWeekly {
-                    Text("WEEK")
-                        .font(.system(size: 9, weight: .heavy, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundStyle(.white.opacity(0.5))
+                    Text("Week")
+                        .eyebrowStyle()
                 }
             }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
-                    Capsule()
-                        .fill(progress >= 1 ? habit.color : habit.color.opacity(0.8))
-                        .frame(width: max(6, geo.size.width * progress))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.75), value: progress)
-                }
-            }
-            .frame(height: 5)
+            MeterBar(fraction: progress, color: habit.color.glyphTone, height: 6)
+                .motion(AppMotion.settle, value: progress)
         }
+        .frame(minHeight: SlideToLogTrack.trackHeight, alignment: .bottom)
     }
 
-    // Timer: week dots on the left, play/start button on the right
+    /// The week's dots on the leading side, the play capsule on the trailing.
     private var timerRow: some View {
         HStack(spacing: 0) {
-            WeekDotsView(completionDates: habit.completionDates)
-            Spacer()
+            WeekDotsView(completionDates: habit.completionDates, accent: habit.color)
+            Spacer(minLength: 6)
             Button {
                 Haptics.medium()
                 onStartTimer()
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: timerIcon)
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                     Text(timerLabel)
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
+                        .font(.caption.weight(.semibold).monospacedDigit())
                 }
                 .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
                 .background(
-                    Capsule().fill(habit.isCompletedToday ? habit.color.opacity(0.35) : habit.color.opacity(0.85))
+                    Capsule().fill(habit.isCompletedToday ? habit.color.opacity(0.3) : habit.color.opacity(0.85))
                 )
+                .frame(minHeight: SlideToLogTrack.trackHeight)
+                .contentShape(.rect)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlassPressStyle())
             .disabled(habit.isCompletedToday)
-            // Inside-out gesture priority: this absorbs the long-press
-            // before the parent contextMenu can claim it.
+            .accessibilityLabel(timerIsActiveForThisHabit ? "Open timer" : "Start \(habit.timerDurationSeconds / 60) minute timer")
+            // Inside-out gesture priority: this absorbs the long press before
+            // the tile's context menu can claim it.
             .onLongPressGesture(minimumDuration: 0.6) {
                 guard timerIsActiveForThisHabit else { return }
                 Haptics.light()
@@ -342,16 +347,16 @@ struct HabitTileView: View {
         }
     }
 
-    // Reflect the global TimerCenter state on the tile so the user can see
-    // a running timer at a glance from the home grid.
     private var timerIsActiveForThisHabit: Bool { timerCenter.habitID == habit.id }
 
     private var timerIcon: String {
+        if habit.isCompletedToday { return "checkmark" }
         if !timerIsActiveForThisHabit { return "play.fill" }
         return timerCenter.isRunning ? "waveform" : "pause.fill"
     }
 
     private var timerLabel: String {
+        if habit.isCompletedToday { return "Done" }
         if timerIsActiveForThisHabit {
             let s = timerCenter.remainingSeconds
             return String(format: "%d:%02d", s / 60, s % 60)
@@ -359,12 +364,11 @@ struct HabitTileView: View {
         return "\(habit.timerDurationSeconds / 60)m"
     }
 
-    // Manual: slide-to-log track. For weekly habits a tiny "X / N THIS WEEK"
-    // caption sits above the slide so the user can see weekly progress at a
-    // glance; interval habits show their next-due cadence in the same slot
-    // and swap the track for a resting pill while counting down.
+    /// Manual: the slide track. Weekly habits show "2 / 5 this week" above
+    /// it; interval habits show their cadence there and swap the track for a
+    /// resting pill while the countdown runs.
     private var manualSlide: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             if let remaining = intervalRestingDays {
                 intervalRestingPill(days: remaining)
             } else {
@@ -380,9 +384,8 @@ struct HabitTileView: View {
         }
     }
 
-    /// Days left on an interval countdown while the tile stays log-free;
-    /// nil whenever the slide track belongs (due today, overdue, already
-    /// logged today, never logged, or not an interval habit).
+    /// Days left on an interval countdown while the tile stays log-free; nil
+    /// whenever the slide track belongs.
     private var intervalRestingDays: Int? {
         guard habit.frequency == .interval,
               !habit.isCompletedToday,
@@ -390,114 +393,50 @@ struct HabitTileView: View {
         return remaining
     }
 
-    // Quiet stand-in for the slide track mid-countdown so upcoming cycles
-    // don't invite a log; manual logging stays available in detail view.
     private func intervalRestingPill(days: Int) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "clock")
-                .font(.system(size: 12, weight: .bold))
-            Text("NEXT LOG IN \(days)D")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(1.2)
+                .font(.footnote.weight(.semibold))
+            Text(days == 1 ? "Next log tomorrow" : "Next log in \(days) days")
+                .font(.caption.weight(.semibold))
         }
-        .foregroundStyle(.white.opacity(0.55))
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 9)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
         .background(Capsule().fill(Color.white.opacity(0.06)))
     }
 
     private var weeklyCountCaption: some View {
         let count = habit.completionsThisWeek
         let target = habit.weeklyTarget
-        let met = count >= target
-        return Text("\(count) / \(target) THIS WEEK")
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
-            .tracking(1.2)
-            .foregroundStyle(met ? habit.color : .white.opacity(0.42))
+        return Text("\(count) / \(target) this week")
+            .eyebrowStyle(count >= target ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
     }
 
-    // Countdown status for interval habits, mirroring the weekly caption slot.
     private var cadenceCaption: some View {
-        let remaining = habit.daysUntilDue
         let text: String
-        let tint: Color
-        switch remaining {
+        let urgent: Bool
+        switch habit.daysUntilDue {
         case nil:
-            text = "EVERY \(habit.intervalDays) DAYS"
-            tint = .white.opacity(0.42)
+            text = "Every \(habit.intervalDays) days"
+            urgent = false
         case 0?:
-            text = "DUE TODAY"
-            tint = habit.color
+            text = "Due today"
+            urgent = true
         case let d? where d < 0:
-            text = "\(abs(d))D OVERDUE"
-            tint = habit.color
+            text = "\(abs(d))d overdue"
+            urgent = true
         case let d?:
-            text = "NEXT IN \(d)D"
-            tint = .white.opacity(0.42)
+            text = "Next in \(d)d"
+            urgent = false
         }
         return Text(text)
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
-            .tracking(1.2)
-            .foregroundStyle(tint)
+            .eyebrowStyle(urgent ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
     }
 
-    // MARK: - Helpers
+    // MARK: - Accessibility
 
-    private func formattedValue(_ value: Double) -> String {
-        switch habit.source {
-        case .steps, .activeCalories:
-            return value >= 1000 ? String(format: "%.1fk", value / 1000) : "\(Int(value))"
-        case .sleepHours, .standHours:
-            return String(format: "%.1fh", value)
-        case .mindfulMinutes, .exerciseMinutes:
-            return "\(Int(value))m"
-        case .walkingDistance:
-            return String(format: "%.1fkm", value)
-        case .flightsClimbed:
-            return "\(Int(value))"
-        case .none:
-            return ""
-        }
-    }
-
-    private var formattedTarget: String {
-        switch habit.source {
-        case .steps, .activeCalories:
-            let t = habit.targetValue
-            return t >= 1000 ? String(format: "%.0fk", t / 1000) : "\(Int(t))"
-        case .sleepHours, .standHours:
-            return String(format: "%.0fh", habit.targetValue)
-        case .mindfulMinutes, .exerciseMinutes:
-            return "\(Int(habit.targetValue))m"
-        case .walkingDistance:
-            return String(format: "%.0fkm", habit.targetValue)
-        case .flightsClimbed:
-            return "\(Int(habit.targetValue))"
-        case .none:
-            return ""
-        }
-    }
-
-    private var tileTint: Color {
-        effectiveCompleted ? habit.color.opacity(0.14) : AppColors.glassTintAccent
-    }
-}
-
-// MARK: - Conditional contextMenu
-
-private extension View {
-    /// Applies `.contextMenu { content }` only when `enabled` is true. When
-    /// disabled, the long-press gesture is suppressed entirely instead of
-    /// presenting an empty menu container.
-    @ViewBuilder
-    func conditionalContextMenu<M: View>(
-        _ enabled: Bool,
-        @ViewBuilder content: () -> M
-    ) -> some View {
-        if enabled {
-            self.contextMenu { content() }
-        } else {
-            self
-        }
+    private var accessibilityLabel: String {
+        let state = effectiveCompleted ? "done" : "not done"
+        return "\(habit.title), \(state), \(habit.displayStreak) \(habit.streakUnitLabel) streak"
     }
 }

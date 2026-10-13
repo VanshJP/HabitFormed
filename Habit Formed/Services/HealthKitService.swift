@@ -2,6 +2,39 @@ import Foundation
 import HealthKit
 import SwiftData
 
+// MARK: - Day Health Metrics
+
+/// One day's Apple Health numbers for the daily report. Every value is
+/// optional: nil means no permission or no samples, and the card skips it.
+nonisolated struct DayHealthMetrics: Sendable, Hashable {
+    var steps: Double?
+    var activeKcal: Double?
+    var restingKcal: Double?
+    var eatenKcal: Double?
+    var exerciseMinutes: Double?
+    var sleepHours: Double?
+    var mindfulMinutes: Double?
+    var protein: Double?
+    var carbs: Double?
+    var fat: Double?
+
+    static let empty = DayHealthMetrics()
+
+    /// Active plus resting energy. Nil only when Health has neither.
+    var burnedKcal: Double? {
+        guard activeKcal != nil || restingKcal != nil else { return nil }
+        return (activeKcal ?? 0) + (restingKcal ?? 0)
+    }
+
+    /// Eaten minus burned: negative is a deficit.
+    var netKcal: Double? {
+        guard let eatenKcal, let burnedKcal else { return nil }
+        return eatenKcal - burnedKcal
+    }
+
+    var hasMacros: Bool { protein != nil || carbs != nil || fat != nil }
+}
+
 enum HealthKitError: LocalizedError {
     case unavailable
     case authorizationFailed(Error)
@@ -66,6 +99,68 @@ final class HealthKitService {
         } catch {
             throw HealthKitError.authorizationFailed(error)
         }
+    }
+
+    /// The extra types a daily report reads: food energy and macros, and the
+    /// resting burn that completes "calories out". Asked for when a report
+    /// that shows them first opens, not at launch, so the Health sheet only
+    /// appears for people who want calories on a card.
+    private var reportReadTypes: Set<HKObjectType> {
+        var set = readTypes
+        let qtypes: [HKQuantityTypeIdentifier] = [
+            .dietaryEnergyConsumed, .basalEnergyBurned,
+            .dietaryProtein, .dietaryCarbohydrates, .dietaryFatTotal,
+        ]
+        for id in qtypes {
+            if let t = HKQuantityType.quantityType(forIdentifier: id) { set.insert(t) }
+        }
+        return set
+    }
+
+    func requestReportAuthorization() async {
+        guard isAvailable else { return }
+        try? await store.requestAuthorization(toShare: [], read: reportReadTypes)
+    }
+
+    // MARK: - Day metrics (daily report)
+
+    /// Every number a daily report can print for `day`. Missing data (no
+    /// permission, no samples) comes back nil and the card leaves it out.
+    func dayMetrics(for day: Date) async -> DayHealthMetrics {
+        guard isAvailable else { return .empty }
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: day)
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
+        // Sleep belongs to the night before the day it is reported on.
+        let sleepStart = start.addingTimeInterval(-6 * 60 * 60)
+        let sleepEnd = start.addingTimeInterval(18 * 60 * 60)
+
+        func quantity(_ id: HKQuantityTypeIdentifier, _ unit: HKUnit) async -> Double? {
+            guard let type = HKQuantityType.quantityType(forIdentifier: id) else { return nil }
+            return await sumQuantity(type: type, unit: unit, start: start, end: end)
+        }
+
+        var metrics = DayHealthMetrics()
+        metrics.steps = await quantity(.stepCount, .count())
+        metrics.activeKcal = await quantity(.activeEnergyBurned, .kilocalorie())
+        metrics.restingKcal = await quantity(.basalEnergyBurned, .kilocalorie())
+        metrics.eatenKcal = await quantity(.dietaryEnergyConsumed, .kilocalorie())
+        metrics.exerciseMinutes = await quantity(.appleExerciseTime, .minute())
+        metrics.protein = await quantity(.dietaryProtein, .gram())
+        metrics.carbs = await quantity(.dietaryCarbohydrates, .gram())
+        metrics.fat = await quantity(.dietaryFatTotal, .gram())
+
+        if let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
+           let seconds = await sumSleepAsleep(type: type, start: sleepStart, end: sleepEnd),
+           seconds > 0 {
+            metrics.sleepHours = seconds / 3600
+        }
+        if let type = HKCategoryType.categoryType(forIdentifier: .mindfulSession),
+           let seconds = await sumCategoryDuration(type: type, start: start, end: end),
+           seconds > 0 {
+            metrics.mindfulMinutes = seconds / 60
+        }
+        return metrics
     }
 
     // MARK: - Today's value

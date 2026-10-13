@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// One month-grouped block of completions inside `HabitDetailView`. Each row
-/// supports swipe-to-delete via a context menu so accidental logs are easy
-/// to undo.
+/// One month of a habit's logs inside `HabitDetailView`: a header and one row
+/// group. Long-press a row to remove a log.
 struct HabitHistoryGroup: View {
     let title: String
     let completions: [HabitCompletion]
@@ -10,28 +9,19 @@ struct HabitHistoryGroup: View {
     let onDelete: (HabitCompletion) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 6)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .eyebrowStyle()
+                .padding(.horizontal, 4)
 
-            VStack(spacing: 0) {
-                ForEach(Array(completions.enumerated()), id: \.element.id) { index, completion in
-                    HabitHistoryRow(completion: completion, accent: accent, onDelete: { onDelete(completion) })
-                    if index < completions.count - 1 {
-                        Divider()
-                            .background(Color.white.opacity(0.08))
-                            .padding(.leading, 52)
+            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
+                ForEach(completions) { completion in
+                    HabitHistoryRow(completion: completion, accent: accent) {
+                        onDelete(completion)
                     }
                 }
             }
-            .padding(.bottom, 6)
         }
-        .glassCard(cornerRadius: 16, tint: AppColors.glassTintAccent)
     }
 }
 
@@ -41,59 +31,44 @@ private struct HabitHistoryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(accent.opacity(0.25))
-                    .frame(width: 32, height: 32)
-                Text(dayNumber)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+        HStack(alignment: .firstTextBaseline, spacing: RowLayout.spacing) {
+            Text(completion.date.formatted(.dateTime.day()))
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(accent.glyphTone)
+                .frame(width: RowLayout.glyphColumn)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(completion.date.relativeDayName)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
+                if !completion.note.isEmpty {
+                    Text(completion.note)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(3)
+                }
+                Text("Logged \(completion.loggedAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(weekday)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text(loggedAtString)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-
-            Spacer()
+            Spacer(minLength: 8)
 
             if completion.value != 1 {
                 Text(formattedValue)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
-
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(accent)
-                .font(.title3)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, RowLayout.horizontalPadding)
+        .padding(.vertical, RowLayout.verticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .contextMenu {
-            Button("Remove Log", systemImage: "trash", role: .destructive) {
+            Button("Remove log", systemImage: "trash", role: .destructive) {
                 onDelete()
             }
         }
-    }
-
-    private var dayNumber: String {
-        completion.date.formatted(.dateTime.day())
-    }
-
-    private var weekday: String {
-        if completion.date.isToday { return "Today" }
-        if completion.date.isYesterday { return "Yesterday" }
-        return completion.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-    }
-
-    private var loggedAtString: String {
-        "Logged at " + completion.loggedAt.formatted(date: .omitted, time: .shortened)
     }
 
     private var formattedValue: String {

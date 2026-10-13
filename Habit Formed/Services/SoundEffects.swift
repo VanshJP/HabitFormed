@@ -15,8 +15,10 @@ enum SoundEffects {
         configure()
     }
 
-    /// Bright two-note bell that fires when a habit is logged.
+    /// Bright two-note bell that fires when a habit is logged. Silent when
+    /// Settings → Log sound is off.
     static func logChime() {
+        guard AppPreferences.isLogSoundOn else { return }
         configure()
         guard let buffer = logChimeBuffer else { return }
         if !engine.isRunning { try? engine.start() }

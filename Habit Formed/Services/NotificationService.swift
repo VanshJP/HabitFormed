@@ -2,12 +2,12 @@ import Foundation
 import UserNotifications
 
 /// Owns all `UserNotifications` interactions: permission, per-habit
-/// reminders that respect each habit's cadence, and one-shot timer
-/// completion alerts.
+/// reminders that respect each habit's cadence, the daily report nudge, and
+/// one-shot timer completion alerts.
 ///
-/// Reminder ids use the `habit-reminder-` prefix and timer alerts use
-/// `timer-`, so a reminder rebuild never touches timer alerts and vice
-/// versa. Reminders are rebuilt from scratch on every `syncReminders`
+/// Reminder ids use the `habit-reminder-` prefix, timer alerts use `timer-`,
+/// and the report nudge is `report-reminder`, so a reminder rebuild never
+/// touches the others. Reminders are rebuilt from scratch on every `syncReminders`
 /// call; iOS dedupes by identifier, making the rebuild idempotent.
 @Observable
 final class NotificationService {
@@ -200,6 +200,40 @@ final class NotificationService {
 
     private static func reminderID(_ habit: Habit) -> String {
         "\(reminderPrefix)\(habit.id.uuidString)"
+    }
+
+    // MARK: - Report reminder
+
+    private static let reportReminderID = "report-reminder"
+
+    /// The evening nudge to send the day's report: one repeating alert at the
+    /// chosen time, or none. Asks for permission the moment it is turned on.
+    @MainActor
+    func syncReportReminder(enabled: Bool, hour: Int, minute: Int) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.reportReminderID])
+        guard enabled else { return }
+
+        await refreshAuthorizationStatus()
+        if !isAuthorized { await requestAuthorization() }
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Daily report"
+        content.body = "Send today's report to your people before the day ends."
+        content.sound = .default
+        content.interruptionLevel = .active
+
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: Self.reportReminderID, content: content, trigger: trigger)
+        do {
+            try await center.add(request)
+        } catch {
+            print("Failed to schedule report reminder: \(error)")
+        }
     }
 
     // MARK: - Timer completion

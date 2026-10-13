@@ -1,99 +1,32 @@
 import SwiftUI
 
-/// Layered radial gradient background: deep navy base + ambient teal /
-/// indigo / cyan orbs. Replaces plain black for premium glass-morphism feel.
+// MARK: - App Background
+
+/// App-wide canvas. Reads `appCanvas` from the environment so Settings → App
+/// look re-skins every screen without each one owning a picker. The style
+/// nudges Classic and Midnight; every other look keeps one mood.
 struct AppBackground: View {
     var style: Style = .primary
 
+    @Environment(\.appCanvas) private var canvas
+
     enum Style {
+        /// Default: deep navy with soft teal light.
         case primary
+        /// Darker with a stronger teal accent, for a focus session (the timer).
+        case recording
+        /// A hair lighter, for sheets and detail views.
         case subtle
-        case focus
     }
 
     var body: some View {
-        ZStack {
-            Color(red: 0.035, green: 0.04, blue: 0.09)
-
-            LinearGradient(
-                colors: gradientColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [tealOrb, .clear],
-                center: UnitPoint(x: 0.85, y: 0.08),
-                startRadius: 20,
-                endRadius: 280
-            )
-
-            RadialGradient(
-                colors: [indigoOrb, .clear],
-                center: UnitPoint(x: 0.12, y: 0.88),
-                startRadius: 10,
-                endRadius: 240
-            )
-
-            RadialGradient(
-                colors: [cyanGlow, .clear],
-                center: UnitPoint(x: 0.5, y: 0.42),
-                startRadius: 10,
-                endRadius: 320
-            )
-        }
-        .ignoresSafeArea()
-    }
-
-    private var gradientColors: [Color] {
-        switch style {
-        case .primary:
-            return [
-                Color(red: 0.05, green: 0.07, blue: 0.16),
-                Color(red: 0.03, green: 0.045, blue: 0.10),
-                Color(red: 0.035, green: 0.035, blue: 0.08),
-            ]
-        case .subtle:
-            return [
-                Color(red: 0.045, green: 0.06, blue: 0.14),
-                Color(red: 0.035, green: 0.05, blue: 0.11),
-                Color(red: 0.03, green: 0.04, blue: 0.09),
-            ]
-        case .focus:
-            return [
-                Color(red: 0.02, green: 0.04, blue: 0.10),
-                Color(red: 0.01, green: 0.02, blue: 0.06),
-                Color(red: 0.02, green: 0.03, blue: 0.07),
-            ]
-        }
-    }
-
-    private var tealOrb: Color {
-        switch style {
-        case .primary: return Color.teal.opacity(0.12)
-        case .subtle:  return Color.teal.opacity(0.10)
-        case .focus:   return Color.teal.opacity(0.18)
-        }
-    }
-
-    private var indigoOrb: Color {
-        switch style {
-        case .primary: return Color.indigo.opacity(0.09)
-        case .subtle:  return Color.indigo.opacity(0.08)
-        case .focus:   return Color.indigo.opacity(0.06)
-        }
-    }
-
-    private var cyanGlow: Color {
-        switch style {
-        case .primary: return Color.cyan.opacity(0.04)
-        case .subtle:  return Color.cyan.opacity(0.03)
-        case .focus:   return Color.cyan.opacity(0.06)
-        }
+        CanvasLookView(look: canvas.look, mood: .ambient, tone: style)
+            .ignoresSafeArea()
     }
 }
 
 extension View {
+    /// Paints the app canvas behind the view.
     func appBackground(_ style: AppBackground.Style = .primary) -> some View {
         self.background { AppBackground(style: style) }
     }
