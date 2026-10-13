@@ -385,7 +385,9 @@ struct HabitScheduleSection: View {
 
 // MARK: - Reminder
 
-/// One reminder per habit, at a time of day. Permission is asked the moment
+/// One reminder per habit. By default it learns: once a few logs exist it
+/// fires `ReminderTiming.leadMinutes` before the habit is usually logged, and
+/// the set time covers the days before that. Permission is asked the moment
 /// the switch turns on, never at launch.
 struct HabitReminderSection: View {
     @Binding var draft: HabitDraft
@@ -396,13 +398,25 @@ struct HabitReminderSection: View {
             GlassRowGroup(dividerInset: RowLayout.dividerInset) {
                 SettingsRow("Remind me", icon: "bell", caption: caption, isOn: $draft.reminderEnabled)
                 if draft.reminderEnabled {
-                    SettingsRow("Time", icon: "clock") {
-                        DatePicker("Reminder time", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
+                    if canLearn {
+                        SettingsRow("Learn my time", icon: "sparkles", caption: learnCaption, isOn: $draft.reminderLearnsTime)
+                    }
+                    if let learned = shownLearnedTime {
+                        SettingsRow("Time", icon: "clock") {
+                            Text(learned.label)
+                                .font(.body.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        SettingsRow(isLearning ? "Until then" : "Time", icon: "clock") {
+                            DatePicker("Reminder time", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                        }
                     }
                 }
             }
             .motion(AppMotion.settle, value: draft.reminderEnabled)
+            .motion(AppMotion.settle, value: draft.reminderLearnsTime)
             .onChange(of: draft.reminderEnabled) { _, isOn in
                 // iOS silently denies repeat prompts after a refusal, so ask
                 // at the moment of intent.
@@ -413,11 +427,28 @@ struct HabitReminderSection: View {
         }
     }
 
+    /// Health habits log themselves from Apple Health, so their log times say
+    /// nothing about the person's routine.
+    private var canLearn: Bool { draft.kind != .health }
+
+    private var isLearning: Bool { canLearn && draft.reminderLearnsTime }
+
+    private var shownLearnedTime: ReminderTime? {
+        isLearning ? draft.learnedReminderTime : nil
+    }
+
     private var caption: String {
         guard draft.reminderEnabled else { return "Off" }
         switch draft.frequency {
-        case .daily, .weekly: return "Every day at the time below"
-        case .interval: return "On each due date at the time below"
+        case .daily, .weekly: return "Every day"
+        case .interval: return "On each due date"
         }
+    }
+
+    private var learnCaption: String {
+        let lead = "\(ReminderTiming.leadMinutes) min before you usually log"
+        guard draft.reminderLearnsTime else { return "Always the time below" }
+        if draft.learnedReminderTime != nil { return lead }
+        return "After \(ReminderTiming.minimumLogs) logs, \(lead)"
     }
 }

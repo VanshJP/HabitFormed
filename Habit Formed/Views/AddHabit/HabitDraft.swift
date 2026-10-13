@@ -18,6 +18,10 @@ struct HabitDraft: Equatable {
     var reminderEnabled = false
     var reminderHour = 9
     var reminderMinute = 0
+    /// New reminders follow the habit's usual log time by default.
+    var reminderLearnsTime = true
+    /// What the habit's logs have taught so far, read once when editing.
+    private(set) var learnedReminderTime: ReminderTime?
 
     init() {}
 
@@ -35,6 +39,10 @@ struct HabitDraft: Equatable {
         reminderEnabled = habit.reminderEnabled
         reminderHour = habit.reminderHour
         reminderMinute = habit.reminderMinute
+        // A habit without a reminder yet gets the learning default; one that
+        // has a reminder keeps the choice already made.
+        reminderLearnsTime = habit.reminderEnabled ? habit.reminderLearnsTime : true
+        learnedReminderTime = habit.learnedReminderTime
     }
 
     var trimmedTitle: String {
@@ -120,6 +128,7 @@ struct HabitDraft: Equatable {
         habit.reminderEnabled = reminderEnabled
         habit.reminderHour = reminderHour
         habit.reminderMinute = reminderMinute
+        habit.reminderLearnsTime = reminderLearnsTime
     }
 
     func makeHabit(sortOrder: Int) -> Habit {
@@ -136,6 +145,7 @@ struct HabitDraft: Equatable {
             reminderEnabled: reminderEnabled,
             reminderHour: reminderHour,
             reminderMinute: reminderMinute,
+            reminderLearnsTime: reminderLearnsTime,
             sortOrder: sortOrder
         )
     }

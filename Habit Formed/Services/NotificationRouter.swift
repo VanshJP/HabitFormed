@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import UserNotifications
 
 extension Notification.Name {
@@ -17,9 +18,13 @@ extension Notification.Name {
 /// 2. Route taps into the app: timer alerts via
 ///    `Notification.Name.habitOpenTimerFromNotification` (the habit's timer
 ///    sheet) and the report reminder via `.habitOpenReportFromNotification`
-///    (today's report). Habit reminder taps just launch.
+///    (today's report). Habit reminder taps just launch; their "Log it"
+///    action logs today in the background through `modelContainer`.
 @MainActor
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
+    /// The app's store, set at launch so a reminder's action can log.
+    var modelContainer: ModelContainer?
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -34,6 +39,18 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let identifier = response.notification.request.identifier
+
+        if response.actionIdentifier == NotificationService.logAction,
+           let raw = response.notification.request.content.userInfo[NotificationService.habitIDKey] as? String,
+           let habitID = UUID(uuidString: raw) {
+            // The handler runs after the save, so iOS keeps the app awake
+            // long enough to write the log.
+            Task { @MainActor in
+                self.logToday(habitID: habitID)
+                completionHandler()
+            }
+            return
+        }
 
         if identifier == "report-reminder" {
             Task { @MainActor in
@@ -55,5 +72,13 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         }
 
         completionHandler()
+    }
+
+    /// Logs today for one habit, the same way a slide on its tile does.
+    private func logToday(habitID: UUID) {
+        guard let context = modelContainer?.mainContext else { return }
+        let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == habitID })
+        guard let habit = try? context.fetch(descriptor).first else { return }
+        habit.log(on: Date(), in: context)
     }
 }

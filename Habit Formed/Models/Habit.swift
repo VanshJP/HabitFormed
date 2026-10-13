@@ -197,6 +197,11 @@ final class Habit {
     var reminderEnabled: Bool = false
     var reminderHour: Int = 9
     var reminderMinute: Int = 0
+    /// When on, the reminder follows the habit's usual log time
+    /// (`ReminderTiming`) once there are enough logs; `reminderHour` and
+    /// `reminderMinute` are the time until then. Off for habits made before
+    /// learning existed, so their set times never move on their own.
+    var reminderLearnsTime: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \HabitCompletion.habit)
     var completions: [HabitCompletion]? = []
@@ -214,6 +219,7 @@ final class Habit {
         reminderEnabled: Bool = false,
         reminderHour: Int = 9,
         reminderMinute: Int = 0,
+        reminderLearnsTime: Bool = false,
         sortOrder: Int = 0
     ) {
         self.title = title
@@ -230,6 +236,7 @@ final class Habit {
         self.reminderEnabled = reminderEnabled
         self.reminderHour = reminderHour
         self.reminderMinute = reminderMinute
+        self.reminderLearnsTime = reminderLearnsTime
     }
 
     // MARK: - Computed
@@ -278,6 +285,31 @@ final class Habit {
         if source != .none { return .health }
         if timerDurationSeconds > 0 { return .timer }
         return .manual
+    }
+
+    // MARK: - Reminder time
+
+    /// The minute of the day this habit is usually logged, from logs made on
+    /// the day they count for (a backfilled day says nothing about a routine).
+    /// Health habits never learn: sync writes their logs, not the person.
+    var usualLogMinute: Int? {
+        guard trackKind != .health else { return nil }
+        let times = (completions ?? [])
+            .filter { $0.loggedAt.isSameDay(as: $0.date) }
+            .map(\.loggedAt)
+            .sorted(by: >)
+        return ReminderTiming.typicalMinute(of: times)
+    }
+
+    /// The learned reminder time, or nil until there are enough logs.
+    var learnedReminderTime: ReminderTime? {
+        usualLogMinute.map { ReminderTiming.reminder(beforeTypical: $0) }
+    }
+
+    /// When the reminder actually fires.
+    var reminderFireTime: ReminderTime {
+        if reminderLearnsTime, let learned = learnedReminderTime { return learned }
+        return ReminderTime(hour: reminderHour, minute: reminderMinute)
     }
 
     // MARK: - Logging

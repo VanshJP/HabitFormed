@@ -50,7 +50,7 @@ are needed when adding new Swift files.
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today tab: month control, week strip, tile grid, undo toast
-├── Models/                   # Habit, HabitCompletion, DayLedger, ReportOptions (+ ReportTheme)
+├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, report builder/renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
@@ -125,6 +125,17 @@ rings, the perfect-day streak and the report's counts. Per habit and day a
 (interval countdown running, or before the habit existed). Only done, open
 and missed count toward the total. A perfect day logged everything expected;
 days that expected nothing are skipped by the streak.
+
+### Reminders
+
+A reminder learns by default (`Habit.reminderLearnsTime`): once a habit has
+`ReminderTiming.minimumLogs` logs made on the day they count for, it fires
+30 minutes before the median time of the latest ones (rounded down to five
+minutes), so plants usually watered at 10:00 AM get a 9:30 AM nudge. Until
+then, with learning off, and for health habits (whose logs are written by
+sync) it fires at the set `reminderHour`/`reminderMinute`. Everything reads
+`Habit.reminderFireTime`. Reminders for manual and timer habits carry a
+"Log it" action that `NotificationRouter` handles in the background.
 
 ### Timers
 

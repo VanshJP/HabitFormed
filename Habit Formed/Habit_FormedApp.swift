@@ -27,6 +27,8 @@ struct Habit_FormedApp: App {
         // Retained by the @State above; must be attached before any
         // notification is delivered for foreground banners + tap routing.
         UNUserNotificationCenter.current().delegate = router
+        n.registerCategories()
+        router.modelContainer = sharedModelContainer
         SoundEffects.prepare()
     }
 

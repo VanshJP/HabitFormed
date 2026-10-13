@@ -19,6 +19,11 @@ final class NotificationService {
     private var syncGeneration = 0
 
     private static let reminderPrefix = "habit-reminder-"
+    /// Habit reminders carry a "Log it" action, so a reminder can be answered
+    /// from the notification without opening the app.
+    nonisolated static let reminderCategory = "habit-reminder"
+    nonisolated static let logAction = "log"
+    nonisolated static let habitIDKey = "habitID"
     /// Rolling one-shots scheduled ahead for interval habits.
     private static let intervalHorizon = 4
 
@@ -42,6 +47,26 @@ final class NotificationService {
             isAuthorized = false
             hasRequestedAuthorization = true
         }
+    }
+
+    // MARK: - Categories
+
+    /// Registers the "Log it" action. Call once at launch, before any
+    /// reminder can be delivered.
+    func registerCategories() {
+        let log = UNNotificationAction(
+            identifier: Self.logAction,
+            title: "Log it",
+            options: [],
+            icon: UNNotificationActionIcon(systemImageName: "checkmark")
+        )
+        let reminder = UNNotificationCategory(
+            identifier: Self.reminderCategory,
+            actions: [log],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([reminder])
     }
 
     // MARK: - Habit reminders
@@ -102,7 +127,7 @@ final class NotificationService {
     private static func reminderRequests(for habit: Habit) -> [UNNotificationRequest] {
         switch habit.frequency {
         case .daily:
-            let content = content(for: habit, body: "Time to log.")
+            let content = content(for: habit, body: dailyBody(for: habit))
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
         case .weekly:
@@ -152,8 +177,8 @@ final class NotificationService {
 
         guard let last = habit.lastCompletionDate,
               var candidate = cal.date(
-                bySettingHour: habit.reminderHour,
-                minute: habit.reminderMinute,
+                bySettingHour: habit.reminderFireTime.hour,
+                minute: habit.reminderFireTime.minute,
                 second: 0,
                 of: last.adding(days: step)
               )
@@ -176,10 +201,17 @@ final class NotificationService {
     // MARK: - Reminder builders
 
     private static func repeatingTrigger(_ habit: Habit) -> UNCalendarNotificationTrigger {
+        let time = habit.reminderFireTime
         var components = DateComponents()
-        components.hour = habit.reminderHour
-        components.minute = habit.reminderMinute
+        components.hour = time.hour
+        components.minute = time.minute
         return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+    }
+
+    /// Says why the reminder came now when the time was learned.
+    private static func dailyBody(for habit: Habit) -> String {
+        guard habit.reminderLearnsTime, let usual = habit.usualLogMinute else { return "Time to log." }
+        return "You usually log this around \(ReminderTime(minuteOfDay: usual).label)."
     }
 
     private static func content(for habit: Habit, body: String) -> UNMutableNotificationContent {
@@ -189,6 +221,11 @@ final class NotificationService {
         content.sound = .default
         content.interruptionLevel = .active
         content.threadIdentifier = habit.id.uuidString
+        content.userInfo = [habitIDKey: habit.id.uuidString]
+        // Health habits log themselves from Apple Health, so they get no action.
+        if habit.trackKind != .health {
+            content.categoryIdentifier = reminderCategory
+        }
         return content
     }
 

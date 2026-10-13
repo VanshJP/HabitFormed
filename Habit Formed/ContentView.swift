@@ -310,15 +310,18 @@ struct ContentView: View {
 
     /// Order-insensitive fingerprint of every habit field that reminder
     /// scheduling depends on. Includes completion counts so logging or
-    /// removing a log re-anchors interval chains and weekly bodies.
+    /// removing a log re-anchors interval chains, weekly bodies and learned
+    /// reminder times.
     private var reminderSignature: String {
         habits
             .map { habit in
                 [
                     habit.id.uuidString,
                     String(habit.reminderEnabled),
+                    String(habit.reminderLearnsTime),
                     "\(habit.reminderHour):\(habit.reminderMinute)",
                     habit.frequencyRaw,
+                    habit.sourceRaw,
                     String(habit.weeklyTarget),
                     String(habit.intervalDays),
                     habit.title,
