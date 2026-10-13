@@ -2,7 +2,7 @@ import MessageUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// Opens Messages with the report card attached and the caption typed, so
+/// Opens Messages with the report card attached and nothing typed, so
 /// texting a friend is one tap instead of a trip through the share sheet.
 /// Unavailable on devices that cannot send texts (the Simulator, some iPads);
 /// callers fall back to `SharePresenter` there.
@@ -16,7 +16,7 @@ final class MessageComposer: NSObject, MFMessageComposeViewControllerDelegate {
 
     /// Returns false when Messages could not be shown.
     @discardableResult
-    func present(image: UIImage?, body: String?) -> Bool {
+    func present(image: UIImage?, body: String? = nil) -> Bool {
         guard Self.canSend, let root = SharePresenter.topViewController else { return false }
         let composer = MFMessageComposeViewController()
         composer.messageComposeDelegate = self

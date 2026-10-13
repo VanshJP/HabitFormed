@@ -87,7 +87,6 @@ struct DailyReportSheet: View {
     var body: some View {
         let options = options
         let report = makeReport(options)
-        let caption = ReportText.caption(report: report, options: options)
 
         return NavigationStack {
             PageScrollView {
@@ -107,7 +106,7 @@ struct DailyReportSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .background { AppBackground(style: .subtle) }
             .safeAreaBar(edge: .bottom) {
-                actions(report: report, options: options, caption: caption)
+                actions(report: report, options: options)
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -300,19 +299,21 @@ struct DailyReportSheet: View {
 
     // MARK: - Actions
 
-    private func actions(report: DailyReport, options: ReportOptions, caption: String) -> some View {
+    /// The card goes alone: no message typed under it, so a friend gets one
+    /// image they can forward as is.
+    private func actions(report: DailyReport, options: ReportOptions) -> some View {
         HStack(spacing: 10) {
             if MessageComposer.canSend {
                 GlassButton(title: "Text it", icon: "message.fill", style: .secondary, size: .large, fullWidth: true) {
                     guard let image = ReportCardRenderer.render(report: report, options: options) else { return }
                     Haptics.medium()
-                    MessageComposer.shared.present(image: image, body: caption)
+                    MessageComposer.shared.present(image: image)
                 }
             }
             GlassButton(title: "Share", icon: "square.and.arrow.up", style: .primary, size: .large, fullWidth: true) {
                 guard let image = ReportCardRenderer.render(report: report, options: options) else { return }
                 Haptics.medium()
-                SharePresenter.present(image: image, message: caption)
+                SharePresenter.present(image: image)
             }
         }
         .padding(.horizontal, AppLayout.pageHorizontal)

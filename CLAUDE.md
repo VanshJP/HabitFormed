@@ -147,12 +147,11 @@ things out. No templates, layouts or placeholder tokens.
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
   on canvas or paper; `ReportCardRenderer` renders it (scale 2 for the
-  preview, 3 for sending). `ReportText.caption` writes the message that goes
-  with it.
+  preview, 3 for sending).
 - `DailyReportSheet`: live preview, theme row, "Habits" and "Also show"
   switches, a note, then Text it (`MessageComposer`, Messages with the image
   attached) and Share (`SharePresenter`; Save and Copy live in the share
-  sheet). The card prints the reporter's name
+  sheet). Both send the card alone, with no text typed under it. The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
@@ -226,7 +225,7 @@ The design system is SpeakUp's; when in doubt, match
 5. **Don't create README/docs files** unless asked. CLAUDE.md is the
    sanctioned doc surface.
 6. **Tests:** there is no test target yet. If adding logic that benefits
-   from tests (streak math, `DayLedger`, `ReportText`, HealthKit value
+   from tests (streak math, `DayLedger`, `ReminderTiming`, HealthKit value
    mapping), surface the suggestion to the user before
    scaffolding a target.
 
