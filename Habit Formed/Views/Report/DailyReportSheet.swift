@@ -94,6 +94,9 @@ struct DailyReportSheet: View {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     cardPreview
                     themeRow
+                    if askForName {
+                        nameRow
+                    }
                     habitsSection
                     extrasSection
                     noteSection
@@ -209,16 +212,6 @@ struct DailyReportSheet: View {
     private var habitsSection: some View {
         GlassSection("Habits") {
             GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                if askForName {
-                    SettingsRow("Your name", icon: "person") {
-                        TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
-                            .textContentType(.givenName)
-                            .submitLabel(.done)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .name)
-                            .frame(maxWidth: 140)
-                    }
-                }
                 ForEach(habits) { habit in
                     ListRowLabel(icon: habit.symbol, tint: habit.color, title: habit.title, trailing: .none) {
                         Toggle(habit.title, isOn: includes(habit))
@@ -226,6 +219,21 @@ struct DailyReportSheet: View {
                             .tint(AppColors.primary)
                     }
                 }
+            }
+        }
+    }
+
+    /// Asked once, the first time there is no name, so a forwarded card says
+    /// whose day it was.
+    private var nameRow: some View {
+        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
+            SettingsRow("Your name", icon: "person", caption: "Printed on the card") {
+                TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
+                    .textContentType(.givenName)
+                    .submitLabel(.done)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: .name)
+                    .frame(maxWidth: 140)
             }
         }
     }

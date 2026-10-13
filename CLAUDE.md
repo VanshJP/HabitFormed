@@ -80,9 +80,11 @@ the header):
   perfect-day `StreakChip` (only once a streak exists), add (+) and Settings
   (gear, pushed). Under it the `WeekStrip` is the date control: 7 days drawn
   on the canvas, a completion dot under each, and the selected day's count
-  ("2/6") in place of its dot. Then the grid's section, titled "Habits" for
-  today or the browsed day's name, with the "Share report" link. Progress is
-  said once, in the strip.
+  ("2/6") in place of its dot. Strip taps only change the selected day; the
+  strip itself moves only when the calendar picks an older day
+  (`stripAnchor`). Then the grid's section, titled "Habits" for today or the
+  browsed day's name, with "Share report" (and a "Today" link while browsing
+  another day). Progress is said once, in the strip.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap
   opens the detail sheet); Log is day by day, each day header carrying a

@@ -21,6 +21,10 @@ struct ContentView: View {
     @State private var sheet: HabitSheet?
     @State private var pendingDelete: Habit?
     @State private var selectedDate: Date = .now
+    /// The last day the week strip shows; nil keeps it on today. Only the
+    /// calendar and "Today" move it, so tapping a strip day never slides the
+    /// strip under the finger.
+    @State private var stripAnchor: Date?
     @State private var showDatePicker = false
     @State private var showArrange = false
     @State private var undo: UndoLog?
@@ -70,12 +74,23 @@ struct ContentView: View {
                     GlassSection(isViewingToday ? "Habits" : selectedDate.relativeDayName) {
                         grid
                     } accessory: {
-                        Button {
-                            onShareReport(selectedDate)
-                        } label: {
-                            HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
+                        HStack(spacing: 14) {
+                            if !isViewingToday {
+                                Button {
+                                    Haptics.selection()
+                                    backToToday()
+                                } label: {
+                                    HeaderLinkLabel("Today", icon: "arrow.uturn.forward")
+                                }
+                                .buttonStyle(.textLink)
+                            }
+                            Button {
+                                onShareReport(selectedDate)
+                            } label: {
+                                HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.textLink)
                         }
-                        .buttonStyle(.textLink)
                     }
                 }
             }
@@ -145,7 +160,7 @@ struct ContentView: View {
                 case .timer(let habit): TimerView(habit: habit)
                 }
             }
-            .sheet(isPresented: $showDatePicker) {
+            .sheet(isPresented: $showDatePicker, onDismiss: anchorStrip) {
                 DateBrowserSheet(selectedDate: $selectedDate)
                     .presentationDetents([.medium, .large])
             }
@@ -274,13 +289,21 @@ struct ContentView: View {
             : selectedDate.formatted(.dateTime.month(.wide).year())
     }
 
-    /// The last day the week strip shows: today, unless the calendar picked a
-    /// day older than the strip, in which case the strip moves back to it.
     private var stripEnd: Date {
+        stripAnchor ?? dayTracker.today
+    }
+
+    /// After the calendar closes: keep the strip on this week when the picked
+    /// day is in it, otherwise move it back so the picked day sits inside.
+    private func anchorStrip() {
         let today = dayTracker.today
         let selected = selectedDate.startOfDay
-        guard selected < today.adding(days: -6) else { return today }
-        return min(today, selected.adding(days: 3))
+        stripAnchor = selected < today.adding(days: -6) ? min(today, selected.adding(days: 3)) : nil
+    }
+
+    private func backToToday() {
+        selectedDate = .now
+        stripAnchor = nil
     }
 
     // MARK: - Reminder signature

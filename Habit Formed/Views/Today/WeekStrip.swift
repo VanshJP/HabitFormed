@@ -47,15 +47,15 @@ struct WeekStrip: View {
 
                 if isSelected && day.expected > 0 {
                     Text("\(day.done)/\(day.expected)")
-                        .font(.caption2.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(day.isPerfect ? AppColors.success : Color.white.opacity(0.8))
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(day.isPerfect ? AppColors.success : Color.white.opacity(0.85))
                         .contentTransition(.numericText(value: Double(day.done)))
-                        .frame(height: 12)
+                        .frame(height: 16)
                 } else {
                     Circle()
                         .fill(dotColor(for: day))
                         .frame(width: 5, height: 5)
-                        .frame(height: 12)
+                        .frame(height: 16)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
