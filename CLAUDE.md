@@ -15,7 +15,7 @@ theme and switches for what to leave out.
 - **Platform:** iOS 26.0+ (single target, iPhone + iPad).
 - **Language:** Swift 5 with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
   and `SWIFT_APPROACHABLE_CONCURRENCY = YES`. Mark new pure types
-  `nonisolated` (see `DayLedger`, `DailyReport`, `ReportContent`).
+  `nonisolated` (see `DayLedger`, `DailyReport`, `ReportOptions`).
 - **UI:** SwiftUI. UIKit only for haptics (`Extensions/Haptics.swift`), the
   share sheet (`SharePresenter`), and Messages (`MessageComposer`).
 - **Persistence:** SwiftData (`@Model`): `Habit`, `HabitCompletion`. Do
