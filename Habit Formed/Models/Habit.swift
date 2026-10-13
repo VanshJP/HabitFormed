@@ -113,15 +113,15 @@ nonisolated enum HealthKitSource: String, Codable, CaseIterable, Identifiable, S
     func compactValue(_ value: Double) -> String {
         switch self {
         case .steps, .activeCalories:
-            return value >= 1000 ? String(format: "%.1fk", value / 1000) : "\(Int(value.rounded()))"
+            return value >= 1000 ? String(format: "%.1fk", value / 1000) : "\(value.safeRounded)"
         case .sleepHours, .standHours:
             return String(format: "%.1fh", value)
         case .mindfulMinutes, .exerciseMinutes:
-            return "\(Int(value.rounded()))m"
+            return "\(value.safeRounded)m"
         case .walkingDistance:
             return String(format: "%.1fkm", value)
         case .flightsClimbed:
-            return "\(Int(value.rounded()))"
+            return "\(value.safeRounded)"
         case .none:
             return ""
         }

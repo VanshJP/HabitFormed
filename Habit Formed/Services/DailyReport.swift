@@ -43,12 +43,12 @@ nonisolated struct DailyReport: Sendable, Hashable {
     var fraction: Double { expected == 0 ? 0 : Double(done) / Double(expected) }
     var remaining: Int { max(expected - done, 0) }
     var isPerfect: Bool { expected > 0 && done >= expected }
-    var percentText: String { "\(Int((fraction * 100).rounded()))%" }
+    var percentText: String { "\((fraction * 100).safeRounded)%" }
 
     /// The name, or a neutral stand-in so "{name}" never prints blank.
     var displayName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Me" : trimmed
+        return trimmed.isEmpty ? "My day" : trimmed
     }
 
     /// "Tue, Oct 13".
@@ -79,13 +79,13 @@ nonisolated struct DailyReport: Sendable, Hashable {
 nonisolated enum ReportFormat {
     static func kcal(_ value: Double?) -> String {
         guard let value else { return "n/a" }
-        return "\(Int(value.rounded()).formatted()) kcal"
+        return "\(value.safeRounded.formatted()) kcal"
     }
 
     /// Signed, so a deficit reads as one: "-560 kcal", "+120 kcal".
     static func signedKcal(_ value: Double?) -> String {
         guard let value else { return "n/a" }
-        let rounded = Int(value.rounded())
+        let rounded = value.safeRounded
         let sign = rounded > 0 ? "+" : ""
         return "\(sign)\(rounded.formatted()) kcal"
     }
@@ -94,7 +94,7 @@ nonisolated enum ReportFormat {
         guard let value else { return "n/a" }
         return value >= 10_000
             ? String(format: "%.1fk", value / 1000)
-            : Int(value.rounded()).formatted()
+            : value.safeRounded.formatted()
     }
 
     static func hours(_ value: Double?) -> String {
@@ -104,12 +104,12 @@ nonisolated enum ReportFormat {
 
     static func minutes(_ value: Double?) -> String {
         guard let value else { return "n/a" }
-        return "\(Int(value.rounded())) min"
+        return "\(value.safeRounded) min"
     }
 
     static func grams(_ value: Double?) -> String {
         guard let value else { return "n/a" }
-        return "\(Int(value.rounded()))g"
+        return "\(value.safeRounded)g"
     }
 }
 
@@ -136,6 +136,7 @@ nonisolated struct ReportToken: Identifiable, Sendable {
         ReportToken(key: "left", label: "Left"),
         ReportToken(key: "streak", label: "Streak"),
         ReportToken(key: "best", label: "Best streak"),
+        ReportToken(key: "week", label: "Perfect this week"),
         ReportToken(key: "checklist", label: "Checklist"),
         ReportToken(key: "missed", label: "Missed"),
         ReportToken(key: "eaten", label: "Eaten"),
@@ -170,6 +171,7 @@ nonisolated enum ReportText {
             "percent": report.percentText,
             "streak": "\(report.perfectStreak)",
             "best": "\(report.bestStreak)",
+            "week": "\(report.week.filter(\.isPerfect).count)/7",
             "checklist": checklist(report: report, content: content),
             "missed": missedList(report),
             "eaten": ReportFormat.kcal(report.health.eatenKcal),

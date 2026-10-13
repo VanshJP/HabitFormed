@@ -26,6 +26,7 @@ struct ReportCardView: View {
             case .streak: StreakCard(report: report, content: content)
             case .receipt: ReceiptCard(report: report, content: content)
             case .clean: CleanCard(report: report, content: content)
+            case .week: WeekGridCard(report: report, content: content)
             }
         }
         .frame(width: Self.width)
@@ -416,8 +417,7 @@ extension DailyReport {
     ScrollView {
         VStack(spacing: 24) {
             ForEach(ReportPreset.all) { preset in
-                let template = ReportTemplate.make(from: preset, sortOrder: 0)
-                ReportCardView(report: .sample, content: template.content)
+                ReportCardView(report: .sample, content: preset.content)
             }
         }
         .padding()

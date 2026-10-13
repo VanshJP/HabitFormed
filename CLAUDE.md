@@ -124,7 +124,8 @@ already logged today). Closing before completion does **not** log.
 ### Daily report
 
 - `ReportTemplate` (SwiftData) holds one way of reporting a day: a
-  `ReportStyle` layout (scoreboard, receipt, fuel, check-in, streak, clean),
+  `ReportStyle` layout (scoreboard, receipt, fuel, check-in, streak, clean,
+  week grid),
   a `ReportTheme` canvas, an accent, words (title, message, footer, caption)
   and toggles (which habits, unfinished, streaks, 7-day dots, notes,
   perfect-day streak, calories, activity). `ReportPreset.all` seeds one
@@ -136,9 +137,10 @@ already logged today). Closing before completion does **not** log.
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it); `ReportCardRenderer` renders
   it (scale 2 for previews, 3 for sending).
-- `DailyReportSheet` previews the exact card, then Save / Copy / Text it
-  (`MessageComposer`, Messages with the image attached) / Share
-  (`SharePresenter`). The card prints the reporter's name
+- `DailyReportSheet` previews the exact output in three kinds (Card, Story
+  for a 9:16 Instagram or Snapchat story via `ReportStoryView`, or Text),
+  then Save / Copy / Text it (`MessageComposer`, Messages with the image
+  attached) / Share (`SharePresenter`). The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
@@ -185,6 +187,8 @@ The design system is SpeakUp's; when in doubt, match
   timer/health (`HabitDraft.setKind`).
 - **Copy:** no em dashes anywhere (strings or comments). Sentence case.
   Keep UI copy plain and short.
+- **Numbers:** convert user-typed or HealthKit doubles with
+  `Double.safeRounded`, never `Int(x)`, which traps on huge values.
 - **HealthKit:** new HealthKit-backed habit types should extend
   `HealthKitSource` (label, defaultTarget, unitSuffix, symbol,
   compactValue) and add a matching branch in

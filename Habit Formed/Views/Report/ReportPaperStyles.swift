@@ -71,10 +71,10 @@ struct ReceiptCard: View {
                     row("CALORIES IN", plain(report.health.eatenKcal))
                     row("CALORIES OUT", plain(report.health.burnedKcal))
                     if let net = report.health.netKcal {
-                        row("NET", (net > 0 ? "+" : "") + Int(net.rounded()).formatted())
+                        row("NET", (net > 0 ? "+" : "") + net.safeRounded.formatted())
                     }
                     if content.calorieGoal > 0 {
-                        row("BUDGET", Int(content.calorieGoal.rounded()).formatted())
+                        row("BUDGET", content.calorieGoal.safeRounded.formatted())
                     }
                 }
             }
@@ -172,7 +172,7 @@ struct ReceiptCard: View {
 
     private func plain(_ kcal: Double?) -> String {
         guard let kcal else { return "N/A" }
-        return Int(kcal.rounded()).formatted()
+        return kcal.safeRounded.formatted()
     }
 
     private func expand(_ text: String) -> String {

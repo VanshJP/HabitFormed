@@ -14,4 +14,14 @@ enum ReportCardRenderer {
         renderer.isOpaque = true
         return renderer.uiImage
     }
+
+    /// The card on a 9:16 story poster (1170 × 2080 px at scale 3).
+    static func renderStory(report: DailyReport, content: ReportContent, scale: CGFloat = 3) -> UIImage? {
+        guard let card = render(report: report, content: content, scale: max(scale, 2)) else { return nil }
+        let renderer = ImageRenderer(content: ReportStoryView(card: card, content: content))
+        renderer.scale = scale
+        renderer.proposedSize = ProposedViewSize(ReportStoryView.size)
+        renderer.isOpaque = true
+        return renderer.uiImage
+    }
 }

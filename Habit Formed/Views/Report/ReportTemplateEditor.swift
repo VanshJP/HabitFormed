@@ -60,6 +60,10 @@ struct ReportTemplateEditor: View {
                 template.selectedHabitIDs = Set(habits.map(\.id))
             }
         }
+        .onChange(of: template.calorieGoal) { _, goal in
+            let clamped = goal.isFinite ? min(max(goal, 0), 99_999) : 2000
+            if clamped != goal { template.calorieGoal = clamped }
+        }
         .onDisappear { try? modelContext.save() }
     }
 

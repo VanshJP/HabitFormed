@@ -16,6 +16,9 @@ struct HabitDetailView: View {
     @State private var showingEdit = false
     @State private var confirmDelete = false
     @State private var calendarWeeks = 12
+    /// Set by Delete. The habit goes once this page is off screen, because a
+    /// page still drawing would read a model whose data no longer exists.
+    @State private var deleteOnClose = false
     @FocusState private var noteFocused: Bool
 
     var body: some View {
@@ -52,6 +55,10 @@ struct HabitDetailView: View {
                     .accessibilityLabel("More")
                 }
             }
+            .onDisappear {
+                guard deleteOnClose else { return }
+                HabitLifecycle.delete(habit, in: modelContext, timer: timerCenter, notifications: notifications)
+            }
             .sheet(isPresented: $showingTimer) {
                 TimerView(habit: habit)
             }
@@ -60,17 +67,8 @@ struct HabitDetailView: View {
             }
             .alert("Delete this habit?", isPresented: $confirmDelete) {
                 Button("Delete", role: .destructive) {
-                    let context = modelContext
-                    let timer = timerCenter
-                    let notifications = notifications
-                    let doomed = habit
+                    deleteOnClose = true
                     dismiss()
-                    // Deleted only once the sheet is gone: a page still on
-                    // screen would read a model whose data no longer exists.
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(450))
-                        HabitLifecycle.delete(doomed, in: context, timer: timer, notifications: notifications)
-                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {

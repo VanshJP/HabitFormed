@@ -172,8 +172,8 @@ struct FuelCard: View {
 
     private var burnCaption: String {
         guard health.burnedKcal != nil else { return "No data" }
-        let active = health.activeKcal.map { "\(Int($0.rounded()).formatted()) active" }
-        let resting = health.restingKcal.map { "\(Int($0.rounded()).formatted()) resting" }
+        let active = health.activeKcal.map { "\($0.safeRounded.formatted()) active" }
+        let resting = health.restingKcal.map { "\($0.safeRounded.formatted()) resting" }
         return [active, resting].compactMap { $0 }.joined(separator: " + ")
     }
 
@@ -186,7 +186,7 @@ struct FuelCard: View {
                 Text(label)
                     .eyebrowStyle(Color.white.opacity(0.6))
             }
-            Text(value.map { Int($0.rounded()).formatted() } ?? "n/a")
+            Text(value.map { $0.safeRounded.formatted() } ?? "n/a")
                 .font(.system(size: 36, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -211,7 +211,7 @@ struct FuelCard: View {
             HStack(spacing: 8) {
                 Image(systemName: deficit ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
                     .font(.title3)
-                Text("\(Int(abs(net).rounded()).formatted()) kcal \(deficit ? "deficit" : "surplus")")
+                Text("\(abs(net).safeRounded.formatted()) kcal \(deficit ? "deficit" : "surplus")")
                     .font(.headline.monospacedDigit())
                 Spacer(minLength: 0)
                 Text("Net \(ReportFormat.signedKcal(net))")
@@ -233,11 +233,11 @@ struct FuelCard: View {
         let left = goal - eaten
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("\(Int(eaten.rounded()).formatted()) of \(Int(goal.rounded()).formatted()) kcal budget")
+                Text("\(eaten.safeRounded.formatted()) of \(goal.safeRounded.formatted()) kcal budget")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
                 Spacer(minLength: 6)
-                Text(left >= 0 ? "\(Int(left.rounded()).formatted()) left" : "\(Int((-left).rounded()).formatted()) over")
+                Text(left >= 0 ? "\(left.safeRounded.formatted()) left" : "\((-left).safeRounded.formatted()) over")
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(left >= 0 ? AppColors.success : AppColors.warning)
             }
@@ -480,6 +480,125 @@ struct StreakCard: View {
         .background {
             RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
                 .fill(Color.white.opacity(0.06))
+        }
+    }
+}
+
+// MARK: - Week grid
+
+/// Every habit across the seven days ending on the report day: one row per
+/// habit, one cell per day, the week's count at the end, and each day's
+/// completion along the bottom.
+struct WeekGridCard: View {
+    let report: DailyReport
+    let content: ReportContent
+
+    private let cell: CGFloat = 18
+    private let gap: CGFloat = 4
+    private let countWidth: CGFloat = 30
+
+    private var perfectDays: Int { report.week.filter(\.isPerfect).count }
+
+    var body: some View {
+        DarkCardFrame(content: content) {
+            ReportHeader(report: report, accent: content.accent)
+            ReportTitle(text: content.expanded(content.title, report))
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(perfectDays)")
+                    .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.white)
+                Text(perfectDays == 1 ? "perfect day this week" : "perfect days this week")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.7))
+                Spacer(minLength: 0)
+            }
+
+            grid
+
+            if content.showPerfectStreak, report.perfectStreak > 0 {
+                ReportStreakLine(report: report)
+            }
+            if content.showActivity {
+                ReportActivityChips(health: report.health)
+            }
+            ReportMessage(text: content.expanded(content.message, report), accent: content.accent)
+            ReportFooter(text: content.expanded(content.footer, report))
+        }
+    }
+
+    private var grid: some View {
+        let rows = Array(report.allItems.prefix(12))
+
+        return VStack(spacing: 10) {
+            HStack(spacing: gap) {
+                Spacer(minLength: 0)
+                ForEach(report.week) { day in
+                    Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(day.date.isSameDay(as: report.date) ? 0.95 : 0.45))
+                        .frame(width: cell)
+                }
+                Color.clear.frame(width: countWidth, height: 1)
+            }
+
+            ForEach(rows) { item in
+                let tint = Color(hex: item.colorHex)
+                HStack(spacing: gap) {
+                    HStack(spacing: 6) {
+                        Image(systemName: item.symbol)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(tint.glyphTone)
+                            .frame(width: 18)
+                        Text(item.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 4)
+                    }
+                    ForEach(Array(item.week.enumerated()), id: \.offset) { _, logged in
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(logged ? tint.glyphTone : Color.white.opacity(0.08))
+                            .frame(width: cell, height: cell)
+                    }
+                    Text("\(item.week.filter { $0 }.count)/7")
+                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(width: countWidth, alignment: .trailing)
+                }
+            }
+
+            if report.allItems.count > rows.count {
+                Text("+\(report.allItems.count - rows.count) more")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 0.5)
+
+            HStack(spacing: gap) {
+                Text("Day done")
+                    .eyebrowStyle(Color.white.opacity(0.5))
+                Spacer(minLength: 0)
+                ForEach(report.week) { day in
+                    ProgressRing(
+                        fraction: day.fraction,
+                        lineWidth: 2.5,
+                        color: day.isPerfect ? AppColors.success : AppColors.progressColor(for: day.fraction)
+                    )
+                    .frame(width: cell, height: cell)
+                }
+                Color.clear.frame(width: countWidth, height: 1)
+            }
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
+                .fill(Color.white.opacity(0.07))
         }
     }
 }

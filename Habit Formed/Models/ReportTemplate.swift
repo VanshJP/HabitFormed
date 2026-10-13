@@ -18,6 +18,8 @@ nonisolated enum ReportStyle: String, CaseIterable, Identifiable, Sendable {
     case streak
     /// White paper, ink type, nothing else.
     case clean
+    /// Every habit across the last seven days, one row each.
+    case week
 
     var id: String { rawValue }
 
@@ -29,6 +31,7 @@ nonisolated enum ReportStyle: String, CaseIterable, Identifiable, Sendable {
         case .checkIn: return "Check-in"
         case .streak: return "Streak"
         case .clean: return "Clean"
+        case .week: return "Week grid"
         }
     }
 
@@ -40,6 +43,7 @@ nonisolated enum ReportStyle: String, CaseIterable, Identifiable, Sendable {
         case .checkIn: return "checklist"
         case .streak: return "flame"
         case .clean: return "doc.plaintext"
+        case .week: return "square.grid.3x3.fill"
         }
     }
 
@@ -51,6 +55,7 @@ nonisolated enum ReportStyle: String, CaseIterable, Identifiable, Sendable {
         case .checkIn: return "Done and not done, for a buddy"
         case .streak: return "Your perfect-day run, poster size"
         case .clean: return "Plain paper, nothing extra"
+        case .week: return "Seven days of every habit"
         }
     }
 
@@ -300,6 +305,30 @@ nonisolated struct ReportPreset: Identifiable, Sendable {
     var calorieGoal: Double = 2000
     var showActivity = false
 
+    /// The preset as template settings, without creating a model.
+    var content: ReportContent {
+        ReportContent(
+            style: style,
+            theme: theme,
+            accentHex: accentHex,
+            title: title,
+            message: message,
+            footer: footer,
+            caption: caption,
+            includeAllHabits: true,
+            selectedHabitIDs: [],
+            showUnfinished: showUnfinished,
+            showStreaks: showStreaks,
+            showWeek: showWeek,
+            showNotes: showNotes,
+            showPerfectStreak: showPerfectStreak,
+            showCalories: showCalories,
+            calorieGoal: calorieGoal,
+            showActivity: showActivity,
+            attachCaption: true
+        )
+    }
+
     static let all: [ReportPreset] = [
         ReportPreset(
             id: "scoreboard",
@@ -383,6 +412,19 @@ nonisolated struct ReportPreset: Identifiable, Sendable {
             footer: "Tracked with Habit Formed",
             caption: "Today's wins:\n{checklist}",
             showUnfinished: false
+        ),
+        ReportPreset(
+            id: "week",
+            name: "Weekly recap",
+            blurb: "Seven days of every habit",
+            style: .week,
+            theme: .tide,
+            accentHex: "#2BA8A8",
+            title: "My week",
+            message: "",
+            footer: "Tracked with Habit Formed",
+            caption: "Week in review: {week} perfect days, {streak} in a row.\n{checklist}",
+            showStreaks: false
         ),
         ReportPreset(
             id: "clean",

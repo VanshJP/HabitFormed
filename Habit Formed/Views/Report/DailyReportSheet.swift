@@ -51,7 +51,7 @@ struct DailyReportSheet: View {
         var merged = metrics
         let digits = eatenText.filter { "0123456789.".contains($0) }
         if let typed = Double(digits) {
-            merged.eatenKcal = typed
+            merged.eatenKcal = min(typed, 99_999)
         }
         return merged
     }
@@ -144,8 +144,15 @@ struct DailyReportSheet: View {
                 )
 
                 switch kind {
-                case .card:
+                case .card, .story:
                     cardPreview(caption: caption)
+                    Text(kind == .story
+                         ? "Full screen 9:16, sized for Instagram and Snapchat stories."
+                         : "The card plus your message, ready for a group chat.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 case .text:
                     textPreview(caption)
                 }
@@ -175,11 +182,13 @@ struct DailyReportSheet: View {
             }
         }
         .motion(AppMotion.slide, value: confirmation)
-        .task(id: RenderKey(report: report, content: content)) {
+        .task(id: RenderKey(report: report, content: content, kind: kind)) {
             // A short pause lets typing settle before the card re-renders.
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
-            preview = ReportCardRenderer.render(report: report, content: content, scale: 2)
+            preview = kind == .story
+                ? ReportCardRenderer.renderStory(report: report, content: content, scale: 1.5)
+                : ReportCardRenderer.render(report: report, content: content, scale: 2)
         }
     }
 
@@ -357,7 +366,7 @@ struct DailyReportSheet: View {
                     TextField(
                         "",
                         text: $eatenText,
-                        prompt: Text(metrics.eatenKcal.map { Int($0.rounded()).formatted() } ?? "kcal")
+                        prompt: Text(metrics.eatenKcal.map { $0.safeRounded.formatted() } ?? "kcal")
                             .foregroundStyle(.white.opacity(0.4))
                     )
                     .keyboardType(.numberPad)
@@ -368,7 +377,7 @@ struct DailyReportSheet: View {
                     .inputWell(isFocused: focusedField == .eaten)
                 }
                 if let burned = metrics.burnedKcal {
-                    Text("Burned \(Int(burned.rounded()).formatted()) kcal so far (active + resting).")
+                    Text("Burned \(burned.safeRounded.formatted()) kcal so far (active + resting).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -381,7 +390,7 @@ struct DailyReportSheet: View {
     private func actionRow(report: DailyReport, content: ReportContent, caption: String) -> some View {
         HStack(alignment: .top, spacing: 4) {
             switch kind {
-            case .card:
+            case .card, .story:
                 ShareAction(icon: "square.and.arrow.down", label: "Save") {
                     Task { await saveToPhotos(report: report, content: content) }
                 }
@@ -420,24 +429,31 @@ struct DailyReportSheet: View {
     }
 
     private func fullImage(report: DailyReport, content: ReportContent) -> UIImage? {
-        ReportCardRenderer.render(report: report, content: content, scale: 3)
+        kind == .story
+            ? ReportCardRenderer.renderStory(report: report, content: content, scale: 3)
+            : ReportCardRenderer.render(report: report, content: content, scale: 3)
+    }
+
+    /// Stories go to apps that ignore a caption, so only the card sends one.
+    private func message(_ caption: String, content: ReportContent) -> String? {
+        kind == .card && content.attachCaption ? caption : nil
     }
 
     private func shareCard(report: DailyReport, content: ReportContent, caption: String) {
         guard let image = fullImage(report: report, content: content) else { return }
         Haptics.medium()
-        SharePresenter.present(image: image, message: content.attachCaption ? caption : nil)
+        SharePresenter.present(image: image, message: message(caption, content: content))
     }
 
     private func textCard(report: DailyReport, content: ReportContent, caption: String) {
         guard let image = fullImage(report: report, content: content) else { return }
         Haptics.medium()
-        MessageComposer.shared.present(image: image, body: content.attachCaption ? caption : nil)
+        MessageComposer.shared.present(image: image, body: message(caption, content: content))
     }
 
     private func copyCard(report: DailyReport, content: ReportContent, caption: String) {
         guard let image = fullImage(report: report, content: content) else { return }
-        let attach = content.attachCaption
+        let attach = message(caption, content: content) != nil
         Task {
             // PNG-encoding a 1170 px card takes tens of milliseconds, so it
             // stays off the main actor.
@@ -543,12 +559,14 @@ nonisolated private struct HealthKey: Equatable {
 nonisolated private struct RenderKey: Equatable {
     let report: DailyReport
     let content: ReportContent
+    let kind: ShareKind
 }
 
 // MARK: - Share kind
 
 nonisolated enum ShareKind: String, CaseIterable, Identifiable, Sendable {
     case card
+    case story
     case text
 
     var id: String { rawValue }
@@ -556,13 +574,15 @@ nonisolated enum ShareKind: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .card: return "Card"
-        case .text: return "Text only"
+        case .story: return "Story"
+        case .text: return "Text"
         }
     }
 
     var icon: String {
         switch self {
         case .card: return "photo"
+        case .story: return "rectangle.portrait"
         case .text: return "text.alignleft"
         }
     }
