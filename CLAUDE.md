@@ -60,7 +60,8 @@ Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today tab: month control, week strip, open habits, Done shelf, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
-├── Services/                 # HealthKit, notifications, timer, widget sync, report builder/renderer, share, Messages
+├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
+│                             #   renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
@@ -69,7 +70,8 @@ Habit Formed/
     ├── Today/                # WeekStrip, TodayHabitList, DoneShelf, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
-    ├── Report/               # DailyReportSheet, ReportCardView
+    ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView,
+    │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
@@ -223,6 +225,18 @@ things out. No templates, layouts or placeholder tokens.
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
 - An optional evening nudge (`report-reminder`) opens today's report.
+
+### Weekly recap
+
+The Sunday recap is the same idea for a week: `WeeklyRecapBuilder` turns
+habits into a `WeeklyRecap` value for the last seven days (perfect days
+against the week before, each habit's seven `DayStatus` squares, the
+longest streak and the habit that climbed most), and `WeeklyRecapCardView`
+draws it under the daily card's rules. `WeeklyRecapSheet` shares the
+daily report's theme, hidden habits and name, and its preview, theme row
+and send bar (`ReportSheetParts`). It opens from History's "Last 7 days"
+section, from an optional Sunday 7 PM nudge (`recap-reminder`, switched on
+in Settings), or from `WidgetLink.recap`.
 
 ## Conventions
 

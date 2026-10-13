@@ -91,8 +91,8 @@ struct DailyReportSheet: View {
         return NavigationStack {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    cardPreview
-                    themeRow
+                    ReportPreview(image: preview)
+                    ReportThemeRow(themeRaw: $themeRaw)
                     if askForName {
                         nameRow
                     }
@@ -106,7 +106,7 @@ struct DailyReportSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .background { AppBackground(style: .subtle) }
             .safeAreaBar(edge: .bottom) {
-                actions(report: report, options: options)
+                ReportSendBar { ReportCardRenderer.render(report: report, options: options) }
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -128,82 +128,6 @@ struct DailyReportSheet: View {
             guard !Task.isCancelled else { return }
             preview = ReportCardRenderer.render(report: report, options: options, scale: 2)
         }
-    }
-
-    // MARK: - Preview
-
-    private var cardPreview: some View {
-        Group {
-            if let preview {
-                Image(uiImage: preview)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                    }
-                    .shadow(color: .black.opacity(0.55), radius: 24, y: 14)
-                    .accessibilityLabel("Report card preview")
-            } else {
-                RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                    .fill(AppColors.surfaceLift)
-                    .aspectRatio(0.7, contentMode: .fit)
-                    .overlay { ProgressView().tint(.white) }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
-    }
-
-    // MARK: - Theme
-
-    private var themeRow: some View {
-        GlassSection("Theme") {
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(ReportTheme.allCases) { theme in
-                        themeSwatch(theme)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-            .scrollIndicators(.hidden)
-            .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
-            .padding(.horizontal, -AppLayout.pageHorizontal)
-        }
-    }
-
-    private func themeSwatch(_ theme: ReportTheme) -> some View {
-        let isSelected = themeRaw == theme.rawValue
-        return Button {
-            guard !isSelected else { return }
-            Haptics.selection()
-            themeRaw = theme.rawValue
-        } label: {
-            VStack(spacing: 6) {
-                Group {
-                    if let look = theme.look {
-                        CanvasLookView(look: look, mood: .session)
-                    } else {
-                        ReportPalette(theme: theme).paper
-                    }
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                        .strokeBorder(isSelected ? Color.white.opacity(0.95) : AppColors.cardStroke, lineWidth: isSelected ? 2 : 1)
-                }
-
-                Text(theme.displayName)
-                    .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-            }
-        }
-        .buttonStyle(GlassPressStyle())
-        .accessibilityLabel(theme.displayName)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - What to share
@@ -295,30 +219,6 @@ struct DailyReportSheet: View {
             .padding(.vertical, 14)
             .glassCard()
         }
-    }
-
-    // MARK: - Actions
-
-    /// The card goes alone: no message typed under it, so a friend gets one
-    /// image they can forward as is.
-    private func actions(report: DailyReport, options: ReportOptions) -> some View {
-        HStack(spacing: 10) {
-            if MessageComposer.canSend {
-                GlassButton(title: "Text it", icon: "message.fill", style: .secondary, size: .large, fullWidth: true) {
-                    guard let image = ReportCardRenderer.render(report: report, options: options) else { return }
-                    Haptics.medium()
-                    MessageComposer.shared.present(image: image)
-                }
-            }
-            GlassButton(title: "Share", icon: "square.and.arrow.up", style: .primary, size: .large, fullWidth: true) {
-                guard let image = ReportCardRenderer.render(report: report, options: options) else { return }
-                Haptics.medium()
-                SharePresenter.present(image: image)
-            }
-        }
-        .padding(.horizontal, AppLayout.pageHorizontal)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Health

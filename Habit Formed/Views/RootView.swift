@@ -9,12 +9,14 @@ enum RootSheet: Identifiable {
     case addHabit
     case timer(Habit)
     case report(Date)
+    case recap(Date)
 
     var id: String {
         switch self {
         case .addHabit: return "add"
         case .timer(let habit): return "timer-\(habit.id.uuidString)"
         case .report(let date): return "report-\(date.timeIntervalSince1970)"
+        case .recap(let date): return "recap-\(date.timeIntervalSince1970)"
         }
     }
 }
@@ -29,6 +31,7 @@ struct RootView: View {
     @AppStorage(AppPreferences.reportReminderEnabled) private var reportReminderOn = false
     @AppStorage(AppPreferences.reportReminderHour) private var reportReminderHour = 21
     @AppStorage(AppPreferences.reportReminderMinute) private var reportReminderMinute = 0
+    @AppStorage(AppPreferences.recapReminderEnabled) private var recapReminderOn = false
 
     @State private var selectedTab: AppTab = .today
     @State private var sheet: RootSheet?
@@ -51,7 +54,10 @@ struct RootView: View {
 
             Tab("History", systemImage: "calendar", value: AppTab.history) {
                 NavigationStack {
-                    HistoryView(onShareReport: { date in openReport(for: date) })
+                    HistoryView(
+                        onShareReport: { date in openReport(for: date) },
+                        onShareWeek: { openRecap() }
+                    )
                         .background { AppBackground() }
                         .toolbar(.hidden, for: .navigationBar)
                 }
@@ -81,6 +87,8 @@ struct RootView: View {
                 TimerView(habit: habit)
             case .report(let date):
                 DailyReportSheet(day: date)
+            case .recap(let date):
+                WeeklyRecapSheet(end: date)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenTimerFromNotification)) { note in
@@ -96,7 +104,12 @@ struct RootView: View {
             guard url.scheme == WidgetLink.scheme else { return }
             if url.host() == WidgetLink.reportHost {
                 openReport(for: Date())
+            } else if url.host() == WidgetLink.recapHost {
+                openRecap()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .habitOpenRecapFromNotification)) { _ in
+            openRecap()
         }
         .task {
             // Re-anchors the repeating report nudge after a reinstall or a
@@ -108,6 +121,9 @@ struct RootView: View {
                     minute: reportReminderMinute
                 )
             }
+            if recapReminderOn {
+                await notifications.syncRecapReminder(enabled: true)
+            }
         }
         .environment(\.glassAppearance, GlassAppearance(rawValue: glassRaw) ?? .light)
         .environment(\.appCanvas, AppCanvas(rawValue: canvasRaw) ?? .classic)
@@ -117,6 +133,11 @@ struct RootView: View {
     private func openReport(for date: Date) {
         Haptics.medium()
         sheet = .report(date.startOfDay)
+    }
+
+    private func openRecap() {
+        Haptics.medium()
+        sheet = .recap(Date().startOfDay)
     }
 
     private func lookupHabit(id: UUID) -> Habit? {

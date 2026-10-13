@@ -3,7 +3,7 @@ import UserNotifications
 
 /// Owns all `UserNotifications` interactions: permission, per-habit
 /// reminders that respect each habit's cadence, the daily report nudge, and
-/// one-shot timer completion alerts.
+/// one-shot timer completion alerts, and the Sunday recap nudge.
 ///
 /// Reminder ids use the `habit-reminder-` prefix, timer alerts use `timer-`,
 /// and the report nudge is `report-reminder`, so a reminder rebuild never
@@ -356,6 +356,41 @@ final class NotificationService {
             try await center.add(request)
         } catch {
             print("Failed to schedule report reminder: \(error)")
+        }
+    }
+
+    // MARK: - Recap reminder
+
+    private static let recapReminderID = "recap-reminder"
+
+    /// Sundays at 7 PM, the nudge to send the week's recap. Asks for
+    /// permission the moment it is turned on.
+    @MainActor
+    func syncRecapReminder(enabled: Bool) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.recapReminderID])
+        guard enabled else { return }
+
+        await refreshAuthorizationStatus()
+        if !isAuthorized { await requestAuthorization() }
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Your week is in"
+        content.body = "See how the last seven days went, then send the recap."
+        content.sound = .default
+        content.interruptionLevel = .active
+
+        var components = DateComponents()
+        components.weekday = 1
+        components.hour = 19
+        components.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: Self.recapReminderID, content: content, trigger: trigger)
+        do {
+            try await center.add(request)
+        } catch {
+            print("Failed to schedule recap reminder: \(error)")
         }
     }
 

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.reportReminderEnabled) private var reminderOn = false
     @AppStorage(AppPreferences.reportReminderHour) private var reminderHour = 21
     @AppStorage(AppPreferences.reportReminderMinute) private var reminderMinute = 0
+    @AppStorage(AppPreferences.recapReminderEnabled) private var recapOn = false
 
     @State private var showArrange = false
     @FocusState private var nameFocused: Bool
@@ -37,12 +38,15 @@ struct SettingsView: View {
         .onChange(of: reminderOn) { _, _ in syncReminder() }
         .onChange(of: reminderHour) { _, _ in syncReminder() }
         .onChange(of: reminderMinute) { _, _ in syncReminder() }
+        .onChange(of: recapOn) { _, isOn in
+            Task { await notifications.syncRecapReminder(enabled: isOn) }
+        }
     }
 
     // MARK: - Report
 
     private var reportSection: some View {
-        GlassSection("Daily report") {
+        GlassSection("Reports") {
             VStack(alignment: .leading, spacing: 8) {
                 GlassRowGroup(dividerInset: RowLayout.dividerInset) {
                     SettingsRow("Your name", icon: "person") {
@@ -60,6 +64,7 @@ struct SettingsView: View {
                                 .labelsHidden()
                         }
                     }
+                    SettingsRow("Sunday recap", icon: "calendar.badge.checkmark", caption: "Sundays at 7 PM, your week as one card", isOn: $recapOn)
                 }
                 .motion(AppMotion.settle, value: reminderOn)
 

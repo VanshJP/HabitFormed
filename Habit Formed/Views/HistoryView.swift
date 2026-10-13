@@ -1,11 +1,12 @@
 import SwiftUI
 import SwiftData
 
-/// The long view, in two sections. Overview: the perfect-day numbers, a
-/// 12-week consistency map and every habit's streak. Log: day by day, where
-/// each day can be sent as a report.
+/// The long view, in two sections. Overview: the perfect-day numbers, this
+/// week with its recap, a 12-week consistency map and every habit's streak.
+/// Log: day by day, where each day can be sent as a report.
 struct HistoryView: View {
     var onShareReport: (Date) -> Void = { _ in }
+    var onShareWeek: () -> Void = {}
 
     @Environment(\.modelContext) private var modelContext
     @Environment(DayTracker.self) private var dayTracker
@@ -82,11 +83,38 @@ struct HistoryView: View {
                 }
             }
 
+            thisWeek(Array(summaries.suffix(7)))
+
             GlassSection("Last 12 weeks", meta: perfect == 1 ? "1 perfect day" : "\(perfect) perfect days") {
                 GlassCard {
                     ConsistencyHeatMap(summaries: byDay, weeks: Self.mapWeeks)
                 }
             }
+        }
+    }
+
+    /// The last seven days in two numbers, with the way to send them as the
+    /// Sunday recap card.
+    private func thisWeek(_ days: [DaySummary]) -> some View {
+        let perfect = days.filter(\.isPerfect).count
+        let logged = days.reduce(0) { $0 + $1.done }
+        let expected = days.reduce(0) { $0 + $1.expected }
+
+        return GlassSection("Last 7 days") {
+            GlassCard {
+                HStack(spacing: 0) {
+                    StatPair(value: "\(perfect) of 7", label: "Perfect days", valueFont: .metricValue)
+                        .frame(maxWidth: .infinity)
+                    statDivider
+                    StatPair(value: "\(logged) of \(expected)", label: "Logged", valueFont: .metricValue)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        } accessory: {
+            Button(action: onShareWeek) {
+                HeaderLinkLabel("Share recap", icon: "square.and.arrow.up")
+            }
+            .buttonStyle(.textLink)
         }
     }
 

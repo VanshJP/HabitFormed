@@ -26,6 +26,8 @@ nonisolated enum AppPreferences {
     static let reportReminderEnabled = "report.reminder.enabled"
     static let reportReminderHour = "report.reminder.hour"
     static let reportReminderMinute = "report.reminder.minute"
+    /// Sunday evening nudge to send the week's recap.
+    static let recapReminderEnabled = "recap.reminder.enabled"
 
     static var isLogSoundOn: Bool {
         UserDefaults.standard.object(forKey: logSound) as? Bool ?? true

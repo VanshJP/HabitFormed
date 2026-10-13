@@ -8,6 +8,8 @@ extension Notification.Name {
     static let habitOpenTimerFromNotification = Notification.Name("habitOpenTimerFromNotification")
     /// Posted when the user taps the evening report reminder.
     static let habitOpenReportFromNotification = Notification.Name("habitOpenReportFromNotification")
+    /// Posted when the user taps the Sunday recap reminder.
+    static let habitOpenRecapFromNotification = Notification.Name("habitOpenRecapFromNotification")
 }
 
 /// `UNUserNotificationCenterDelegate` attached at app launch.
@@ -55,6 +57,12 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         if identifier == "report-reminder" {
             Task { @MainActor in
                 NotificationCenter.default.post(name: .habitOpenReportFromNotification, object: nil)
+            }
+        }
+
+        if identifier == "recap-reminder" {
+            Task { @MainActor in
+                NotificationCenter.default.post(name: .habitOpenRecapFromNotification, object: nil)
             }
         }
 
