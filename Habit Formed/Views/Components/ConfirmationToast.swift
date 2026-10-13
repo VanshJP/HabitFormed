@@ -35,8 +35,25 @@ struct UndoToast: View {
     let message: String
     var tint: Color = AppColors.success
     let onUndo: () -> Void
+    /// An optional second door beside Undo, such as sending the day's report.
+    var actionTitle: String?
+    var onAction: () -> Void
 
     @Environment(\.glassAppearance) private var glassAppearance
+
+    init(
+        message: String,
+        tint: Color = AppColors.success,
+        onUndo: @escaping () -> Void,
+        actionTitle: String? = nil,
+        onAction: @escaping () -> Void = {}
+    ) {
+        self.message = message
+        self.tint = tint
+        self.onUndo = onUndo
+        self.actionTitle = actionTitle
+        self.onAction = onAction
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -51,6 +68,24 @@ struct UndoToast: View {
                 .lineLimit(1)
 
             Spacer(minLength: 4)
+
+            if let actionTitle {
+                Button {
+                    Haptics.light()
+                    onAction()
+                } label: {
+                    Text(actionTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.inkOnLight)
+                        .lineLimit(1)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 32)
+                        .background(Capsule().fill(AppColors.solidWhite))
+                        .frame(minHeight: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+            }
 
             Button {
                 Haptics.light()
@@ -81,6 +116,8 @@ struct UndoToast: View {
         VStack(spacing: 16) {
             ConfirmationToast(message: "Copied")
             UndoToast(message: "Read logged") {}
+                .padding(.horizontal, 16)
+            UndoToast(message: "Perfect day", onUndo: {}, actionTitle: "Send report")
                 .padding(.horizontal, 16)
         }
         .padding(.top, 12)

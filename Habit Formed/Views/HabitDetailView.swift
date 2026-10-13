@@ -1,8 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// One habit's page: the streak, today's log and note, a calendar that fixes
-/// history with a tap, and the latest logs. Opened by tapping a tile.
+/// One habit's page: the streak, then its history as a calendar (the first
+/// thing a tap on a tile is for, and where a tap fixes a day), today's log and
+/// note, and the latest logs. Opened by tapping a tile.
 struct HabitDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -31,8 +32,8 @@ struct HabitDetailView: View {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     hero
-                    todaySection
                     calendarSection
+                    todaySection
                     recentSection
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)

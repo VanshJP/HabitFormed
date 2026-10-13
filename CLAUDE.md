@@ -73,7 +73,7 @@ Habit Formed/
     ├── Settings/             # SettingsView
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
-    ├── HabitDetailView.swift # Per-habit page: streak hero, log + note, tappable calendar, recent logs
+    ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
     ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
@@ -125,7 +125,8 @@ new surfaces:
 The slide-to-log knob mirrors iOS's slide-to-answer: drag past ~75% and
 release to log; release earlier to cancel. The track is 44pt tall. Once
 logged it collapses into a "Logged" pill. Every log from the grid shows an
-`UndoToast` for four seconds.
+`UndoToast` for four seconds; the log that finishes a perfect day turns it
+into "Perfect day" with a "Send report" button for six.
 
 When the grid shows a **past day**, the bottom row of every tile becomes a
 pill that toggles that day's log (fixing a forgotten day is one tap). The

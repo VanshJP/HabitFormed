@@ -122,6 +122,12 @@ struct ContentView: View {
             guard isPerfect, !wasPerfect, isViewingToday else { return }
             Haptics.success()
             celebration += 1
+            // The log that finished the day offers to send it, right where
+            // the thumb already is.
+            if var last = undo, last.wasLogged, last.day.isToday {
+                last.completesDay = true
+                undo = last
+            }
         }
     }
 
@@ -148,13 +154,22 @@ struct ContentView: View {
     @ViewBuilder
     private var undoToast: some View {
         if let undo {
-            UndoToast(message: undo.message, tint: undo.tint) { revert(undo) }
+            UndoToast(
+                message: undo.message,
+                tint: undo.tint,
+                onUndo: { revert(undo) },
+                actionTitle: undo.completesDay ? "Send report" : nil,
+                onAction: {
+                    self.undo = nil
+                    onShareReport(Date())
+                }
+            )
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.top, 4)
                 .readableColumn()
                 .transition(.move(edge: .top).combined(with: .opacity))
-                .task(id: undo.id) {
-                    try? await Task.sleep(for: .seconds(4))
+                .task(id: "\(undo.id)-\(undo.completesDay)") {
+                    try? await Task.sleep(for: .seconds(undo.completesDay ? 6 : 4))
                     if self.undo?.id == undo.id { self.undo = nil }
                 }
         }
@@ -414,6 +429,8 @@ struct UndoLog: Equatable {
     let day: Date
     /// True when the change added a log; false when it removed one.
     let wasLogged: Bool
+    /// Set when this log finished a perfect day, so the toast offers the report.
+    var completesDay = false
 
     init(habit: Habit, day: Date, wasLogged: Bool) {
         self.habitID = habit.id
@@ -424,6 +441,7 @@ struct UndoLog: Equatable {
     }
 
     var message: String {
+        if completesDay { return "Perfect day" }
         let when = day.isToday ? "" : " for \(day.relativeDayName)"
         return wasLogged ? "\(title) logged\(when)" : "\(title) unlogged\(when)"
     }
