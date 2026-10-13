@@ -92,6 +92,12 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenReportFromNotification)) { _ in
             openReport(for: Date())
         }
+        .onOpenURL { url in
+            guard url.scheme == WidgetLink.scheme else { return }
+            if url.host() == WidgetLink.reportHost {
+                openReport(for: Date())
+            }
+        }
         .task {
             // Re-anchors the repeating report nudge after a reinstall or a
             // permission change made in iOS Settings.

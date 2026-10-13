@@ -84,6 +84,7 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 ├── WidgetSnapshot.swift      # Shared: what the widget shows, pending widget logs
 ├── WidgetStore.swift         # Shared: App Group read/write (group.com.vansh.Habit-Formed)
 ├── LogHabitIntent.swift      # Shared: the widget's log button
+├── WidgetLink.swift          # Shared: habitformed:// links that RootView opens
 └── Habit_Formed_WidgetLiveActivity.swift # Timer Live Activity (widget-only)
 ```
 
@@ -165,7 +166,10 @@ handles in the background.
 The widget never opens SwiftData. `WidgetSync` (app side) writes a
 `WidgetSnapshot` (today's page plus tomorrow's, so the widget flips at
 midnight on its own) to the App Group whenever `WidgetSync.signature`
-changes, and reloads timelines only when the snapshot differs. The medium
+changes, and reloads timelines only when the snapshot differs. Tapping the
+small widget opens today's report (`WidgetLink.report`, handled in
+`RootView.onOpenURL`; the scheme is registered in
+`Habit-Formed-Info.plist`). The medium
 widget's log button runs `LogHabitIntent`, which queues a
 `PendingWidgetLog` and marks the habit done in the snapshot; the app writes
 the real log (keeping the tap time as `loggedAt`) on launch, on returning to

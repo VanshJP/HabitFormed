@@ -43,7 +43,10 @@ struct TodayWidgetView: View {
                 case .systemMedium:
                     MediumTodayView(page: page)
                 default:
+                    // Too small for buttons, so the whole widget is the way
+                    // to today's report.
                     SmallTodayView(page: page)
+                        .widgetURL(WidgetLink.report)
                 }
             } else {
                 Text("Open Habit Formed to start today.")
