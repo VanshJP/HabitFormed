@@ -26,6 +26,9 @@ final class NotificationService {
     nonisolated static let habitIDKey = "habitID"
     /// Rolling one-shots scheduled ahead for interval habits.
     private static let intervalHorizon = 4
+    /// iOS keeps 64 pending requests per app; habit reminders stay under
+    /// this so the report, recap and timer alerts always fit.
+    private static let habitReminderBudget = 56
 
     // MARK: - Authorization
 
@@ -92,8 +95,15 @@ final class NotificationService {
 
         guard isAuthorized else { return }
 
-        for habit in habits where habit.reminderEnabled {
-            for request in Self.reminderRequests(for: habit) {
+        // Splitting a week to skip a handled day costs six more requests;
+        // habits past the budget keep their plain daily alert.
+        let reminding = habits.filter(\.reminderEnabled)
+        var spare = Self.habitReminderBudget - reminding.reduce(0) { $0 + Self.baseRequestCount($1) }
+
+        for habit in reminding {
+            let splitWeek = spare >= 6 && Self.hasHandledDay(habit)
+            if splitWeek { spare -= 6 }
+            for request in Self.reminderRequests(for: habit, splitWeek: splitWeek) {
                 do {
                     try await center.add(request)
                 } catch {
@@ -118,21 +128,24 @@ final class NotificationService {
 
     /// Builds every notification request a habit needs right now.
     ///
-    /// - daily: repeating alert at the reminder time.
-    /// - weekly: repeating alert at the reminder time; body reflects
-    ///   this week's progress toward the target.
+    /// - daily: repeating alert at the reminder time, or with `splitWeek`
+    ///   one alert per weekday so a day already handled stays quiet.
+    /// - weekly: the same; body reflects this week's progress toward the
+    ///   target, and a week whose target is met stays quiet.
     /// - interval: rolling one-shots on upcoming cycle due dates (plus
     ///   catch-up nags while overdue). Never-logged interval habits get
     ///   a repeating nudge until the first log starts the countdown.
-    private static func reminderRequests(for habit: Habit) -> [UNNotificationRequest] {
+    private static func reminderRequests(for habit: Habit, splitWeek: Bool) -> [UNNotificationRequest] {
         switch habit.frequency {
         case .daily:
             let content = content(for: habit, body: dailyBody(for: habit))
+            if splitWeek { return weekRequests(habit, content: content) }
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
         case .weekly:
             let body = "\(habit.completionsThisWeek) of \(habit.weeklyTarget) this week."
             let content = content(for: habit, body: body)
+            if splitWeek { return weekRequests(habit, content: content) }
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
         case .interval:
@@ -143,6 +156,79 @@ final class NotificationService {
             return intervalReminderRequests(habit)
         }
     }
+
+    /// Requests a habit needs before any week is split.
+    private static func baseRequestCount(_ habit: Habit) -> Int {
+        habit.frequency == .interval && habit.lastCompletionDate != nil ? intervalHorizon : 1
+    }
+
+    // MARK: - Skipping handled days
+
+    /// The next seven firings at the reminder time, one per weekday,
+    /// starting with today's while it is still ahead.
+    private static func upcomingFirings(_ habit: Habit, now: Date = Date()) -> [Date] {
+        let time = habit.reminderFireTime
+        guard var first = Calendar.current.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: now) else {
+            return []
+        }
+        if first <= now { first = first.adding(days: 1) }
+        return (0..<7).map { first.adding(days: $0) }
+    }
+
+    /// A firing that would nag about a day already handled: one that is
+    /// logged, or for a weekly habit, one in a week whose target is met.
+    private static func isHandled(_ firing: Date, habit: Habit) -> Bool {
+        if habit.isCompleted(on: firing) { return true }
+        return habit.frequency == .weekly
+            && habit.completionsInWeek(of: firing).count >= habit.weeklyTarget
+    }
+
+    private static func hasHandledDay(_ habit: Habit) -> Bool {
+        guard habit.frequency != .interval else { return false }
+        return upcomingFirings(habit).contains { isHandled($0, habit: habit) }
+    }
+
+    /// One alert per weekday. A weekday whose next firing is handled gets a
+    /// one-shot a week later instead of a repeating alert, so it comes back
+    /// even if the app is not opened again; the next sync, on any foreground
+    /// or log, folds the week back into one daily alert.
+    private static func weekRequests(_ habit: Habit, content: UNMutableNotificationContent) -> [UNNotificationRequest] {
+        let calendar = Calendar.current
+        let time = habit.reminderFireTime
+        return upcomingFirings(habit).enumerated().map { index, firing in
+            let handled = isHandled(firing, habit: habit)
+            let firstFire = handled ? firing.adding(days: 7) : firing
+            let trigger: UNCalendarNotificationTrigger
+            if handled {
+                var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: firstFire)
+                parts.timeZone = calendar.timeZone
+                trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+            } else {
+                var parts = DateComponents()
+                parts.weekday = calendar.component(.weekday, from: firing)
+                parts.hour = time.hour
+                parts.minute = time.minute
+                trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: true)
+            }
+            let dayContent = habit.frequency == .weekly
+                ? weeklyContent(habit, base: content, firstFire: firstFire)
+                : content
+            return request(id: "\(reminderID(habit))-d\(index)", content: dayContent, trigger: trigger)
+        }
+    }
+
+    /// A weekly alert whose first firing lands in a later week starts that
+    /// week at zero, not at this week's count.
+    private static func weeklyContent(
+        _ habit: Habit, base: UNMutableNotificationContent, firstFire: Date
+    ) -> UNMutableNotificationContent {
+        guard !Calendar.current.isDate(firstFire, equalTo: Date(), toGranularity: .weekOfYear),
+              let fresh = base.mutableCopy() as? UNMutableNotificationContent else { return base }
+        fresh.body = "0 of \(habit.weeklyTarget) this week."
+        return fresh
+    }
+
+    // MARK: - Interval chains
 
     /// One-shot per upcoming due date, horizon deep. Each app foreground
     /// or log re-syncs the chain, so fired slots are replaced with fresh

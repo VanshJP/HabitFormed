@@ -161,6 +161,13 @@ learning, so answering the reminder never walks it earlier. Reminders for
 manual and timer habits carry a "Log it" action that `NotificationRouter`
 handles in the background.
 
+A reminder stays quiet on a day already handled (logged, or a weekly
+habit's met week). A daily alert is one repeating request; when one of the
+next seven firings is handled, the habit's week splits into seven weekday
+requests, the handled ones becoming one-shots a week out, and the next sync
+folds it back. Habit reminders stay within `habitReminderBudget` (56 of
+iOS's 64 pending), and habits past it keep the plain daily alert.
+
 ### Widgets
 
 The widget never opens SwiftData. `WidgetSync` (app side) writes a
