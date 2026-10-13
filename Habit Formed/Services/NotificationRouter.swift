@@ -78,7 +78,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     private func logToday(habitID: UUID) {
         guard let context = modelContainer?.mainContext else { return }
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == habitID })
-        guard let habit = try? context.fetch(descriptor).first else { return }
-        habit.log(on: Date(), in: context)
+        guard let habit = try? context.fetch(descriptor).first,
+              habit.log(on: Date(), in: context) != nil else { return }
+        let all = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)])
+        if let habits = try? context.fetch(all) {
+            WidgetSync.update(habits: habits)
+        }
     }
 }

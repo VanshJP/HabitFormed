@@ -12,7 +12,8 @@ habit, with streak counts and 7-day completion dots. The signature feature is
 the **daily report**: one card plus text that you send to friends, with a
 theme and switches for what to leave out.
 
-- **Platform:** iOS 26.0+ (single target, iPhone + iPad).
+- **Platform:** iOS 26.0+ (iPhone + iPad), plus a widget extension
+  (Home Screen widget and the timer Live Activity).
 - **Language:** Swift 5 with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
   and `SWIFT_APPROACHABLE_CONCURRENCY = YES`. Mark new pure types
   `nonisolated` (see `DayLedger`, `DailyReport`, `ReportOptions`).
@@ -44,6 +45,14 @@ The Xcode project uses `objectVersion = 77` with
 `Habit Formed/` folder is picked up automatically; no `pbxproj` edits
 are needed when adding new Swift files.
 
+`Habit Formed Widget/` is synchronized into **both** targets. A file there
+is shared (compiled into the app and the extension) unless it is listed in
+the app target's membership exceptions in `project.pbxproj`. Shared files
+(`WidgetSnapshot`, `WidgetStore`, `LogHabitIntent`, the timer attributes and
+intent) stay Foundation-only and `nonisolated`; a new widget-only file
+(views, providers, `Widget` structs) must be added to that exception list,
+the one sanctioned `pbxproj` edit for files.
+
 ## Folder layout
 
 ```
@@ -51,7 +60,7 @@ Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today tab: month control, week strip, tile grid, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
-├── Services/                 # HealthKit, notifications, timer, report builder/renderer, share, Messages
+├── Services/                 # HealthKit, notifications, timer, widget sync, report builder/renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
@@ -68,6 +77,14 @@ Habit Formed/
     ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
+
+Habit Formed Widget/          # Widget extension (see the membership note above)
+├── TodayWidget.swift         # Home Screen widget, timeline provider (widget-only)
+├── TodayWidgetViews.swift    # Small and medium layouts, WidgetPalette (widget-only)
+├── WidgetSnapshot.swift      # Shared: what the widget shows, pending widget logs
+├── WidgetStore.swift         # Shared: App Group read/write (group.com.vansh.Habit-Formed)
+├── LogHabitIntent.swift      # Shared: the widget's log button
+└── Habit_Formed_WidgetLiveActivity.swift # Timer Live Activity (widget-only)
 ```
 
 ## Interaction model
@@ -138,6 +155,18 @@ then, with learning off, and for health habits (whose logs are written by
 sync) it fires at the set `reminderHour`/`reminderMinute`. Everything reads
 `Habit.reminderFireTime`. Reminders for manual and timer habits carry a
 "Log it" action that `NotificationRouter` handles in the background.
+
+### Widgets
+
+The widget never opens SwiftData. `WidgetSync` (app side) writes a
+`WidgetSnapshot` (today's page plus tomorrow's, so the widget flips at
+midnight on its own) to the App Group whenever `WidgetSync.signature`
+changes, and reloads timelines only when the snapshot differs. The medium
+widget's log button runs `LogHabitIntent`, which queues a
+`PendingWidgetLog` and marks the habit done in the snapshot; the app writes
+the real log (keeping the tap time as `loggedAt`) on launch, on returning to
+the foreground, or at once when the intent ran in the app's process. Always
+apply pending logs before writing a snapshot.
 
 ### Timers
 

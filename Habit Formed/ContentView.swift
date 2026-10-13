@@ -198,6 +198,7 @@ struct ContentView: View {
     private func lifecycle<V: View>(_ content: V) -> some View {
         content
             .task {
+                WidgetSync.refresh(habits: habits, in: modelContext)
                 try? await health.requestAuthorization()
                 await health.syncHealthKitHabits(in: modelContext)
                 // HealthKit change notifications keep health tiles near
@@ -210,6 +211,12 @@ struct ContentView: View {
             .onChange(of: reminderSignature) { _, _ in
                 Task { await notifications.syncReminders(for: habits) }
             }
+            .onChange(of: WidgetSync.signature(habits: habits, today: dayTracker.today)) { _, _ in
+                WidgetSync.update(habits: habits)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .habitLoggedFromWidget)) { _ in
+                WidgetSync.refresh(habits: habits, in: modelContext)
+            }
             .task(id: "health-sync") {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(15))
@@ -220,6 +227,7 @@ struct ContentView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     dayTracker.refresh()
+                    WidgetSync.refresh(habits: habits, in: modelContext)
                     Task {
                         await health.syncHealthKitHabits(in: modelContext)
                         health.startObservingHealthKitHabits(in: modelContext)
