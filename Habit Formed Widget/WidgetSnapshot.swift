@@ -42,13 +42,18 @@ nonisolated struct WidgetSnapshot: Codable, Sendable, Equatable {
         var remaining: Int { max(expected - done, 0) }
         var isPerfect: Bool { expected > 0 && done >= expected }
 
+        /// A logged habit always counts for its day, even a weekly one on a
+        /// free day, matching how the app's day ledger counts it.
         mutating func markDone(_ habitID: UUID) {
             guard let index = items.firstIndex(where: { $0.id == habitID }), !items[index].isDone else { return }
             items[index].isDone = true
-            guard items[index].isExpected else { return }
+            let wasExpected = items[index].isExpected
+            items[index].isExpected = true
             done += 1
+            if !wasExpected { expected += 1 }
             if !week.isEmpty {
                 week[week.count - 1].done += 1
+                if !wasExpected { week[week.count - 1].expected += 1 }
             }
         }
     }

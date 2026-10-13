@@ -154,8 +154,11 @@ A reminder learns by default (`Habit.reminderLearnsTime`): once a habit has
 minutes), so plants usually watered at 10:00 AM get a 9:30 AM nudge. Until
 then, with learning off, and for health habits (whose logs are written by
 sync) it fires at the set `reminderHour`/`reminderMinute`. Everything reads
-`Habit.reminderFireTime`. Reminders for manual and timer habits carry a
-"Log it" action that `NotificationRouter` handles in the background.
+`Habit.reminderFireTime`. Logs made within those 30 minutes after a learned
+reminder are marked `HabitCompletion.followedReminder` and left out of
+learning, so answering the reminder never walks it earlier. Reminders for
+manual and timer habits carry a "Log it" action that `NotificationRouter`
+handles in the background.
 
 ### Widgets
 

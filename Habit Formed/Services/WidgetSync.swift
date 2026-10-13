@@ -23,9 +23,8 @@ enum WidgetSync {
         let pending = WidgetStore.pendingLogs()
         guard !pending.isEmpty else { return }
         for log in pending {
-            guard let habit = habits.first(where: { $0.id == log.habitID }),
-                  let entry = habit.log(on: log.day, in: context) else { continue }
-            entry.loggedAt = log.tappedAt
+            guard let habit = habits.first(where: { $0.id == log.habitID }) else { continue }
+            habit.log(on: log.day, at: log.tappedAt, in: context)
         }
         try? context.save()
         WidgetStore.removePending(pending)

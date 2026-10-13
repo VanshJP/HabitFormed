@@ -12,6 +12,10 @@ final class HabitCompletion {
     /// What the day's log was about ("Chopin nocturne", "5k in the rain").
     /// Optional context for history and the daily report.
     var note: String = ""
+    /// Made soon after a learned reminder rang. Learning skips these: they
+    /// show when the reminder fired, not when the habit is usually done, and
+    /// counting them would walk the reminder earlier day after day.
+    var followedReminder: Bool = false
 
     var habit: Habit?
 

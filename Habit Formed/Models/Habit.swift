@@ -290,12 +290,13 @@ final class Habit {
     // MARK: - Reminder time
 
     /// The minute of the day this habit is usually logged, from logs made on
-    /// the day they count for (a backfilled day says nothing about a routine).
-    /// Health habits never learn: sync writes their logs, not the person.
+    /// the day they count for (a backfilled day says nothing about a routine)
+    /// and not prompted by a learned reminder. Health habits never learn: sync
+    /// writes their logs, not the person.
     var usualLogMinute: Int? {
         guard trackKind != .health else { return nil }
         let times = (completions ?? [])
-            .filter { $0.loggedAt.isSameDay(as: $0.date) }
+            .filter { !$0.followedReminder && $0.loggedAt.isSameDay(as: $0.date) }
             .map(\.loggedAt)
             .sorted(by: >)
         return ReminderTiming.typicalMinute(of: times)
@@ -315,15 +316,29 @@ final class Habit {
     // MARK: - Logging
 
     /// Logs `day` unless it already has a log, and returns the new entry.
-    /// Every log path (slide, detail, calendar backfill, timer) goes through
-    /// here so a day never holds two completions.
+    /// Every log path (slide, detail, calendar backfill, timer, widget,
+    /// reminder action) goes through here so a day never holds two
+    /// completions. `time` is when it happened; the widget passes its tap.
     @discardableResult
-    func log(on day: Date = Date(), in context: ModelContext) -> HabitCompletion? {
+    func log(on day: Date = Date(), at time: Date = Date(), in context: ModelContext) -> HabitCompletion? {
         guard completion(on: day) == nil else { return nil }
+        // Read before this log can move it.
+        let learned = reminderEnabled && reminderLearnsTime ? learnedReminderTime : nil
         let entry = HabitCompletion(date: day, value: targetValue, habit: self)
+        entry.loggedAt = time
+        entry.followedReminder = Self.follows(learned, at: time, on: day)
         context.insert(entry)
         try? context.save()
         return entry
+    }
+
+    /// True when `time`, on `day` itself, falls within
+    /// `ReminderTiming.leadMinutes` after a learned reminder.
+    private static func follows(_ reminder: ReminderTime?, at time: Date, on day: Date) -> Bool {
+        guard let reminder, time.isSameDay(as: day) else { return false }
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
+        let since = (parts.hour ?? 0) * 60 + (parts.minute ?? 0) - reminder.minuteOfDay
+        return since >= 0 && since < ReminderTiming.leadMinutes
     }
 
     /// Removes every log on `day`.

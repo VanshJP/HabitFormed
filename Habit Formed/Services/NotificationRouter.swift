@@ -82,7 +82,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
               habit.log(on: Date(), in: context) != nil else { return }
         let all = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)])
         if let habits = try? context.fetch(all) {
-            WidgetSync.update(habits: habits)
+            WidgetSync.refresh(habits: habits, in: context)
         }
     }
 }
