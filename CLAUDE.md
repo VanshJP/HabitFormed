@@ -47,7 +47,7 @@ are needed when adding new Swift files.
 ```
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion, ReportTemplate) + services
-├── ContentView.swift         # Today tab: header, week strip, progress card, tile grid, undo toast
+├── ContentView.swift         # Today tab: header with progress line, week strip, tile grid, undo toast
 ├── Models/                   # Habit, HabitCompletion, ReportTemplate (+ presets), DayLedger
 ├── Services/                 # HealthKit, notifications, timer, report builder/renderer, share, Messages
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
@@ -55,7 +55,7 @@ Habit Formed/
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
 └── Views/
     ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, StatTile, PageTitle, ...)
-    ├── Today/                # WeekStrip, DayProgressCard, DateBrowserSheet, ArrangeHabitsSheet
+    ├── Today/                # WeekStrip, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
     ├── Report/               # DailyReportSheet, ReportTemplateEditor, ReportCardView + styles
@@ -73,10 +73,13 @@ Habit Formed/
 `RootView` hosts two tabs, each with no navigation bar (the page title is
 the header):
 
-- **Today**: `ContentView`. `PageTitle` with a capsule holding the
-  perfect-day `StreakChip`, add (+) and Settings (gear, pushed). Under it the
-  `WeekStrip` (last 7 days as rings; tap to browse, calendar for older), the
-  `DayProgressCard` (ring, verdict, "Share today's report"), and the grid.
+- **Today**: `ContentView`. `PageTitle` with the browsed day's progress as
+  one line ("2 of 6 done · 4 to go") and a capsule holding the perfect-day
+  `StreakChip` (only once a streak exists), add (+) and Settings (gear,
+  pushed). Under it the `WeekStrip` (last 7 days as dates with a completion
+  dot, drawn on the canvas; tap to browse, calendar for older), then the
+  "Habits" section whose header carries the "Share report" link. Keep the
+  top of Today light: progress is said once, in the header line.
 - **History**: `HistoryView`. Lifetime stats, a 12-week consistency map,
   per-habit streak rows (tap opens the detail sheet), and a day-by-day log
   where each day header has a Share button for that day's report.

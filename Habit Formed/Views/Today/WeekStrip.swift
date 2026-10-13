@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// The last seven days as rings, today on the right. Tap a day to browse it;
-/// the calendar button reaches anything older.
+/// The last seven days, today on the right: the weekday, the date, and a dot
+/// for how that day went. Tap a day to browse it; the calendar button reaches
+/// anything older. Drawn straight on the canvas, so it reads as navigation
+/// rather than another card.
 struct WeekStrip: View {
     /// Seven summaries, oldest first, ending today.
     let summaries: [DaySummary]
@@ -9,27 +11,23 @@ struct WeekStrip: View {
     let onOpenCalendar: () -> Void
 
     var body: some View {
-        GlassCard(padding: 6) {
-            HStack(spacing: 2) {
-                ForEach(summaries) { day in
-                    dayCell(day)
-                }
-
-                Button {
-                    Haptics.light()
-                    onOpenCalendar()
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36)
-                        .frame(maxHeight: .infinity)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(GlassPressStyle())
-                .accessibilityLabel("Browse an older day")
+        HStack(spacing: 0) {
+            ForEach(summaries) { day in
+                dayCell(day)
             }
-            .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                Haptics.light()
+                onOpenCalendar()
+            } label: {
+                Image(systemName: "calendar")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: AppLayout.minHitTarget)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(GlassPressStyle())
+            .accessibilityLabel("Browse an older day")
         }
     }
 
@@ -42,41 +40,45 @@ struct WeekStrip: View {
             Haptics.selection()
             withAnimation(AppMotion.snap) { selectedDate = day.date }
         } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: 6) {
                 Text(day.date.formatted(.dateTime.weekday(.narrow)))
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(isToday ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(.secondary)
 
-                ProgressRing(fraction: day.fraction, lineWidth: 3) {
-                    if day.isPerfect {
-                        Image(systemName: "checkmark")
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(AppColors.success)
-                    } else {
-                        Text(day.date.formatted(.dateTime.day()))
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(.white.opacity(day.expected == 0 ? 0.45 : 0.9))
-                    }
-                }
-                .frame(width: 32, height: 32)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.12))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+                Text(day.date.formatted(.dateTime.day()))
+                    .font(.subheadline.weight(isSelected || isToday ? .bold : .medium).monospacedDigit())
+                    .foregroundStyle(isSelected ? AppColors.inkOnLight : Color.white.opacity(isToday ? 1 : 0.8))
+                    .frame(width: 34, height: 34)
+                    .background {
+                        // Selection is a hard cut, never an animated fill.
+                        if isSelected {
+                            Circle().fill(AppColors.solidWhite)
+                        } else if isToday {
+                            Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
                         }
-                }
+                    }
+                    .transaction { $0.animation = nil }
+
+                Circle()
+                    .fill(dotColor(for: day))
+                    .frame(width: 5, height: 5)
             }
+            .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: day))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Green for a perfect day, the progress ramp for a partial one, a faint
+    /// dot for a day with nothing logged, and nothing for a day that asked
+    /// nothing.
+    private func dotColor(for day: DaySummary) -> Color {
+        guard day.expected > 0 else { return .clear }
+        if day.isPerfect { return AppColors.success }
+        if day.done == 0 { return Color.white.opacity(day.date.isToday ? 0 : 0.18) }
+        return AppColors.progressColor(for: day.fraction)
     }
 
     private func accessibilityLabel(for day: DaySummary) -> String {

@@ -26,10 +26,13 @@ struct SlideToLogTrack: View {
                 Capsule()
                     .fill(isLogged ? accent.opacity(0.24) : Color.white.opacity(0.08))
 
-                if !isLogged {
+                // The trail grows from under the knob, so at rest it is hidden
+                // behind it instead of showing as a ring around it.
+                if !isLogged && dragX > 0 {
                     Capsule()
-                        .fill(accent.opacity(0.40))
-                        .frame(width: dragX + Self.knobSize + inset * 2)
+                        .fill(accent.opacity(0.35))
+                        .frame(width: dragX + Self.knobSize, height: Self.knobSize)
+                        .offset(x: inset)
                 }
 
                 if isLogged {
@@ -39,7 +42,8 @@ struct SlideToLogTrack: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     Text(progress > 0.6 ? "Release" : "Slide to log")
-                        .eyebrowStyle(Color.white.opacity(max(0.25, 0.6 - progress * 0.4)))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(max(0.25, 0.55 - progress * 0.35)))
                         .padding(.leading, Self.knobSize * 0.6)
                         .frame(maxWidth: .infinity)
                         .allowsHitTesting(false)
@@ -53,7 +57,6 @@ struct SlideToLogTrack: View {
                                 .font(.footnote.weight(.black))
                                 .foregroundStyle(.white)
                         )
-                        .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
                         .frame(width: Self.knobSize, height: Self.knobSize)
                         .offset(x: inset + dragX)
                         .gesture(drag(maxX: maxX))

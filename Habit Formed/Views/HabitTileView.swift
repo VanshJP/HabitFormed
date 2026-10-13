@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// One habit on the Today grid. Three bottom rows by type:
+/// One habit on the Today grid: its glyph, name and one status line, over a
+/// bottom row that depends on how it is tracked:
 /// - Manual: the slide-to-log track
 /// - HealthKit: today's reading against the target, with a meter
 /// - Timer: the week's dots and a play capsule
@@ -31,8 +32,6 @@ struct HabitTileView: View {
     // tile. Swept from the slide knob when the user logs by slide.
     @State private var sweepProgress: CGFloat = 0
     @State private var showStopConfirm = false
-    /// Expands a 12-week heat map under the streak. Toggled by the streak.
-    @State private var showHeatMap = false
 
     private let padding = AppLayout.tilePadding
 
@@ -56,7 +55,7 @@ struct HabitTileView: View {
                 // today" yet stays discoverable.
                 .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
         }
-        .frame(minHeight: 184)
+        .frame(minHeight: 168)
         .glassCard(
             cornerRadius: AppLayout.tileRadius,
             tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
@@ -129,29 +128,17 @@ struct HabitTileView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             topRow
-            Spacer(minLength: 10)
+            Spacer(minLength: 12)
             Text(habit.title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
-            streakRow
-                .padding(.top, 2)
-            Spacer(minLength: 10)
+            statusLine
+                .padding(.top, 3)
+            Spacer(minLength: 12)
             bottomSection
-            if showHeatMap {
-                ActivityHeatMap(
-                    completionDates: habit.completionDates,
-                    accent: habit.color,
-                    weeks: 12,
-                    cellSpacing: 2,
-                    cornerRadius: 2
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
         }
         .padding(padding)
     }
@@ -192,56 +179,63 @@ struct HabitTileView: View {
         }
     }
 
+    /// Only where the bottom row cannot say "done" itself: a health meter
+    /// reads as progress, not completion.
     @ViewBuilder
     private var statusBadge: some View {
-        if effectiveCompleted {
+        if effectiveCompleted && habit.trackKind == .health && !isPastDay {
             Image(systemName: "checkmark.circle.fill")
                 .font(.body)
                 .foregroundStyle(habit.color.glyphTone)
-                .transition(.scale.combined(with: .opacity))
-        } else if habit.frequency == .interval && habit.source == .none && !isPastDay {
-            // Interval cue: a quiet clock while the countdown runs, tinted
-            // once due or overdue.
-            Image(systemName: habit.isDue ? "clock.badge.exclamationmark" : "clock")
-                .font(.footnote)
-                .foregroundStyle(habit.isDue ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.tertiary))
-        } else if habit.source != .none {
-            Image(systemName: "heart.text.square")
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
-        } else if habit.timerDurationSeconds > 0 {
-            Image(systemName: "timer")
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
         }
     }
 
-    // MARK: - Streak
+    // MARK: - Status line
 
-    private var streakRow: some View {
-        Button {
-            Haptics.light()
-            withAnimation(AppMotion.settle) { showHeatMap.toggle() }
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("\(habit.displayStreak)")
-                    .font(.statValue)
-                    .foregroundStyle(.white)
-                Text(habit.streakUnitLabel)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(showHeatMap ? -180 : 0))
-                Spacer(minLength: 0)
+    /// One quiet line under the name: the streak once there is one, and the
+    /// cadence fact that matters today ("2 of 5 this week", "Due today").
+    private var statusLine: some View {
+        let streak = habit.displayStreak
+        let cadence = cadenceStatus
+
+        return HStack(spacing: 4) {
+            if streak > 0 {
+                Text("\(streak) \(habit.streakUnit(for: streak))")
+                    .foregroundStyle(.white.opacity(0.9))
+                    .layoutPriority(1)
             }
-            .frame(minHeight: 28)
-            .contentShape(Rectangle())
+            if streak > 0, cadence != nil {
+                Text("·")
+                    .foregroundStyle(.tertiary)
+            }
+            if let cadence {
+                Text(cadence.text)
+                    .foregroundStyle(cadence.highlighted ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(habit.displayStreak) \(habit.streakUnitLabel) streak")
-        .accessibilityHint(showHeatMap ? "Hides the last 12 weeks" : "Shows the last 12 weeks")
+        .font(.caption.weight(.medium).monospacedDigit())
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+
+    /// The schedule fact for this tile, or nil when the streak says enough.
+    /// Highlighted means it asks for attention (due) or celebrates (target met).
+    private var cadenceStatus: (text: String, highlighted: Bool)? {
+        switch habit.frequency {
+        case .daily:
+            return habit.displayStreak > 0 ? nil : ("Daily", false)
+        case .weekly:
+            let count = habit.completionsInWeek(of: selectedDate).count
+            return ("\(count) of \(habit.weeklyTarget) this week", count >= habit.weeklyTarget)
+        case .interval:
+            let every = "Every \(habit.intervalDays) days"
+            guard !isPastDay, intervalRestingDays == nil, !habit.isCompletedToday else { return (every, false) }
+            switch habit.daysUntilDue {
+            case 0?: return ("Due today", true)
+            case let d? where d < 0: return (d == -1 ? "1 day overdue" : "\(-d) days overdue", true)
+            default: return (every, false)
+            }
+        }
     }
 
     // MARK: - Bottom section
@@ -364,22 +358,15 @@ struct HabitTileView: View {
         return "\(habit.timerDurationSeconds / 60)m"
     }
 
-    /// Manual: the slide track. Weekly habits show "2 / 5 this week" above
-    /// it; interval habits show their cadence there and swap the track for a
-    /// resting pill while the countdown runs.
+    /// Manual: the slide track, swapped for a resting pill while an interval
+    /// countdown runs so an early cycle does not invite a log.
+    @ViewBuilder
     private var manualSlide: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let remaining = intervalRestingDays {
-                intervalRestingPill(days: remaining)
-            } else {
-                if habit.frequency == .weekly {
-                    weeklyCountCaption
-                } else if habit.frequency == .interval {
-                    cadenceCaption
-                }
-                SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
-                    onLog()
-                }
+        if let remaining = intervalRestingDays {
+            intervalRestingPill(days: remaining)
+        } else {
+            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
+                onLog()
             }
         }
     }
@@ -403,34 +390,6 @@ struct HabitTileView: View {
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
         .background(Capsule().fill(Color.white.opacity(0.06)))
-    }
-
-    private var weeklyCountCaption: some View {
-        let count = habit.completionsThisWeek
-        let target = habit.weeklyTarget
-        return Text("\(count) / \(target) this week")
-            .eyebrowStyle(count >= target ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
-    }
-
-    private var cadenceCaption: some View {
-        let text: String
-        let urgent: Bool
-        switch habit.daysUntilDue {
-        case nil:
-            text = "Every \(habit.intervalDays) days"
-            urgent = false
-        case 0?:
-            text = "Due today"
-            urgent = true
-        case let d? where d < 0:
-            text = "\(abs(d))d overdue"
-            urgent = true
-        case let d?:
-            text = "Next in \(d)d"
-            urgent = false
-        }
-        return Text(text)
-            .eyebrowStyle(urgent ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
     }
 
     // MARK: - Accessibility

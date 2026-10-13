@@ -54,7 +54,7 @@ struct ContentView: View {
 
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                header(streak: streak, todayIsPerfect: todayIsPerfect)
+                header(selected: selected, streak: streak, todayIsPerfect: todayIsPerfect)
 
                 if habits.isEmpty {
                     EmptyStateCard(
@@ -71,14 +71,16 @@ struct ContentView: View {
                         onOpenCalendar: { showDatePicker = true }
                     )
 
-                    DayProgressCard(
-                        summary: selected,
-                        isToday: isViewingToday,
-                        onShare: { onShareReport(selectedDate) },
-                        onBackToToday: { selectedDate = .now }
-                    )
-
-                    grid
+                    GlassSection("Habits") {
+                        grid
+                    } accessory: {
+                        Button {
+                            onShareReport(selectedDate)
+                        } label: {
+                            HeaderLinkLabel(isViewingToday ? "Share report" : "Share this day", icon: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.textLink)
+                    }
                 }
             }
             .pageContentInsets()
@@ -209,16 +211,21 @@ struct ContentView: View {
 
     // MARK: - Header
 
-    private func header(streak: Int, todayIsPerfect: Bool) -> some View {
+    private func header(selected: DaySummary, streak: Int, todayIsPerfect: Bool) -> some View {
         PageTitle(kicker: kicker, title: title) {
-            if streak > 0 {
-                Text(streakLine(streak: streak, todayIsPerfect: todayIsPerfect))
-                    .font(.caption)
-                    .foregroundStyle(todayIsPerfect ? AnyShapeStyle(AppColors.success) : AnyShapeStyle(.secondary))
+            if !habits.isEmpty {
+                Text(progressLine(for: selected))
+                    .font(.subheadline)
+                    .foregroundStyle(selected.isPerfect ? AnyShapeStyle(AppColors.success) : AnyShapeStyle(.secondary))
+                    .contentTransition(.numericText())
+                    .motion(AppMotion.snap, value: selected.done)
             }
         } accessory: {
             HStack(spacing: 0) {
-                StreakChip(streak: streak, doneToday: todayIsPerfect)
+                // The flame earns its place: with no run going it is only noise.
+                if streak > 0 {
+                    StreakChip(streak: streak, doneToday: todayIsPerfect)
+                }
 
                 Button(action: onAdd) {
                     Image(systemName: "plus")
@@ -243,24 +250,34 @@ struct ContentView: View {
                 .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
                 .accessibilityLabel("Settings")
             }
-            .padding(.trailing, 2)
+            .padding(.horizontal, 2)
             .headerGlass()
         }
     }
 
+    /// The browsed day's full date; the title already says which day it is.
     private var kicker: String {
-        dayTracker.today.formatted(.dateTime.weekday(.wide).month(.wide).day())
+        selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 
     private var title: String {
-        isViewingToday ? "Today" : selectedDate.relativeDayName
+        if isViewingToday { return "Today" }
+        if selectedDate.isYesterday { return "Yesterday" }
+        return selectedDate.formatted(.dateTime.weekday(.wide))
     }
 
-    /// Never claims a day the user has not earned: before today is perfect it
-    /// names the stake.
-    private func streakLine(streak: Int, todayIsPerfect: Bool) -> String {
-        let days = streak == 1 ? "1 perfect day" : "\(streak) perfect days"
-        return todayIsPerfect ? "\(days) in a row · nice work" : "\(days) in a row · finish today to keep it"
+    /// The day in one line: what is done, what is left, and on a perfect day
+    /// the run it extends. Past days say how to fix them.
+    private func progressLine(for day: DaySummary) -> String {
+        guard isViewingToday else {
+            guard day.expected > 0 else { return "Nothing was due · tap a tile to log it" }
+            return "\(day.done) of \(day.expected) done · tap a tile to fix a log"
+        }
+        guard day.expected > 0 else { return "Nothing due today" }
+        if day.isPerfect {
+            return "All \(day.expected) done · perfect day"
+        }
+        return "\(day.done) of \(day.expected) done · \(day.remaining) to go"
     }
 
     // MARK: - Reminder signature
