@@ -106,6 +106,12 @@ struct HabitDetailView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
+            if let usual = habit.usualLogMinute {
+                Text("Usually logged around \(ReminderTime(minuteOfDay: usual).label)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
             if habit.frequency == .interval {
                 let status = nextDueStatus
                 Text(status.text)
