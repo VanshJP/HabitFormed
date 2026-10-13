@@ -21,7 +21,9 @@ enum WidgetSync {
     /// tap, or a day already logged, is skipped.
     static func applyPendingLogs(habits: [Habit], in context: ModelContext) {
         let pending = WidgetStore.pendingLogs()
-        guard !pending.isEmpty else { return }
+        // Habits still loading on a cold launch would match nothing and the
+        // queue would be dropped; a later pass picks it up.
+        guard !pending.isEmpty, !habits.isEmpty else { return }
         for log in pending {
             guard let habit = habits.first(where: { $0.id == log.habitID }) else { continue }
             habit.log(on: log.day, at: log.tappedAt, in: context)

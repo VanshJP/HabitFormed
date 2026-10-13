@@ -9,8 +9,8 @@ is SpeakUp's design system, ported (deep-navy canvas, Liquid Glass plates,
 colour only in data and identity, one loud CTA per screen). Inspired
 functionally by the Streaks app: a small grid of tiles, each representing one
 habit, with streak counts and 7-day completion dots. The signature feature is
-the **daily report**: one card plus text that you send to friends, with a
-theme and switches for what to leave out.
+the **daily report**: one card that you send to friends, with a theme and
+switches for what to leave out.
 
 - **Platform:** iOS 26.0+ (iPhone + iPad), plus a widget extension
   (Home Screen widget and the timer Live Activity).
