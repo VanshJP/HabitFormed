@@ -249,38 +249,66 @@ final class Habit {
 
     var completionDates: [Date] { (completions ?? []).map { $0.date } }
 
-    var isCompletedToday: Bool {
-        (completions ?? []).contains { $0.date.isToday }
-    }
+    var isCompletedToday: Bool { completion(on: Date()) != nil }
 
-    var todayCompletion: HabitCompletion? {
-        (completions ?? []).first { $0.date.isToday }
-    }
+    var todayCompletion: HabitCompletion? { completion(on: Date()) }
 
-    func isCompleted(on date: Date) -> Bool {
-        (completions ?? []).contains { $0.date.isSameDay(as: date) }
-    }
+    func isCompleted(on date: Date) -> Bool { completion(on: date) != nil }
 
+    /// Logs are checked against the day's range: two calendar calls in all,
+    /// not one per log.
     func completion(on date: Date) -> HabitCompletion? {
-        (completions ?? []).first { $0.date.isSameDay(as: date) }
+        let day = date.dayRange
+        return (completions ?? []).first { day.contains($0.date) }
     }
 
     /// Unique logged days, normalised to the start of each day.
-    var completionDays: Set<Date> {
-        Set(completionDates.map { $0.startOfDay })
-    }
+    var completionDays: Set<Date> { track.logDays }
 
-    /// Value snapshot for the day ledger, safe to hand to pure code.
+    /// Value snapshot for the day ledger, safe to hand to pure code. Rounding
+    /// every log to its day is the one slow step (a calendar call per log),
+    /// so the snapshot is kept per habit and rebuilt only when its logs, its
+    /// schedule or the time zone change.
     var track: HabitTrack {
-        HabitTrack(
+        let dates = completionDates
+        let key = TrackKey(
+            logCount: dates.count,
+            logSum: dates.reduce(0) { $0 + $1.timeIntervalSinceReferenceDate },
+            frequency: frequency,
+            weeklyTarget: weeklyTarget,
+            intervalDays: intervalDays,
+            createdAt: createdAt,
+            timeZone: TimeZone.current.identifier
+        )
+        if let cached = Self.trackCache[id], cached.key == key { return cached.track }
+        let track = HabitTrack(
             id: id,
             frequency: frequency,
             weeklyTarget: weeklyTarget,
             intervalDays: intervalDays,
             firstDay: createdAt.startOfDay,
-            logDays: completionDays
+            logDays: Set(dates.map(\.startOfDay))
         )
+        Self.trackCache[id] = (key, track)
+        return track
     }
+
+    /// What a cached `track` was built from. The sum of the log times
+    /// changes with any log added or removed.
+    private struct TrackKey: Equatable {
+        let logCount: Int
+        let logSum: Double
+        let frequency: HabitFrequency
+        let weeklyTarget: Int
+        let intervalDays: Int
+        let createdAt: Date
+        let timeZone: String
+    }
+
+    // ponytail: a plain dictionary, never observed, so reading `track` in a
+    // view body cannot invalidate anything. Entries of deleted habits linger;
+    // a handful of small sets.
+    private static var trackCache: [UUID: (key: TrackKey, track: HabitTrack)] = [:]
 
     /// How a habit is tracked, for copy and tile layout.
     var trackKind: HabitTrackKind {
@@ -345,7 +373,8 @@ final class Habit {
 
     /// Removes every log on `day`.
     func removeLog(on day: Date, in context: ModelContext) {
-        for entry in (completions ?? []) where entry.date.isSameDay(as: day) {
+        let range = day.dayRange
+        for entry in (completions ?? []) where range.contains(entry.date) {
             context.delete(entry)
         }
         try? context.save()
@@ -386,7 +415,8 @@ final class Habit {
     /// The daily report for a past day uses this.
     func displayStreak(asOf day: Date) -> Int {
         let end = day.startOfDay
-        let dates = completionDates.filter { $0.startOfDay <= end }
+        let limit = day.dayRange.upperBound
+        let dates = completionDates.filter { $0 < limit }
         switch frequency {
         case .daily:
             return Date.calculateStreak(from: dates, today: end)
@@ -410,7 +440,7 @@ final class Habit {
     // MARK: - Interval countdown
 
     var lastCompletionDate: Date? {
-        completionDates.map { $0.startOfDay }.max()
+        completionDates.max()?.startOfDay
     }
 
     /// First day the habit is due again (last log + cadence), or nil
@@ -469,9 +499,8 @@ final class Habit {
     }
 
     func completionsInWeek(of date: Date) -> [HabitCompletion] {
-        let cal = Calendar.current
-        return (completions ?? []).filter {
-            cal.isDate($0.date, equalTo: date, toGranularity: .weekOfYear)
-        }
+        guard let week = Calendar.current.dateInterval(of: .weekOfYear, for: date) else { return [] }
+        let range = week.start..<week.end
+        return (completions ?? []).filter { range.contains($0.date) }
     }
 }

@@ -39,10 +39,28 @@ nonisolated struct HabitTrack: Sendable {
     let firstDay: Date
     /// Start of every day with a log.
     let logDays: Set<Date>
+    /// `logDays` oldest first, for the interval countdown's binary search;
+    /// empty for other cadences, which never look back.
+    private let sortedDays: [Date]
+
+    init(id: UUID, frequency: HabitFrequency, weeklyTarget: Int, intervalDays: Int, firstDay: Date, logDays: Set<Date>) {
+        self.id = id
+        self.frequency = frequency
+        self.weeklyTarget = weeklyTarget
+        self.intervalDays = intervalDays
+        self.firstDay = firstDay
+        self.logDays = logDays
+        self.sortedDays = frequency == .interval ? logDays.sorted() : []
+    }
 
     func status(on day: Date, today: Date = Date()) -> DayStatus {
-        let day = day.startOfDay
-        let today = today.startOfDay
+        status(onDay: day.startOfDay, today: today.startOfDay)
+    }
+
+    /// `status(on:today:)` for dates already at the start of their day, as
+    /// every ledger loop has them. Rounding a date to its day is a calendar
+    /// call, the one cost that adds up across a long streak walk.
+    func status(onDay day: Date, today: Date) -> DayStatus {
         if logDays.contains(day) { return .done }
         if day < firstDay || day > today { return .resting }
 
@@ -53,7 +71,7 @@ nonisolated struct HabitTrack: Sendable {
             return .flexible
         case .interval:
             if let last = lastLog(before: day),
-               day < last.adding(days: max(intervalDays, 1)) {
+               day < last.adding(days: max(intervalDays, 1)).startOfDay {
                 return .resting
             }
             return day == today ? .open : .missed
@@ -68,7 +86,13 @@ nonisolated struct HabitTrack: Sendable {
     }
 
     private func lastLog(before day: Date) -> Date? {
-        logDays.filter { $0 < day }.max()
+        var low = 0
+        var high = sortedDays.count
+        while low < high {
+            let mid = (low + high) / 2
+            if sortedDays[mid] < day { low = mid + 1 } else { high = mid }
+        }
+        return low > 0 ? sortedDays[low - 1] : nil
     }
 }
 
@@ -102,14 +126,19 @@ nonisolated enum DayLedger {
     private static let lookback = 730
 
     static func summary(on day: Date, tracks: [HabitTrack], today: Date = Date()) -> DaySummary {
+        summary(onDay: day.startOfDay, tracks: tracks, today: today.startOfDay)
+    }
+
+    /// `summary(on:tracks:today:)` for dates already at the start of their day.
+    private static func summary(onDay day: Date, tracks: [HabitTrack], today: Date) -> DaySummary {
         var done = 0
         var expected = 0
         for track in tracks {
-            let status = track.status(on: day, today: today)
+            let status = track.status(onDay: day, today: today)
             if status == .done { done += 1 }
             if status.isExpected { expected += 1 }
         }
-        return DaySummary(date: day.startOfDay, done: done, expected: expected)
+        return DaySummary(date: day, done: done, expected: expected)
     }
 
     /// Consecutive perfect days. Today joins once it is perfect; until then
@@ -118,19 +147,19 @@ nonisolated enum DayLedger {
     static func perfectStreak(tracks: [HabitTrack], today: Date = Date()) -> Int {
         guard let earliest = tracks.map(\.firstDay).min() else { return 0 }
         let today = today.startOfDay
-        var day = summary(on: today, tracks: tracks, today: today).isPerfect
+        var day = summary(onDay: today, tracks: tracks, today: today).isPerfect
             ? today
-            : today.adding(days: -1)
+            : today.previousDayStart
 
         var streak = 0
         for _ in 0..<lookback {
             guard day >= earliest else { break }
-            let daySummary = summary(on: day, tracks: tracks, today: today)
+            let daySummary = summary(onDay: day, tracks: tracks, today: today)
             if daySummary.expected > 0 {
                 guard daySummary.isPerfect else { break }
                 streak += 1
             }
-            day = day.adding(days: -1)
+            day = day.previousDayStart
         }
         return streak
     }
@@ -139,12 +168,12 @@ nonisolated enum DayLedger {
     static func bestPerfectStreak(tracks: [HabitTrack], today: Date = Date()) -> Int {
         guard let earliest = tracks.map(\.firstDay).min() else { return 0 }
         let today = today.startOfDay
-        let windowStart = max(earliest, today.adding(days: -lookback))
+        let windowStart = max(earliest, today.adding(days: -lookback).startOfDay)
         var day = windowStart
         var best = 0
         var run = 0
         while day <= today {
-            let daySummary = summary(on: day, tracks: tracks, today: today)
+            let daySummary = summary(onDay: day, tracks: tracks, today: today)
             if daySummary.expected > 0 {
                 if daySummary.isPerfect {
                     run += 1
@@ -153,16 +182,21 @@ nonisolated enum DayLedger {
                     run = 0
                 }
             }
-            day = day.adding(days: 1)
+            day = day.nextDayStart
         }
         return best
     }
 
     /// Summaries for `count` days ending on `last`, oldest first.
     static func summaries(endingOn last: Date, count: Int, tracks: [HabitTrack], today: Date = Date()) -> [DaySummary] {
-        let last = last.startOfDay
-        return (0..<count).reversed().map { offset in
-            summary(on: last.adding(days: -offset), tracks: tracks, today: today)
+        let today = today.startOfDay
+        var day = last.startOfDay
+        var days: [DaySummary] = []
+        days.reserveCapacity(count)
+        for _ in 0..<count {
+            days.append(summary(onDay: day, tracks: tracks, today: today))
+            day = day.previousDayStart
         }
+        return days.reversed()
     }
 }
