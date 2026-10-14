@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Slide-to-log track, mirroring iOS's slide-to-answer. As the knob travels
-/// its chevron fades and a check draws itself in, finishing at 75% where it
-/// arms (a tick and a small pop); let go to log, or pull back to disarm. A confident
+/// its chevron turns a quarter clockwise and settles into a check, landing
+/// at 75% where it arms (a tick and a small pop); let go to log, or pull
+/// back to disarm. A confident
 /// flick from halfway logs too. Flat: the knob is a disc a step lighter
 /// than its color, the pill a soft white tint, no shadows.
 /// Once logged the channel goes and the knob melts into the filled square,
@@ -79,15 +80,9 @@ struct SlideToLogTrack: View {
             .fill(accent.mix(with: .white, by: 0.22))
             .opacity(isLogged ? 0 : 1)
             .overlay {
-                ZStack {
-                    Glyph.chevron
-                        .stroke(.white, style: stroke)
-                        .opacity(1 - Self.ramp(p, from: 0.04, to: 0.2))
-                    Glyph.check
-                        .trim(from: 0, to: Self.ramp(p, from: 0.2, to: armRatio))
-                        .stroke(.white, style: stroke)
-                }
-                .frame(width: 16, height: 16)
+                KnobGlyph(turn: Self.ramp(p, from: 0.05, to: armRatio))
+                    .stroke(.white, style: stroke)
+                    .frame(width: 16, height: 16)
             }
             .frame(width: Self.knobSize, height: Self.knobSize)
             .scaleEffect(isHeld ? (isArmed ? 1.12 : 1.06) : 1)
@@ -95,8 +90,9 @@ struct SlideToLogTrack: View {
             .motion(AppMotion.snap, value: isArmed)
     }
 
-    /// 0 before `from`, 1 after `to`, eased between: the chevron is gone
-    /// early and the check is fully drawn exactly where letting go logs.
+    /// 0 before `from`, 1 after `to`, eased between: the glyph starts
+    /// turning as the knob leaves home and is a whole check exactly where
+    /// letting go logs.
     private static func ramp(_ value: CGFloat, from: CGFloat, to: CGFloat) -> CGFloat {
         let t = min(max((value - from) / (to - from), 0), 1)
         return t * t * (3 - 2 * t)
@@ -150,17 +146,63 @@ extension SlideToLogTrack {
     }
 }
 
-/// The knob's two glyphs, drawn as strokes so the check can draw itself in
-/// with `trim` (which animates when the knob springs back).
-private struct Glyph: Shape {
-    let points: [CGPoint]
+/// The knob's glyph: a chevron that turns a quarter clockwise into a check
+/// as `turn` runs from 0 to 1. A ">" turned a quarter is a "v", and a check
+/// is a "v" with one short leg and one long, so each leg keeps its angle
+/// and length from the corner and only those move: one stroke rotating,
+/// never two glyphs crossfading. Animatable, so an undo turns it back.
+private struct KnobGlyph: Shape {
+    var turn: CGFloat
 
-    static let chevron = Glyph(points: [CGPoint(x: 0.36, y: 0.18), CGPoint(x: 0.68, y: 0.5), CGPoint(x: 0.36, y: 0.82)])
-    static let check = Glyph(points: [CGPoint(x: 0.16, y: 0.54), CGPoint(x: 0.4, y: 0.78), CGPoint(x: 0.86, y: 0.26)])
+    var animatableData: CGFloat {
+        get { turn }
+        set { turn = newValue }
+    }
+
+    // Unit square, y down. The chevron ">" and the check, each as its two
+    // ends around the corner; the chevron's lower leg becomes the check's
+    // short one as it turns.
+    private static let chevron = (short: CGPoint(x: 0.36, y: 0.82), corner: CGPoint(x: 0.68, y: 0.5), long: CGPoint(x: 0.36, y: 0.18))
+    private static let check = (short: CGPoint(x: 0.16, y: 0.54), corner: CGPoint(x: 0.4, y: 0.78), long: CGPoint(x: 0.86, y: 0.26))
 
     func path(in rect: CGRect) -> Path {
+        let t = min(max(turn, 0), 1)
+        let from = Self.chevron, to = Self.check
+        // The corner rides a quarter turn about the middle, then eases onto
+        // the check's corner.
+        let center = CGPoint(x: 0.5, y: 0.5)
+        let swung = Self.rotate(from.corner, about: center, by: .pi / 2 * t)
+        let landed = Self.rotate(from.corner, about: center, by: .pi / 2)
+        let corner = CGPoint(x: swung.x + (to.corner.x - landed.x) * t, y: swung.y + (to.corner.y - landed.y) * t)
+
+        let short = Self.leg(from: (from.short, from.corner), to: (to.short, to.corner), at: t)
+        let long = Self.leg(from: (from.long, from.corner), to: (to.long, to.corner), at: t)
+        func point(_ offset: CGVector) -> CGPoint {
+            CGPoint(x: rect.minX + (corner.x + offset.dx) * rect.width, y: rect.minY + (corner.y + offset.dy) * rect.height)
+        }
+
         var path = Path()
-        path.addLines(points.map { CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height) })
+        path.move(to: point(short))
+        path.addLine(to: point(.zero))
+        path.addLine(to: point(long))
         return path
+    }
+
+    /// A leg from the corner, its angle turning clockwise and its length
+    /// easing from one glyph's to the other's.
+    private static func leg(from start: (end: CGPoint, corner: CGPoint), to finish: (end: CGPoint, corner: CGPoint), at t: CGFloat) -> CGVector {
+        let a = atan2(start.end.y - start.corner.y, start.end.x - start.corner.x)
+        var b = atan2(finish.end.y - finish.corner.y, finish.end.x - finish.corner.x)
+        while b < a { b += 2 * .pi }
+        let length0 = hypot(start.end.x - start.corner.x, start.end.y - start.corner.y)
+        let length1 = hypot(finish.end.x - finish.corner.x, finish.end.y - finish.corner.y)
+        let angle = a + (b - a) * t
+        let length = length0 + (length1 - length0) * t
+        return CGVector(dx: cos(angle) * length, dy: sin(angle) * length)
+    }
+
+    private static func rotate(_ point: CGPoint, about center: CGPoint, by angle: CGFloat) -> CGPoint {
+        let dx = point.x - center.x, dy = point.y - center.y
+        return CGPoint(x: center.x + dx * cos(angle) - dy * sin(angle), y: center.y + dx * sin(angle) + dy * cos(angle))
     }
 }
