@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Settings, pushed from Today's gear: how Today looks and sounds, the
 /// reports' name and reminders, and the app's look. One flat panel per
@@ -15,6 +16,9 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.reportReminderHour) private var reminderHour = 21
     @AppStorage(AppPreferences.reportReminderMinute) private var reminderMinute = 0
     @AppStorage(AppPreferences.recapReminderEnabled) private var recapOn = false
+
+    @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
+    private var habits: [Habit]
 
     @State private var showArrange = false
     @FocusState private var nameFocused: Bool
@@ -64,8 +68,15 @@ struct SettingsView: View {
                 }
                 .buttonStyle(RowPressStyle())
                 SettingsRow("Log sound", icon: "speaker.wave.2", isOn: $logSound)
+                // Voice commands are invisible until someone says the words.
+                SettingsRow("Siri", icon: "mic", caption: siriPhrases)
             }
         }
+    }
+
+    private var siriPhrases: String {
+        let habit = habits.first(where: { $0.trackKind != .health })?.title ?? "Read"
+        return "Say \"Log \(habit) in Habit Formed\" or \"What's left in Habit Formed\""
     }
 
     // MARK: - Reports
