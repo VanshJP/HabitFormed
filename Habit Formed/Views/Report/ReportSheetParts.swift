@@ -101,8 +101,14 @@ struct ReportSendBar: View {
                 SharePresenter.present(image: image)
             }
         }
-        .padding(.horizontal, AppLayout.pageHorizontal)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+    }
+}
+
+extension View {
+    /// Spacing for a bar pinned to the sheet's foot.
+    func pinnedBar() -> some View {
+        padding(.horizontal, AppLayout.pageHorizontal)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
     }
 }

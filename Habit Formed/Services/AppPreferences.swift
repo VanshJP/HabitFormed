@@ -16,6 +16,10 @@ nonisolated enum AppPreferences {
     static let reporterName = "report.name"
     /// Daily report choices, kept so the next report starts the same way.
     static let reportTheme = "report.theme"
+    static let reportLayout = "report.layout"
+    /// A palette hex, or empty to follow the theme.
+    static let reportAccent = "report.accent"
+    static let reportFont = "report.font"
     static let reportHiddenHabits = "report.hiddenHabits"
     static let reportShowStreaks = "report.showStreaks"
     static let reportShowNotes = "report.showNotes"

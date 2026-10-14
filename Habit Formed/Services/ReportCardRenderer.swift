@@ -16,8 +16,8 @@ enum ReportCardRenderer {
     }
 
     /// The Sunday recap card, drawn the same way.
-    static func render(recap: WeeklyRecap, theme: ReportTheme) -> UIImage? {
-        let renderer = ImageRenderer(content: WeeklyRecapCardView(recap: recap, theme: theme))
+    static func render(recap: WeeklyRecap, options: ReportOptions) -> UIImage? {
+        let renderer = ImageRenderer(content: WeeklyRecapCardView(recap: recap, options: options))
         renderer.scale = 3
         renderer.proposedSize = ProposedViewSize(width: WeeklyRecapCardView.width, height: nil)
         renderer.isOpaque = true

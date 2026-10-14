@@ -6,6 +6,12 @@ import Foundation
 /// Persisted by raw value (`AppPreferences.reportTheme`); do not rename cases.
 nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
     case classic
+    // The plain ones up front, as on the app's look rail.
+    case black
+    case graphite
+    case navy
+    case plum
+    case forest
     case midnight
     case aurora
     case ember
@@ -24,6 +30,11 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         case .dusk: return "Dusk"
         case .tide: return "Tide"
         case .paper: return "Paper"
+        case .black: return "Black"
+        case .graphite: return "Graphite"
+        case .navy: return "Navy"
+        case .plum: return "Plum"
+        case .forest: return "Forest"
         }
     }
 
@@ -37,17 +48,75 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         case .dusk: return .dusk
         case .tide: return .tide
         case .paper: return nil
+        case .black: return .black
+        case .graphite: return .graphite
+        case .navy: return .navy
+        case .plum: return .plum
+        case .forest: return .forest
+        }
+    }
+}
+
+// MARK: - Report Layout
+
+/// How the card lays out the habits. Persisted by raw value
+/// (`AppPreferences.reportLayout`).
+nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
+    /// A row per habit with its detail, streak, note and week.
+    case list
+    /// A square per habit, filled with its colour once done, like Today.
+    case grid
+    /// One big ring and a strip of glyphs: the day at a glance.
+    case focus
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .list: return "List"
+        case .grid: return "Grid"
+        case .focus: return "Focus"
+        }
+    }
+
+    /// Notes and the week's dots need a row to sit in.
+    var showsRowDetail: Bool { self == .list }
+}
+
+// MARK: - Report Font
+
+/// The card's typeface family. Persisted by raw value
+/// (`AppPreferences.reportFont`).
+nonisolated enum ReportFont: String, CaseIterable, Identifiable, Sendable {
+    case standard
+    case rounded
+    case serif
+    case mono
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard: return "Default"
+        case .rounded: return "Rounded"
+        case .serif: return "Serif"
+        case .mono: return "Mono"
         }
     }
 }
 
 // MARK: - Report Options
 
-/// What the daily report shows. One report, everything on by default; the
-/// switches take things out. The sheet keeps these in `@AppStorage` so the
-/// next report starts the way the last one was sent.
+/// What the daily report shows and how it looks. One report, everything on
+/// by default; the switches take things out. Kept in `@AppStorage`, set in
+/// Settings → Report card or the sheet's Edit, so sending needs no choices.
 nonisolated struct ReportOptions: Sendable, Hashable {
     var theme: ReportTheme = .classic
+    var layout: ReportLayout = .list
+    /// A palette colour's hex for the ring, mark and note bar, or empty to
+    /// follow the theme's own accent.
+    var accentHex = ""
+    var font: ReportFont = .standard
     /// Habits left off the card.
     var hiddenHabitIDs: Set<UUID> = []
     var showStreaks = true

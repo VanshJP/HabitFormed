@@ -4,6 +4,7 @@ import SwiftUI
 struct DateBrowserSheet: View {
     @Binding var selectedDate: Date
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appCanvas) private var canvas
 
     var body: some View {
         NavigationStack {
@@ -14,7 +15,7 @@ struct DateBrowserSheet: View {
                 displayedComponents: .date
             )
             .datePickerStyle(.graphical)
-            .tint(AppColors.brandBright)
+            .tint(canvas.look.accent)
             .padding(.horizontal, AppLayout.pageHorizontal)
             .frame(maxHeight: .infinity, alignment: .top)
             .background { AppBackground(style: .subtle) }

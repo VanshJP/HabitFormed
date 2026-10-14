@@ -111,11 +111,12 @@ struct SettingsToggle: View {
     let title: String
     var hint: String?
     @Binding var isOn: Bool
+    @Environment(\.appCanvas) private var canvas
 
     var body: some View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
-            .tint(AppColors.primary)
+            .tint(canvas.look.accent)
             .accessibilityHint(hint ?? "")
     }
 }

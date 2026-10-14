@@ -17,6 +17,9 @@ struct DailyReportSheet: View {
 
     @AppStorage(AppPreferences.reporterName) private var reporterName = ""
     @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.classic.rawValue
+    @AppStorage(AppPreferences.reportLayout) private var layoutRaw = ReportLayout.list.rawValue
+    @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
+    @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
     @AppStorage(AppPreferences.reportHiddenHabits) private var hiddenRaw = ""
     @AppStorage(AppPreferences.reportShowStreaks) private var showStreaks = true
     @AppStorage(AppPreferences.reportShowNotes) private var showNotes = true
@@ -49,6 +52,9 @@ struct DailyReportSheet: View {
     private var options: ReportOptions {
         ReportOptions(
             theme: ReportTheme(rawValue: themeRaw) ?? .classic,
+            layout: ReportLayout(rawValue: layoutRaw) ?? .list,
+            accentHex: accentHex,
+            font: ReportFont(rawValue: fontRaw) ?? .standard,
             hiddenHabitIDs: ReportOptions.hiddenIDs(from: hiddenRaw),
             showStreaks: showStreaks,
             showNotes: showNotes,
@@ -100,12 +106,16 @@ struct DailyReportSheet: View {
                     ReportPreview(width: ReportCardView.width) {
                         ReportCardView(report: report, options: options)
                     }
-                    if isPreset || isEditing {
-                        ReportThemeRow(themeRaw: $themeRaw)
-                        contentsSection
-                    }
                     if !isPreset {
                         fields
+                        // Right under the note while only sending, so a short
+                        // card is not left floating far above the button.
+                        if !isEditing {
+                            ReportSendBar { ReportCardRenderer.render(report: report, options: options) }
+                        }
+                    }
+                    if isPreset || isEditing {
+                        ReportStyleEditor()
                     }
                 }
                 .motion(AppMotion.settle, value: isEditing)
@@ -115,8 +125,10 @@ struct DailyReportSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .background { AppBackground(style: .subtle) }
             .safeAreaBar(edge: .bottom) {
-                if !isPreset {
+                // Editing makes the page long, so the button stays in reach.
+                if !isPreset && isEditing {
                     ReportSendBar { ReportCardRenderer.render(report: report, options: options) }
+                        .pinnedBar()
                 }
             }
             .navigationTitle(title)
@@ -138,42 +150,6 @@ struct DailyReportSheet: View {
             askForName = reporterName.trimmingCharacters(in: .whitespaces).isEmpty
         }
         .task(id: options.needsHealth) { await loadHealth(needsHealth: options.needsHealth) }
-    }
-
-    // MARK: - What to share
-
-    /// Everything the card can show, as chips: the habits first, then the
-    /// extras. The preview above shows each one come and go.
-    private var contentsSection: some View {
-        GlassSection("On the card") {
-            GlassEffectContainer(spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    FlowLayout(spacing: 8) {
-                        ForEach(habits) { habit in
-                            ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
-                        }
-                    }
-                    FlowLayout(spacing: 8) {
-                        ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
-                        ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
-                        ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
-                        ToggleChip(title: "Calories", icon: "fork.knife", isOn: $showCalories)
-                        ToggleChip(title: "Activity", icon: "figure.walk", isOn: $showActivity)
-                    }
-                }
-            }
-        }
-    }
-
-    private func includes(_ habit: Habit) -> Binding<Bool> {
-        Binding(
-            get: { !ReportOptions.hiddenIDs(from: hiddenRaw).contains(habit.id) },
-            set: { isOn in
-                var hidden = ReportOptions.hiddenIDs(from: hiddenRaw)
-                if isOn { hidden.remove(habit.id) } else { hidden.insert(habit.id) }
-                hiddenRaw = ReportOptions.raw(from: hidden)
-            }
-        )
     }
 
     /// What you type onto the card, in one panel: your name (asked once,

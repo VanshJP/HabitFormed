@@ -17,13 +17,21 @@ struct ReportCardView: View {
     /// height in a chat.
     static let maxItems = 12
 
-    private var palette: ReportPalette { ReportPalette(theme: options.theme) }
+    private var palette: ReportPalette { ReportPalette(theme: options.theme, accentHex: options.accentHex) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
-            hero
-            habitList
+            switch options.layout {
+            case .list:
+                hero
+                habitList
+            case .grid:
+                hero
+                ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
+            case .focus:
+                ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
+            }
             if options.showCalories {
                 calories
             }
@@ -39,6 +47,7 @@ struct ReportCardView: View {
         .padding(.vertical, 28)
         .frame(width: Self.width, alignment: .leading)
         .background { background }
+        .fontDesign(options.font.design)
         .environment(\.dynamicTypeSize, .large)
         .environment(\.colorScheme, palette.isLight ? .light : .dark)
     }
@@ -54,8 +63,10 @@ struct ReportCardView: View {
 
     // MARK: - Header and hero
 
+    /// Centred over Focus's ring, so that card reads as one poster.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let centred = options.layout == .focus
+        return VStack(alignment: centred ? .center : .leading, spacing: 2) {
             Text(report.name.isEmpty ? "Daily report" : report.name)
                 .font(.title3.bold())
                 .foregroundStyle(palette.ink)
@@ -63,6 +74,7 @@ struct ReportCardView: View {
                 .font(.subheadline)
                 .foregroundStyle(palette.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
     }
 
     private var hero: some View {
@@ -73,7 +85,7 @@ struct ReportCardView: View {
                 color: report.isPerfect ? AppColors.success : palette.accent
             ) {
                 Text("\(report.done)/\(report.expected)")
-                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 26, weight: .bold, design: options.font.numerals).monospacedDigit())
                     .foregroundStyle(palette.ink)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
@@ -237,7 +249,7 @@ struct ReportCardView: View {
     private func calorieColumn(_ label: String, _ value: String, tint: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 15, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -306,12 +318,19 @@ struct ReportCardView: View {
 // MARK: - Palette
 
 /// Ink, wells and accents for a theme: white on the canvases, near-black on
-/// paper.
+/// paper. The accent is the theme's own unless a palette colour is picked.
 struct ReportPalette {
     let isLight: Bool
+    let accent: Color
 
-    init(theme: ReportTheme) {
+    init(theme: ReportTheme, accentHex: String = "") {
         isLight = theme.look == nil
+        if !accentHex.isEmpty {
+            let picked = Color(hex: accentHex)
+            accent = isLight ? picked : picked.glyphTone
+        } else {
+            accent = theme.look?.accent ?? AppColors.primary
+        }
     }
 
     var paper: Color { Color(red: 0.984, green: 0.980, blue: 0.965) }
@@ -320,7 +339,6 @@ struct ReportPalette {
     var faint: Color { ink.opacity(isLight ? 0.4 : 0.45) }
     var well: Color { isLight ? AppColors.inkOnLight.opacity(0.05) : Color.white.opacity(0.07) }
     var rule: Color { isLight ? AppColors.inkOnLight.opacity(0.12) : Color.white.opacity(0.12) }
-    var accent: Color { isLight ? AppColors.primary : AppColors.brandBright }
 
     /// A habit's colour, lifted on dark canvases and kept deep on paper so it
     /// clears contrast either way.
@@ -328,6 +346,22 @@ struct ReportPalette {
         let color = Color(hex: hex)
         return isLight ? color : color.glyphTone
     }
+}
+
+// MARK: - Font
+
+extension ReportFont {
+    var design: Font.Design {
+        switch self {
+        case .standard: return .default
+        case .rounded: return .rounded
+        case .serif: return .serif
+        case .mono: return .monospaced
+        }
+    }
+
+    /// Big numbers stay rounded on the default face, as they always were.
+    var numerals: Font.Design { self == .standard ? .rounded : design }
 }
 
 // MARK: - Mark

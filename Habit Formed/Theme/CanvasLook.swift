@@ -46,6 +46,26 @@ nonisolated enum CanvasLook: CaseIterable, Hashable, Sendable {
     }
 }
 
+// MARK: - Accent
+
+extension CanvasLook {
+    /// The one colour the look lends to controls and progress: switches, the
+    /// week strip's rings, a report card's ring. Bright enough to read on its
+    /// own canvas.
+    var accent: Color {
+        switch self {
+        case .classic, .midnight, .depth, .noir: return AppColors.brandBright
+        case .tide, .navy: return AppColors.info.mix(with: .white, by: 0.15)
+        case .mist, .black, .graphite: return Color(red: 0.62, green: 0.66, blue: 0.72)
+        case .aurora: return AppColors.tilePalette[3].mix(with: .white, by: 0.30)
+        case .ember: return AppColors.tilePalette[6].mix(with: .white, by: 0.15)
+        case .dusk: return AppColors.tilePalette[7].mix(with: .white, by: 0.10)
+        case .plum: return AppColors.tilePalette[5]
+        case .forest: return AppColors.tilePalette[8].mix(with: .white, by: 0.15)
+        }
+    }
+}
+
 // MARK: - Mood
 
 /// How hard a look pushes. The app canvas sits behind text all day; a report

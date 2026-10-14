@@ -33,11 +33,11 @@ enum AppColors {
 
     /// Day completion ramp shared by the week strip, the progress ring and the
     /// report, so "how much of today is done" wears one colour everywhere.
-    static func progressColor(for fraction: Double) -> Color {
+    static func progressColor(for fraction: Double, accent: Color = brandBright) -> Color {
         switch fraction {
         case ..<0.001: return Color.white.opacity(0.35)
         case ..<0.5:   return warning
-        case ..<1:     return brandBright
+        case ..<1:     return accent
         default:       return success
         }
     }

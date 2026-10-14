@@ -6,13 +6,16 @@ import SwiftUI
 /// `ImageRenderer` can draw it and it looks the same wherever it is sent.
 struct WeeklyRecapCardView: View {
     let recap: WeeklyRecap
-    let theme: ReportTheme
+    /// The daily card's look: theme, accent and type (layout is the daily
+    /// card's own).
+    let options: ReportOptions
 
     static let width: CGFloat = ReportCardView.width
     /// Rows drawn before "+N more".
     static let maxRows = 12
 
-    private var palette: ReportPalette { ReportPalette(theme: theme) }
+    private var theme: ReportTheme { options.theme }
+    private var palette: ReportPalette { ReportPalette(theme: theme, accentHex: options.accentHex) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -28,6 +31,7 @@ struct WeeklyRecapCardView: View {
         .padding(.vertical, 28)
         .frame(width: Self.width, alignment: .leading)
         .background { background }
+        .fontDesign(options.font.design)
         .environment(\.dynamicTypeSize, .large)
         .environment(\.colorScheme, palette.isLight ? .light : .dark)
     }
@@ -57,7 +61,7 @@ struct WeeklyRecapCardView: View {
     private var hero: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("\(recap.perfectDays)")
-                .font(.system(size: 64, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 64, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(recap.perfectDays > 0 ? AppColors.success : palette.ink)
             VStack(alignment: .leading, spacing: 3) {
                 Text(recap.perfectDays == 1 ? "perfect day" : "perfect days")
@@ -89,7 +93,7 @@ struct WeeklyRecapCardView: View {
             Text(label)
                 .eyebrowStyle(palette.secondary)
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 15, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(palette.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)

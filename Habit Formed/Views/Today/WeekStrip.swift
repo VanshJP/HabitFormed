@@ -12,6 +12,7 @@ struct WeekStrip: View {
     @Binding var selectedDate: Date
 
     @Environment(\.glassAppearance) private var glassAppearance
+    @Environment(\.appCanvas) private var canvas
 
     private let ringSize: CGFloat = 44
     private let lineWidth: CGFloat = 3
@@ -88,7 +89,7 @@ struct WeekStrip: View {
 
     /// Green for a perfect day, the progress ramp for a partial one.
     private func ringColor(for day: DaySummary) -> Color {
-        day.isPerfect ? AppColors.success : AppColors.progressColor(for: day.fraction)
+        day.isPerfect ? AppColors.success : AppColors.progressColor(for: day.fraction, accent: canvas.look.accent)
     }
 
     private func accessibilityLabel(for day: DaySummary) -> String {
