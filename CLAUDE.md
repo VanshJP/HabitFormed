@@ -142,10 +142,9 @@ draws itself in; at
 go logs. Release earlier to cancel; a flick from halfway logs too. The
 surface owns the knob's `progress`, so an undo plays it all backwards. The
 track is 44pt tall with the 36pt knob inset in it; its gray pill is what
-is left to slide, shrinking behind the knob over the fill. Light comes
-from above: the pill is a groove (inner shadow, lit bottom lip) with its
-label pressed in, and the knob a domed button (rim, highlight ring,
-specular) glowing its own color, deeper while held. Done, the channel and
+is left to slide, shrinking behind the knob over the fill. Flat, no
+shadows: the knob is a disc a step lighter than the habit's color, so it
+stays distinct on the fill. Done, the channel and
 the knob melt into the fill and only the white check stays. Every log from
 the grid shows an `UndoToast` for four seconds; the log that finishes a
 perfect day turns it into "Perfect day" with a "Send report" button for

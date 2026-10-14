@@ -15,11 +15,7 @@ struct CompletionFill: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(LinearGradient(
-                colors: [color, color.opacity(0.82)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ))
+            .fill(color)
             .mask { Bloom(amount: amount, track: track) }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
