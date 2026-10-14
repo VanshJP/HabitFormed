@@ -21,6 +21,8 @@ struct ContentView: View {
 
     @State private var sheet: HabitSheet?
     @State private var pendingDelete: Habit?
+    @State private var pendingStop: Habit?
+    @Namespace private var zoom
     @State private var selectedDate: Date = .now
     /// The last day the week strip shows; nil keeps it on today. Only the
     /// calendar and "Today" move it, so tapping a strip day never slides the
@@ -95,7 +97,8 @@ struct ContentView: View {
                             layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
                             selectedDate: selectedDate,
                             isPastDay: !isViewingToday,
-                            actions: actions(for:)
+                            actions: actions(for:),
+                            zoom: zoom
                         )
                     } accessory: {
                         HStack(spacing: 14) {
@@ -121,7 +124,7 @@ struct ContentView: View {
 
                     if sendsPerfectDay {
                         GlassButton(
-                            title: "Send today's report",
+                            title: "Share today's report",
                             icon: "square.and.arrow.up",
                             style: .primary,
                             size: .large,
@@ -170,7 +173,8 @@ struct ContentView: View {
             edit: { sheet = .edit(habit) },
             arrange: { showArrange = true },
             requestDelete: { pendingDelete = habit },
-            startTimer: { sheet = .timer(habit) }
+            startTimer: { sheet = .timer(habit) },
+            requestStopTimer: { pendingStop = habit }
         )
     }
 
@@ -202,7 +206,9 @@ struct ContentView: View {
             .sheet(item: $sheet) { item in
                 switch item {
                 case .edit(let habit): AddHabitView(habit: habit)
-                case .detail(let habit): HabitDetailView(habit: habit)
+                case .detail(let habit):
+                    HabitDetailView(habit: habit)
+                        .navigationTransition(.zoom(sourceID: habit.id.uuidString, in: zoom))
                 case .timer(let habit): TimerView(habit: habit)
                 }
             }
@@ -225,6 +231,22 @@ struct ContentView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { habit in
                 Text("This permanently deletes \(habit.title) and its history.")
+            }
+            .confirmationDialog(
+                "Stop the timer for \(pendingStop?.title ?? "this habit")?",
+                isPresented: Binding(
+                    get: { pendingStop != nil },
+                    set: { if !$0 { pendingStop = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Stop", role: .destructive) {
+                    Haptics.warning()
+                    timerCenter.stop()
+                }
+                Button("Keep going", role: .cancel) {}
+            } message: {
+                Text("This session won't be logged.")
             }
     }
 
@@ -308,6 +330,7 @@ struct ContentView: View {
                 // The flame earns its place: with no run going it is only noise.
                 if streak > 0 {
                     StreakChip(streak: streak, doneToday: todayIsPerfect)
+                        .transition(.blurReplace)
                 }
 
                 Button(action: onAdd) {
@@ -360,8 +383,10 @@ struct ContentView: View {
     }
 
     private func backToToday() {
-        selectedDate = .now
-        stripAnchor = nil
+        withMotion(AppMotion.snap) {
+            selectedDate = .now
+            stripAnchor = nil
+        }
     }
 
     // MARK: - Reminder signature
@@ -403,7 +428,7 @@ struct ContentView: View {
 
     private func undoToday(_ habit: Habit) {
         Haptics.undo()
-        habit.removeLog(on: Date(), in: modelContext)
+        withMotion(AppMotion.snap) { habit.removeLog(on: Date(), in: modelContext) }
     }
 
     /// Past days are fixed with one tap rather than a slide: a forgotten log

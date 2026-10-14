@@ -90,7 +90,7 @@ struct DailyReportSheet: View {
     }
 
     private var title: String {
-        if isPreset { return "Report card" }
+        if isPreset { return "Report style" }
         if day.isToday { return "Today's report" }
         if day.isYesterday { return "Yesterday's report" }
         return day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
@@ -108,6 +108,9 @@ struct DailyReportSheet: View {
                     ReportPreview(width: ReportCardView.width) {
                         ReportCardView(report: report, options: options)
                     }
+                    // A new look or switch eases in; the note is left out so
+                    // typing does not animate every letter.
+                    .motion(AppMotion.settle, value: { var style = options; style.note = ""; return style }())
                     if !isPreset {
                         fields
                         // Right under the note while only sending, so a short
@@ -160,7 +163,7 @@ struct DailyReportSheet: View {
     private var fields: some View {
         Panel {
             if askForName {
-                SettingsRow("Name on cards", icon: "person") {
+                SettingsRow("Name on reports", icon: "person") {
                     TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
                         .textContentType(.givenName)
                         .submitLabel(.done)
@@ -189,7 +192,7 @@ struct DailyReportSheet: View {
                 TextField(
                     "",
                     text: $note,
-                    prompt: Text("Add a note to this card").foregroundStyle(.white.opacity(0.4)),
+                    prompt: Text("Add a note to this report").foregroundStyle(.white.opacity(0.4)),
                     axis: .vertical
                 )
                 .font(.subheadline)

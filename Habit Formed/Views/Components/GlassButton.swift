@@ -3,7 +3,6 @@ import SwiftUI
 struct GlassButtonLabel: View {
     let title: String
     var icon: String? = nil
-    var iconPosition: GlassButton.IconPosition = .left
     var style: GlassButton.GlassButtonVariant = .primary
     var size: GlassButton.GlassButtonSize = .medium
     var fullWidth: Bool = false
@@ -21,17 +20,12 @@ struct GlassButtonLabel: View {
 
     @ViewBuilder
     private var labelContent: some View {
+        // An action's glyph leads its words, as everywhere in the app; only
+        // disclosure chevrons trail.
         HStack(spacing: 8) {
-            if iconPosition == .left {
-                glyphSlot
-            }
-
+            glyphSlot
             Text(title)
                 .font(size.font)
-
-            if iconPosition == .right {
-                glyphSlot
-            }
         }
     }
 
@@ -114,17 +108,12 @@ private struct GlassButtonChrome: ViewModifier {
 struct GlassButton: View {
     let title: String
     var icon: String? = nil
-    var iconPosition: IconPosition = .left
     var style: GlassButtonVariant = .primary
     var size: GlassButtonSize = .medium
     var fullWidth: Bool = false
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
-
-    enum IconPosition {
-        case left, right
-    }
 
     enum GlassButtonVariant {
         case primary
@@ -176,7 +165,6 @@ struct GlassButton: View {
             GlassButtonLabel(
                 title: title,
                 icon: icon,
-                iconPosition: iconPosition,
                 style: style,
                 size: size,
                 fullWidth: fullWidth

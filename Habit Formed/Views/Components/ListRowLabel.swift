@@ -163,21 +163,6 @@ struct RowGlyph: View {
     }
 }
 
-/// A glyph inline with a card's title: the title's font in an 18pt box.
-struct TitleGlyph: View {
-    let icon: String
-    var tint: Color = AppColors.primary
-    @ScaledMetric(relativeTo: .subheadline) private var box: CGFloat = 18
-
-    var body: some View {
-        Image(systemName: icon)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(tint.glyphTone)
-            .frame(width: box, height: box)
-            .accessibilityHidden(true)
-    }
-}
-
 #Preview {
     VStack(spacing: 20) {
         GlassRowGroup(dividerInset: RowLayout.dividerInset) {

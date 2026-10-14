@@ -34,6 +34,8 @@ struct PatternsSection: View {
                     }
                 }
             }
+            // The tip arrives after the facts; it eases in instead of popping.
+            .motion(AppMotion.settle, value: tip)
             .task(id: source) { await askForTip(insights, source: source) }
         }
     }

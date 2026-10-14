@@ -35,7 +35,7 @@ struct WeekStrip: View {
         return Button {
             guard !isSelected else { return }
             Haptics.selection()
-            withAnimation(AppMotion.snap) { selectedDate = day.date }
+            withMotion(AppMotion.snap) { selectedDate = day.date }
         } label: {
             ZStack {
                 ring(for: day)

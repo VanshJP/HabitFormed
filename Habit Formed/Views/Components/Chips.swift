@@ -63,6 +63,7 @@ private struct ChipFace: View {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(glyphColor)
+                    .symbolEffect(.bounce, value: isOn)
             }
             Text(title)
                 .font(.subheadline.weight(.semibold))

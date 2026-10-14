@@ -35,6 +35,8 @@ struct RootView: View {
 
     @State private var selectedTab: AppTab = .today
     @State private var sheet: RootSheet?
+    /// The mini banner the full timer zooms out of.
+    @Namespace private var timerZoom
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -76,6 +78,7 @@ struct RootView: View {
                         sheet = .timer(habit)
                     }
                 }
+                .zoomSource("timer", in: timerZoom)
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, 90)
                 .readableColumn()
@@ -89,6 +92,7 @@ struct RootView: View {
                 AddHabitView()
             case .timer(let habit):
                 TimerView(habit: habit)
+                    .navigationTransition(.zoom(sourceID: "timer", in: timerZoom))
             case .report(let date):
                 DailyReportSheet(day: date)
             case .recap(let date):
@@ -201,9 +205,12 @@ private struct MiniTimerBanner: View {
                             .trim(from: 0, to: CGFloat(progress))
                             .stroke(center.habitColor.glyphTone, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        Image(systemName: center.isRunning ? "waveform" : (isFinished ? "checkmark" : "pause.fill"))
+                        let glyph = center.isRunning ? "waveform" : (isFinished ? "checkmark" : "pause.fill")
+                        Image(systemName: glyph)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
+                            .symbolEffect(.variableColor.iterative, isActive: center.isRunning)
+                            .symbolSwap(glyph)
                     }
                     .frame(width: 34, height: 34)
 
@@ -221,7 +228,8 @@ private struct MiniTimerBanner: View {
                     Text(formatted(displaySeconds))
                         .font(.statValue)
                         .foregroundStyle(.white)
-                        .contentTransition(.numericText())
+                        .contentTransition(.numericText(countsDown: true))
+                        .motion(AppMotion.snap, value: displaySeconds)
 
                     Image(systemName: "chevron.up")
                         .font(.caption.weight(.semibold))

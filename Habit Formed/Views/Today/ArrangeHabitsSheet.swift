@@ -37,11 +37,8 @@ struct ArrangeHabitsSheet: View {
             .navigationTitle("Arrange habits")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        Haptics.light()
-                        dismiss()
-                    }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .close) { dismiss() }
                 }
             }
         }

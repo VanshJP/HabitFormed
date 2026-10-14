@@ -11,6 +11,8 @@ struct HabitActions {
     let arrange: () -> Void
     let requestDelete: () -> Void
     let startTimer: () -> Void
+    /// Asks before stopping, as the tile's own button and the timer do.
+    let requestStopTimer: () -> Void
 }
 
 /// The long-press menu every habit surface shares: log or undo the day shown,
@@ -41,8 +43,7 @@ struct HabitContextMenu: View {
         if habit.timerDurationSeconds > 0, !isPastDay {
             if timerCenter.habitID == habit.id {
                 Button("Stop timer", systemImage: "stop.circle", role: .destructive) {
-                    Haptics.warning()
-                    timerCenter.stop()
+                    actions.requestStopTimer()
                 }
             } else {
                 Button("Start timer", systemImage: "timer") { actions.startTimer() }
@@ -50,7 +51,7 @@ struct HabitContextMenu: View {
         }
         Divider()
         Button("Edit", systemImage: "pencil") { Haptics.light(); actions.edit() }
-        Button("Arrange habits", systemImage: "arrow.up.arrow.down") { actions.arrange() }
+        Button("Arrange habits", systemImage: "arrow.up.arrow.down") { Haptics.light(); actions.arrange() }
         Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); actions.requestDelete() }
     }
 }

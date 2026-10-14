@@ -27,7 +27,7 @@ struct DateBrowserSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Today") {
-                        Haptics.selection()
+                        // The date change ticks once, below.
                         selectedDate = .now
                         dismiss()
                     }

@@ -193,8 +193,10 @@ struct HeaderMeta: View {
     }
 }
 
-/// A door in a header's trailing slot ("Share ›", "Edit ›"), in
-/// `HeaderMeta`'s type so a link is not louder than the facts beside it.
+/// A door in a header's trailing slot ("Show all ⌄", "⇪ Share report"), in
+/// `HeaderMeta`'s type so a link is not louder than the facts beside it. The
+/// app's one icon rule: an action's glyph leads its words, and only a
+/// disclosure chevron trails them.
 struct HeaderLinkLabel: View {
     let title: String
     var icon: String = "chevron.right"
@@ -205,16 +207,23 @@ struct HeaderLinkLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 3) {
-            Text(title)
-            Image(systemName: icon)
-                .font(.caption2.weight(.bold))
+        HStack(spacing: 4) {
+            if isChevron {
+                Text(title)
+                Image(systemName: icon)
+                    .font(.caption2.weight(.bold))
+            } else {
+                Image(systemName: icon)
+                Text(title)
+            }
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
         .frame(minHeight: AppLayout.minHitTarget)
         .contentShape(.rect)
     }
+
+    private var isChevron: Bool { icon.hasPrefix("chevron") }
 }
 
 // MARK: - Glass Section
@@ -247,42 +256,6 @@ extension GlassSection where Accessory == HeaderMeta? {
     init(_ title: String, meta: String? = nil, @ViewBuilder content: () -> Content) {
         self.header = GlassSectionHeader(title, meta: meta)
         self.content = content()
-    }
-}
-
-// MARK: - Glass Card Title
-
-/// Card-level title row, one register below `GlassSectionHeader`.
-struct GlassCardTitle<Accessory: View>: View {
-    let title: String
-    let icon: String?
-    var accessory: Accessory
-
-    init(_ title: String, icon: String? = nil, @ViewBuilder accessory: () -> Accessory) {
-        self.title = title
-        self.icon = icon
-        self.accessory = accessory()
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
-            Spacer()
-            accessory
-        }
-    }
-}
-
-extension GlassCardTitle where Accessory == EmptyView {
-    init(_ title: String, icon: String? = nil) {
-        self.init(title, icon: icon) { EmptyView() }
     }
 }
 

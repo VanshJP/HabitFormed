@@ -37,7 +37,7 @@ struct AddHabitView: View {
                         // idea has not taken its settings.
                         HabitIdeas(pickedTitle: draft.title == pickedIdea ? draft.title : "") { template in
                             pickedIdea = template.title
-                            withAnimation(AppMotion.settle) { draft.apply(template) }
+                            withMotion(AppMotion.settle) { draft.apply(template) }
                             nameFocused = false
                         }
                     }
@@ -53,16 +53,13 @@ struct AddHabitView: View {
             .safeAreaBar(edge: .bottom) {
                 GlassButton(title: habit == nil ? "Add habit" : "Save changes", style: .primary, size: .large, fullWidth: true, action: save)
                     .disabled(!draft.canSave)
-                    .padding(.horizontal, AppLayout.pageHorizontal)
-                    .padding(.top, 10)
-                    .padding(.bottom, 8)
+                    .pinnedBar()
             }
             .navigationTitle(habit == nil ? "New habit" : "Edit habit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(role: .close) {
-                        Haptics.light()
                         if isDirty { confirmDiscard = true } else { dismiss() }
                     }
                 }
@@ -134,7 +131,7 @@ struct AddHabitView: View {
 
     private func toggleLook() {
         Haptics.light()
-        withAnimation(AppMotion.settle) { showLook.toggle() }
+        withMotion(AppMotion.settle) { showLook.toggle() }
     }
 
     // MARK: - Actions

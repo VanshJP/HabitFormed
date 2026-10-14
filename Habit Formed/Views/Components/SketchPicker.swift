@@ -40,7 +40,7 @@ struct SketchPicker<Item: Identifiable & Hashable, Sketch: View>: View {
                             .strokeBorder(Color.white.opacity(isSelected ? 0.95 : 0), lineWidth: 2)
                     }
                 Text(name(item))
-                    .font(.caption.weight(isSelected ? .semibold : .regular))
+                    .font(.caption2.weight(isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
             }
             .contentShape(.rect)

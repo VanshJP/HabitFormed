@@ -90,7 +90,7 @@ struct SettingsView: View {
     private var reportSection: some View {
         GlassSection("Reports") {
             Panel {
-                SettingsRow("Name on cards", icon: "person") {
+                SettingsRow("Name on reports", icon: "person") {
                     TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
                         .textContentType(.givenName)
                         .submitLabel(.done)
@@ -102,7 +102,7 @@ struct SettingsView: View {
                     Haptics.light()
                     showReportCard = true
                 } label: {
-                    SettingsRow("Report card", icon: "rectangle.portrait", trailing: .chevron)
+                    SettingsRow("Report style", icon: "rectangle.portrait", trailing: .chevron)
                 }
                 .buttonStyle(RowPressStyle())
                 SettingsRow("Daily reminder", icon: "bell", caption: reminderCaption, accessoryIsLabelled: true) {
@@ -112,19 +112,23 @@ struct SettingsView: View {
                     }
                     SettingsToggle(title: "Daily reminder", isOn: $reminderOn)
                 }
-                SettingsRow("Sunday recap", icon: "calendar", accessoryIsLabelled: true) {
+                SettingsRow("Weekly recap", icon: "calendar", accessoryIsLabelled: true) {
                     if recapOn {
-                        Text("7 PM")
+                        Text("\(Calendar.current.shortWeekdaySymbols[0]) \(Self.recapTime.label)")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    SettingsToggle(title: "Sunday recap at 7 PM", isOn: $recapOn)
+                    SettingsToggle(title: "Weekly recap on Sundays at \(Self.recapTime.label)", isOn: $recapOn)
                 }
             }
             .motion(AppMotion.snap, value: reminderOn)
             .motion(AppMotion.snap, value: recapOn)
         }
     }
+
+    /// When the Sunday nudge rings (`NotificationService.syncRecapReminder`),
+    /// in the person's own clock format.
+    private static let recapTime = ReminderTime(hour: 19, minute: 0)
 
     private var reminderTime: Binding<Date> {
         Binding(

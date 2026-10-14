@@ -50,8 +50,8 @@ struct HabitDetailView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Edit", systemImage: "pencil") { showingEdit = true }
-                        Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                        Button("Edit", systemImage: "pencil") { Haptics.light(); showingEdit = true }
+                        Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); confirmDelete = true }
                     } label: {
                         Image(systemName: "ellipsis")
                     }
@@ -158,10 +158,10 @@ struct HabitDetailView: View {
         guard habit.reminderEnabled else { return usualLabel.map { "Usually logged around \($0)" } }
         let setTime = ReminderTime(hour: habit.reminderHour, minute: habit.reminderMinute).label
         guard habit.reminderLearnsTime, habit.trackKind != .health else {
-            return usualLabel.map { "Reminds you at \(setTime). Usually logged around \($0)" } ?? "Reminds you at \(setTime)"
+            return usualLabel.map { "Reminds you at \(setTime), usually logged around \($0)" } ?? "Reminds you at \(setTime)"
         }
         guard let usual, let usualLabel else {
-            return "Reminds you at \(setTime). Learns your routine after \(ReminderTiming.minimumLogs) logs"
+            return "Reminds you at \(setTime), learns your routine after \(ReminderTiming.minimumLogs) logs"
         }
         return "Reminds you at \(ReminderTiming.reminder(beforeTypical: usual).label), before your usual \(usualLabel)"
     }
@@ -183,7 +183,7 @@ struct HabitDetailView: View {
     // MARK: - Today
 
     private var todaySection: some View {
-        VStack(spacing: 12) {
+        let section = VStack(spacing: 12) {
             if let entry = habit.todayCompletion {
                 loggedCard(entry)
             } else {
@@ -201,6 +201,7 @@ struct HabitDetailView: View {
                 }
             }
         }
+        return section.motion(AppMotion.settle, value: habit.isCompletedToday)
     }
 
     private func loggedCard(_ entry: HabitCompletion) -> some View {
@@ -209,6 +210,7 @@ struct HabitDetailView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(habit.color.glyphTone)
+                        .symbolEffect(.bounce, value: entry.id)
                     Text("Logged today at \(entry.loggedAt.formatted(date: .omitted, time: .shortened))")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
@@ -274,7 +276,7 @@ struct HabitDetailView: View {
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("Tap a day to add or remove its log.")
+                    Text("Tap a day to add or remove its log")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -317,7 +319,7 @@ struct HabitDetailView: View {
     // MARK: - Actions
 
     private func delete(_ completion: HabitCompletion) {
-        Haptics.warning()
+        Haptics.undo()
         modelContext.delete(completion)
         try? modelContext.save()
     }

@@ -30,6 +30,8 @@ struct HabitStatusLine: View {
         .font(.caption.weight(.medium).monospacedDigit())
         .lineLimit(1)
         .minimumScaleFactor(0.85)
+        // "3 days" rolls to "4 days" as the knob logs.
+        .contentTransition(.numericText())
     }
 
     /// The schedule fact, or nil when the streak says enough. Highlighted

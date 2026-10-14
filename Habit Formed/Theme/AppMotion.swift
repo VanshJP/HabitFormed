@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Named motion tokens, so motion reads as one system instead of several
 /// independent guesses that happen to be close.
@@ -153,4 +154,11 @@ extension View {
             self
         }
     }
+}
+
+/// `withAnimation` that goes still under Reduce Motion, for a change made in
+/// an action rather than keyed to a value (`motion(_:value:)`).
+@discardableResult
+func withMotion<Result>(_ animation: Animation?, _ body: () throws -> Result) rethrows -> Result {
+    try withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : animation, body)
 }

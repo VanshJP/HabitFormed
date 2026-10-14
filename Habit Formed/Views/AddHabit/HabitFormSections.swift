@@ -30,9 +30,9 @@ struct HabitIdeas: View {
         } accessory: {
             Button {
                 Haptics.light()
-                withAnimation(AppMotion.settle) { showAll.toggle() }
+                withMotion(AppMotion.settle) { showAll.toggle() }
             } label: {
-                HeaderLinkLabel(showAll ? "Fewer" : "Show all", icon: showAll ? "chevron.up" : "chevron.down")
+                HeaderLinkLabel(showAll ? "Show fewer" : "Show all", icon: showAll ? "chevron.up" : "chevron.down")
             }
             .buttonStyle(.textLink)
             .accessibilityLabel(showAll ? "Show fewer ideas" : "Show all ideas")
@@ -90,15 +90,15 @@ struct HabitLookPicker: View {
 
             Button {
                 Haptics.light()
-                withAnimation(AppMotion.settle) { showAllIcons.toggle() }
+                withMotion(AppMotion.settle) { showAllIcons.toggle() }
             } label: {
                 HStack(spacing: 4) {
-                    Text(showAllIcons ? "Fewer icons" : "More icons")
+                    Text(showAllIcons ? "Show fewer" : "Show all")
                     Image(systemName: "chevron.down")
                         .font(.caption2.weight(.bold))
-                        .rotationEffect(.degrees(showAllIcons ? -180 : 0))
+                        .rotationEffect(.degrees(showAllIcons ? 180 : 0))
                 }
-                .font(.footnote.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
             }
             .buttonStyle(.textLink)
@@ -139,7 +139,7 @@ struct HabitLookPicker: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Colour \(hex)")
+        .accessibilityLabel("Color \(hex)")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -153,7 +153,7 @@ struct HabitLookPicker: View {
             Image(systemName: symbol)
                 .font(.body)
                 .foregroundStyle(isSelected ? AppColors.inkOnLight : Color.white.opacity(0.75))
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
                 .background {
                     // Only the choice is painted; the rest are bare glyphs.
                     if isSelected {
@@ -185,7 +185,7 @@ struct HabitTrackSection: View {
                     FlowLayout(spacing: 8) {
                         ForEach(HabitTrackKind.allCases) { kind in
                             ChoiceChip(title: kind.label, icon: kind.symbol, isSelected: draft.kind == kind) {
-                                withAnimation(AppMotion.settle) { draft.setKind(kind) }
+                                withMotion(AppMotion.settle) { draft.setKind(kind) }
                             }
                         }
                     }
@@ -302,7 +302,7 @@ struct HabitScheduleSection: View {
                     FlowLayout(spacing: 8) {
                         ForEach(options) { frequency in
                             ChoiceChip(title: frequency.shortLabel, isSelected: draft.frequency == frequency) {
-                                withAnimation(AppMotion.settle) { draft.setFrequency(frequency) }
+                                withMotion(AppMotion.settle) { draft.setFrequency(frequency) }
                             }
                         }
                     }
@@ -336,7 +336,7 @@ struct HabitScheduleSection: View {
                                     }
                                 }
                             }
-                            Text("Counts from your last log.")
+                            Text("Counts from your last log")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

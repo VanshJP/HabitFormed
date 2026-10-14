@@ -16,8 +16,10 @@ struct RowTimerButton: View {
             onStart()
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: done ? "checkmark" : (active && timerCenter.isRunning ? "waveform" : "play.fill"))
+                Image(systemName: glyph(done: done, active: active))
                     .font(.caption2.weight(.bold))
+                    .symbolEffect(.variableColor.iterative, isActive: active && timerCenter.isRunning)
+                    .symbolSwap(glyph(done: done, active: active))
                 Text(done ? "Done" : (active ? timerText : "\(habit.timerDurationSeconds / 60) min"))
                     .font(.caption.weight(.semibold).monospacedDigit())
             }
@@ -29,6 +31,14 @@ struct RowTimerButton: View {
         .buttonStyle(GlassPressStyle())
         .disabled(done)
         .accessibilityLabel(active ? "Open timer" : "Start \(habit.timerDurationSeconds / 60) minute timer")
+    }
+
+    /// The same glyphs as a tile's timer: what the timer is doing, not what a
+    /// tap would do.
+    private func glyph(done: Bool, active: Bool) -> String {
+        if done { return "checkmark" }
+        if !active { return "play.fill" }
+        return timerCenter.isRunning ? "waveform" : "pause.fill"
     }
 
     private var timerText: String {

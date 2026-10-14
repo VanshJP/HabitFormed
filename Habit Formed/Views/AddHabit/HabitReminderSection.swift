@@ -99,7 +99,7 @@ struct HabitReminderSection: View {
         } else {
             rule = "After \(ReminderTiming.minimumLogs) logs it moves to \(ReminderTiming.leadMinutes) min before you usually log"
         }
-        return explanation.map { "\($0). \(rule)" } ?? rule
+        return explanation.map { "\($0), \(rule.prefix(1).lowercased())\(rule.dropFirst())" } ?? rule
     }
 
     /// Rewords the reason with the on-device model once typing pauses. The

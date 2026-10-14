@@ -17,6 +17,8 @@ struct HabitTileView: View {
     /// True when the grid is showing a day before today.
     var isPastDay: Bool = false
     let actions: HabitActions
+    /// Where the habit's page zooms out from, when the host presents one.
+    var zoom: Namespace.ID?
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
@@ -58,6 +60,7 @@ struct HabitTileView: View {
                 tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
             )
             .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
+            .zoomSource(habit.id.uuidString, in: zoom)
             .onTapGesture { Haptics.light(); actions.open() }
             .contextMenu {
                 if !isSliding {
@@ -123,7 +126,7 @@ struct HabitTileView: View {
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withAnimation(animation) {
+        withMotion(animation) {
             slide = state.doneToday ? 1 : 0
             doneFill = state.done ? 1 : 0
         }
@@ -173,7 +176,8 @@ struct HabitTileView: View {
             HStack(spacing: 6) {
                 Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")
                     .font(.footnote.weight(.semibold))
-                Text(logged ? "Logged" : "Tap to log")
+                    .symbolSwap(logged)
+                Text(logged ? "Logged" : "Log")
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
@@ -201,6 +205,8 @@ struct HabitTileView: View {
                 Text(habit.source.compactValue(liveValue))
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
+                    .contentTransition(.numericText(value: liveValue))
+                    .motion(AppMotion.snap, value: liveValue)
                 Text("of \(habit.source.compactValue(habit.targetValue))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -228,6 +234,8 @@ struct HabitTileView: View {
                 HStack(spacing: 5) {
                     Image(systemName: timerIcon)
                         .font(.caption2.weight(.bold))
+                        .symbolEffect(.variableColor.iterative, isActive: timerIsActiveForThisHabit && timerCenter.isRunning)
+                        .symbolSwap(timerIcon)
                     Text(timerLabel)
                         .font(.caption.weight(.semibold).monospacedDigit())
                 }
@@ -267,7 +275,7 @@ struct HabitTileView: View {
             let s = timerCenter.remainingSeconds
             return String(format: "%d:%02d", s / 60, s % 60)
         }
-        return "\(habit.timerDurationSeconds / 60)m"
+        return "\(habit.timerDurationSeconds / 60) min"
     }
 
     /// Manual: the slide track, swapped for a resting pill while an interval

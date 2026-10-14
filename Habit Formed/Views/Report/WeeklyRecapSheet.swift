@@ -67,7 +67,7 @@ struct WeeklyRecapSheet: View {
                 .padding(.bottom, AppLayout.pageBottom)
             }
             .background { AppBackground(style: .subtle) }
-            .navigationTitle("Week recap")
+            .navigationTitle("Weekly recap")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

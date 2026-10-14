@@ -126,7 +126,7 @@ the header):
   of filled squares and needs no other line to say so.
 - **History**: `HistoryView`, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
-  seven days under it and a "Recap" button. Then "Patterns" (up to three
+  seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
   lines `HabitInsights` found in the last eight weeks, plus an Apple
   Intelligence tip when the model is there; hidden until two weeks of days
   exist and something holds). Then the 12-week map with its
@@ -135,7 +135,7 @@ the header):
   list its logs (long-press one to remove it) and a "Share report" row.
 - **Settings**: pushed from the gear. Today (layout as two small pictures,
   arrange, log sound, the Siri phrase with one of your habits), Reports
-  (name on cards, Report card, daily reminder with its time, Sunday recap)
+  (name on reports, Report style, daily reminder with its time, weekly recap)
   and Look (canvas rail, plain ones first after Classic, and glass). No captions except where the words are the
   content (the Siri phrases); few-way choices are chips in their row.
 
@@ -266,7 +266,7 @@ things out. No templates, layouts or placeholder tokens.
   notes, last 7 days, calories in vs out, and activity. Notes and the week's
   dots exist only in List. All in `@AppStorage`; the note is for one card
   only. `ReportStyleEditor` edits them and is the one editor for Settings →
-  Report card and the sheet's Edit.
+  Report style and the sheet's Edit.
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
@@ -274,7 +274,7 @@ things out. No templates, layouts or placeholder tokens.
   (`ReportPreview`), so a theme or switch shows at once;
   `ReportCardRenderer` draws the image at 3x only when it is sent.
 - The look is set ahead of time, so sending carries no choices: Settings →
-  Report card opens `DailyReportSheet(isPreset: true)` (live preview, theme
+  Report style opens `DailyReportSheet(isPreset: true)` (live preview, theme
   layout as `SketchPicker` pictures, background rail, accent dots, type
   chips, "On the card" as `ToggleChip`s; nothing to send).
 - `DailyReportSheet` to send: live preview, one panel of fields (name the
@@ -320,7 +320,7 @@ against the week before, each habit's seven `DayStatus` squares, the
 longest streak and the habit that climbed most), and `WeeklyRecapCardView`
 draws it under the daily card's rules. `WeeklyRecapSheet` shares the
 daily report's theme, hidden habits and name, and its preview, theme row
-and send bar (`ReportSheetParts`). It opens from History's "Recap"
+and send bar (`ReportSheetParts`). It opens from History's "Weekly recap"
 button, from an optional Sunday 7 PM nudge (`recap-reminder`, switched on
 in Settings), or from `WidgetLink.recap`.
 
@@ -352,7 +352,9 @@ The design system is SpeakUp's; when in doubt, match
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);
-  words-only buttons use `.buttonStyle(.textLink)`. Selected chips and
+  words-only buttons use `.buttonStyle(.textLink)`. One icon rule: an
+  action's glyph leads its words (`GlassButton`, `Label`, `HeaderLinkLabel`),
+  and only a disclosure chevron trails them, turning 180° when it opens. Selected chips and
   segments are solid white with `AppColors.inkOnLight` text. The week
   strip is the exception: its selected day is a soft circle of glass.
 - **Type:** text styles that scale (`.subheadline.weight(.semibold)` etc.);
@@ -362,11 +364,22 @@ The design system is SpeakUp's; when in doubt, match
 - **Sections:** `GlassSection("Title", meta:)` with a sentence-case header;
   `detail:` puts one fact right after the title.
 - **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
-  close with `Button(role: .close)` top leading; deletes confirm with an
-  `.alert("Delete this X?")`.
-- **Motion:** `AppMotion` tokens and `.motion(_:value:)`, which respects
-  Reduce Motion.
-- **Haptics:** route every tactile moment through `Haptics.*`. Don't
+  close with `Button(role: .close)` top leading (no haptic), and a Done
+  that commits is `Button(role: .confirm)`; deletes confirm with an
+  `.alert("Delete this X?")`, and stopping a running timer always asks
+  "Stop the timer for X?". A habit's page zooms out of its tile or row
+  (`zoomSource` + `.navigationTransition(.zoom)`), the timer out of the
+  mini banner.
+- **Motion:** `AppMotion` tokens and `.motion(_:value:)`, or
+  `withMotion(_:_:)` for a change made in an action; both go still under
+  Reduce Motion (never call `withAnimation` directly). Numbers that change
+  roll (`.contentTransition(.numericText())`; a countdown passes
+  `countsDown: true`), a glyph that changes state morphs (`symbolSwap`), a
+  running timer's waveform moves (`.symbolEffect(.variableColor)`), and a
+  check that lands bounces once (`.symbolEffect(.bounce, value:)`). None
+  of it inside the report or recap cards, which `ImageRenderer` draws.
+- **Haptics:** route every tactile moment through `Haptics.*`; taking a
+  log back is `Haptics.undo` wherever it happens. Don't
   instantiate `UIImpactFeedbackGenerator` inline.
 - **Streak math:** call `Date.calculateStreak(from:today:)`; do not
   duplicate the day-grace logic. Schedule-aware streaks go through
@@ -378,7 +391,9 @@ The design system is SpeakUp's; when in doubt, match
   manual-swipe only; auto-reset to daily when track type becomes
   timer/health (`HabitDraft.setKind`).
 - **Copy:** no em dashes anywhere (strings or comments). Sentence case.
-  Keep UI copy plain and short.
+  Keep UI copy plain and short; captions end without a period, and two
+  facts in one line join with a comma. Tiles and rows say the same thing
+  the same way ("Log", "Next log in 3 days", "10 min").
 - **Numbers:** convert user-typed or HealthKit doubles with
   `Double.safeRounded`, never `Int(x)`, which traps on huge values.
 - **HealthKit:** new HealthKit-backed habit types should extend

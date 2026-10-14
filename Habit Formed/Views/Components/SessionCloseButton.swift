@@ -3,8 +3,8 @@ import SwiftUI
 /// The ✕ that leaves a full-screen session (the timer). A headline-weight
 /// glyph on a 44pt glass circle.
 ///
-/// A card's ✕ is `DismissButton` and a sheet's is `Button(role: .close)`;
-/// this is the third, for a screen with no navigation bar.
+/// A sheet's ✕ is `Button(role: .close)`; this one is for a screen with no
+/// navigation bar.
 struct SessionCloseButton: View {
     /// What the tap does, for VoiceOver: "Close timer".
     let label: String

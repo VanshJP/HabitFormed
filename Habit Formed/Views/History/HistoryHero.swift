@@ -29,7 +29,7 @@ struct HistoryHero: View {
             Spacer(minLength: 12)
 
             Button(action: onShareRecap) {
-                Label("Recap", systemImage: "square.and.arrow.up")
+                Label("Weekly recap", systemImage: "square.and.arrow.up")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)

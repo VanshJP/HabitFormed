@@ -12,6 +12,8 @@ struct HabitRowView: View {
     /// True when the list is showing a day before today.
     var isPastDay: Bool = false
     let actions: HabitActions
+    /// Where the habit's page zooms out from, when the host presents one.
+    var zoom: Namespace.ID?
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
@@ -63,6 +65,7 @@ struct HabitRowView: View {
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
         )
         .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
+        .zoomSource(habit.id.uuidString, in: zoom)
         .onTapGesture { Haptics.light(); actions.open() }
         .contextMenu {
             if !isSliding {
@@ -95,7 +98,7 @@ struct HabitRowView: View {
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withAnimation(animation) {
+        withMotion(animation) {
             slide = state.doneToday ? 1 : 0
             doneFill = state.done ? 1 : 0
         }
@@ -113,8 +116,10 @@ struct HabitRowView: View {
             case .timer: RowTimerButton(habit: habit, onStart: actions.startTimer)
             case .manual:
                 if let days = habit.restingDaysLeft {
-                    Text(days == 1 ? "Next tomorrow" : "Next in \(days) days")
+                    Text(days == 1 ? "Next log tomorrow" : "Next log in \(days) days")
                         .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                         .background(Capsule().fill(Color.white.opacity(0.06)))
@@ -132,6 +137,7 @@ struct HabitRowView: View {
         return Button(action: actions.togglePastDay) {
             Label(logged ? "Logged" : "Log", systemImage: logged ? "checkmark.circle.fill" : "plus.circle")
                 .font(.caption.weight(.semibold))
+                .symbolSwap(logged)
                 .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                 .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                 .background(Capsule().fill(Color.white.opacity(logged ? 0.18 : 0.08)))
@@ -154,6 +160,8 @@ struct HabitRowView: View {
                 Text(habit.source.compactValue(value))
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
+                    .contentTransition(.numericText(value: value))
+                    .motion(AppMotion.snap, value: value)
                 Text("of \(habit.source.compactValue(habit.targetValue))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)

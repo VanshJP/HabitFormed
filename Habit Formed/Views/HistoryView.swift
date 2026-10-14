@@ -144,7 +144,7 @@ struct HistoryView: View {
         let isOpen = openDay == group.date
         Button {
             Haptics.light()
-            withAnimation(AppMotion.settle) { openDay = isOpen ? nil : group.date }
+            withMotion(AppMotion.settle) { openDay = isOpen ? nil : group.date }
         } label: {
             DayRow(
                 date: group.date,
@@ -187,7 +187,7 @@ struct HistoryView: View {
     // MARK: - Actions
 
     private func delete(_ completion: HabitCompletion) {
-        Haptics.warning()
+        Haptics.undo()
         modelContext.delete(completion)
         try? modelContext.save()
     }

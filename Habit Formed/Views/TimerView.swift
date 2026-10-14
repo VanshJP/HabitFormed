@@ -81,7 +81,7 @@ struct TimerView: View {
             isPresented: $showResetConfirm,
             titleVisibility: .visible
         ) {
-            Button("Reset to \(habit.timerDurationSeconds / 60) Min", role: .destructive) {
+            Button("Reset to \(habit.timerDurationSeconds / 60) min", role: .destructive) {
                 Haptics.warning()
                 center.reset()
             }
@@ -90,7 +90,7 @@ struct TimerView: View {
             Text("This session's progress will be lost.")
         }
         .confirmationDialog(
-            "Stop timer?",
+            "Stop the timer for \(habit.title)?",
             isPresented: $showStopConfirm,
             titleVisibility: .visible
         ) {
@@ -137,7 +137,8 @@ struct TimerView: View {
                     Text(formatted(displaySeconds))
                         .font(.displayNumeral)
                         .foregroundStyle(.white)
-                        .contentTransition(.numericText())
+                        .contentTransition(.numericText(countsDown: true))
+                        .motion(AppMotion.snap, value: displaySeconds)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                     Text(stateLabel(isFinished: isFinished))
@@ -178,7 +179,6 @@ struct TimerView: View {
                 showResetConfirm = true
             }
             .disabled(!isOurTimer || !canReset)
-            .opacity(!isOurTimer || !canReset ? 0.5 : 1)
 
             GlassButton(title: primaryTitle, icon: primaryIcon, style: .primary, size: .large, fullWidth: true) {
                 Haptics.medium()
@@ -238,6 +238,6 @@ struct TimerView: View {
     // MARK: - Format
 
     private func formatted(_ seconds: Int) -> String {
-        String(format: "%02d:%02d", seconds / 60, seconds % 60)
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }

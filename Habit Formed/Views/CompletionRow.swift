@@ -26,7 +26,7 @@ struct CompletionRow: View {
             Spacer(minLength: 8)
 
             Text(completion.loggedAt.formatted(date: .omitted, time: .shortened))
-                .font(.caption2.weight(.medium).monospacedDigit())
+                .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, RowLayout.horizontalPadding)

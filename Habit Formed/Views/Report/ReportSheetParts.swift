@@ -71,11 +71,20 @@ struct ReportEditButton: View {
     @Binding var isEditing: Bool
 
     var body: some View {
-        Button(isEditing ? "Done" : "Edit") {
-            Haptics.light()
-            isEditing.toggle()
+        // Done is the system's confirm, the glass check that pairs with the
+        // sheet's close.
+        if isEditing {
+            Button(role: .confirm) { toggle() }
+                .accessibilityLabel("Done editing the report")
+        } else {
+            Button("Edit") { toggle() }
+                .accessibilityLabel("Edit the report")
         }
-        .accessibilityLabel(isEditing ? "Done editing the card" : "Edit the card")
+    }
+
+    private func toggle() {
+        Haptics.light()
+        withMotion(AppMotion.settle) { isEditing.toggle() }
     }
 }
 

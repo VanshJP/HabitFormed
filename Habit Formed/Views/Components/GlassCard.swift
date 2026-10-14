@@ -105,35 +105,6 @@ struct GlassRowGroup<Content: View>: View {
     }
 }
 
-// MARK: - Featured Glass Card (for hero/prominent content)
-
-struct FeaturedGlassCard<Content: View>: View {
-    let content: Content
-    var gradientColors: [Color]
-    var cornerRadius: CGFloat
-    var padding: CGFloat
-
-    init(
-        gradientColors: [Color] = [AppColors.primary.opacity(0.10), Color.white.opacity(0.02)],
-        cornerRadius: CGFloat = AppLayout.cardRadius,
-        padding: CGFloat = AppLayout.cardPadding,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.content = content()
-        self.gradientColors = gradientColors
-        self.cornerRadius = cornerRadius
-        self.padding = padding
-    }
-
-    var body: some View {
-        content
-            .environment(\.isOnGlass, true)
-            .padding(padding)
-            .glassEffect(.regular.tint(gradientColors.first ?? AppColors.primary), in: .rect(cornerRadius: cornerRadius))
-            .shadow(color: .black.opacity(0.3), radius: 18, y: 9)
-    }
-}
-
 // MARK: - Meter Bar
 
 /// Slim progress capsule toward a finish line (steps, a weekly target).
@@ -231,7 +202,6 @@ struct EmptyStateInline: View {
     ScrollView {
         VStack(spacing: 20) {
             GlassCard { Text("Standard card").foregroundStyle(.white) }
-            FeaturedGlassCard { Text("Featured card").foregroundStyle(.white) }
             EmptyStateCard(
                 icon: "circle.hexagongrid",
                 title: "No habits yet",
