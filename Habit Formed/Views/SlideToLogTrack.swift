@@ -17,6 +17,9 @@ struct SlideToLogTrack: View {
     let accent: Color
     let isLogged: Bool
     @Binding var progress: CGFloat
+    /// True while a thumb is on the knob, so the surface can hold back its
+    /// long-press menu: a pause mid-slide is not a long press.
+    @Binding var isSliding: Bool
     let onComplete: () -> Void
 
     @State private var isArmed = false
@@ -69,6 +72,9 @@ struct SlideToLogTrack: View {
             onComplete()
         }
         .onChange(of: isLogged) { isArmed = false }
+        // From the gesture state, which resets itself even when the gesture
+        // is cancelled rather than ended.
+        .onChange(of: isHeld) { _, held in isSliding = held }
     }
 
     /// A flat disc a step lighter than the fill it slides over, so it stays

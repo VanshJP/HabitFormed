@@ -22,6 +22,9 @@ struct HabitRowView: View {
 
     /// The slide knob's place, 0...1. Manual habits on today fill from it.
     @State private var slide: CGFloat = 0
+    /// While the knob is held the long-press menu stays empty, so pausing
+    /// mid-slide never opens it.
+    @State private var isSliding = false
     /// The fill for everything without a slide: health, timers, past days.
     @State private var doneFill: CGFloat = 0
 
@@ -62,7 +65,9 @@ struct HabitRowView: View {
         .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
         .onTapGesture { Haptics.light(); actions.open() }
         .contextMenu {
-            HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
+            if !isSliding {
+                HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(habit.title), \(isDone ? "done" : "not done")")
@@ -114,7 +119,7 @@ struct HabitRowView: View {
                         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                         .background(Capsule().fill(Color.white.opacity(0.06)))
                 } else {
-                    SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide) {
+                    SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide, isSliding: $isSliding) {
                         actions.log()
                     }
                 }

@@ -24,6 +24,9 @@ struct HabitTileView: View {
 
     /// The slide knob's place, 0...1. Manual habits on today fill from it.
     @State private var slide: CGFloat = 0
+    /// While the knob is held the long-press menu stays empty, so pausing
+    /// mid-slide never opens it.
+    @State private var isSliding = false
     /// The fill for everything without a slide: health, timers, past days.
     @State private var doneFill: CGFloat = 0
     @State private var showStopConfirm = false
@@ -57,7 +60,9 @@ struct HabitTileView: View {
             .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
             .onTapGesture { Haptics.light(); actions.open() }
             .contextMenu {
-                HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
+                if !isSliding {
+                    HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
+                }
             }
             .confirmationDialog(
                 "Stop the timer for \(habit.title)?",
@@ -272,7 +277,7 @@ struct HabitTileView: View {
         if let remaining = intervalRestingDays {
             intervalRestingPill(days: remaining)
         } else {
-            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide) {
+            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide, isSliding: $isSliding) {
                 actions.log()
             }
         }
