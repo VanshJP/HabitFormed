@@ -30,8 +30,9 @@ struct HabitTileView: View {
 
     private let padding = AppLayout.tilePadding
 
-    /// Completion for the day being shown. Weekly habits stay lit for the
-    /// whole week once logged, so the glow doesn't flicker between days.
+    /// Completion for the day being shown; a weekly habit counts the whole
+    /// week once logged. Fills follow it, except a manual habit on today,
+    /// which fills from its slide (logged today or not).
     private var effectiveCompleted: Bool {
         if habit.frequency == .weekly {
             return !habit.completionsInWeek(of: selectedDate).isEmpty
