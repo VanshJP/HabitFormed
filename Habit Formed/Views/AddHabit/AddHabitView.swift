@@ -6,6 +6,7 @@ import SwiftData
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(HealthKitService.self) private var health
 
     var habit: Habit?
 
@@ -13,6 +14,7 @@ struct AddHabitView: View {
     @State private var original = HabitDraft()
     @State private var didLoad = false
     @State private var confirmDiscard = false
+    @State private var isSaving = false
     @FocusState private var nameFocused: Bool
 
     private var isDirty: Bool { draft != original }
@@ -107,15 +109,21 @@ struct AddHabitView: View {
     }
 
     private func save() {
-        guard draft.canSave else { return }
-        if let habit {
-            draft.apply(to: habit)
-        } else {
-            modelContext.insert(draft.makeHabit(sortOrder: nextSortOrder()))
+        guard draft.canSave, !isSaving else { return }
+        isSaving = true
+        Task {
+            // Ask for Health over this sheet, before the habit exists: once
+            // the sheet starts closing, the Health prompt has nowhere to show.
+            if draft.kind == .health { try? await health.requestAuthorization() }
+            if let habit {
+                draft.apply(to: habit)
+            } else {
+                modelContext.insert(draft.makeHabit(sortOrder: nextSortOrder()))
+            }
+            try? modelContext.save()
+            Haptics.success()
+            dismiss()
         }
-        try? modelContext.save()
-        Haptics.success()
-        dismiss()
     }
 
     private func nextSortOrder() -> Int {

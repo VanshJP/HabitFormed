@@ -90,6 +90,7 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 ├── WidgetStore.swift         # Shared: App Group read/write (group.com.vansh.Habit-Formed)
 ├── LogHabitIntent.swift      # Shared: the widget's log button
 ├── WidgetLink.swift          # Shared: habitformed:// links that RootView opens
+├── PrivacyInfo.xcprivacy     # Shared: the privacy manifest for both bundles (UserDefaults reasons)
 └── Habit_Formed_WidgetLiveActivity.swift # Timer Live Activity (widget-only)
 ```
 
@@ -315,9 +316,6 @@ The design system is SpeakUp's; when in doubt, match
 
 ## Known gaps / future work
 
-- App icon PNG is not yet present in
-  `Assets.xcassets/AppIcon.appiconset/` (the `Contents.json` slot is
-  defined; a 1024×1024 image needs to be dropped in).
 - HealthKit auto-sync only inserts a completion when today's value
   meets the target; partial progress shows on the tile's meter.
 - Notifications: reminders are cadence-aware and rebuilt by

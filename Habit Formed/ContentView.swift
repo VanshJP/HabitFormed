@@ -35,6 +35,10 @@ struct ContentView: View {
 
     @AppStorage(AppPreferences.todayLayout) private var layoutRaw = TodayLayout.tiles.rawValue
 
+    private var usesHealth: Bool {
+        habits.contains { $0.trackKind == .health }
+    }
+
     private var isViewingToday: Bool {
         // Against `dayTracker.today` so a midnight rollover flips this.
         selectedDate.isSameDay(as: dayTracker.today)
@@ -230,14 +234,18 @@ struct ContentView: View {
         content
             .task {
                 WidgetSync.refresh(habits: habits, in: modelContext)
+                // Permission is requested lazily when a reminder is turned on.
+                await notifications.syncReminders(for: habits)
+            }
+            .task(id: usesHealth) {
+                // Health is asked for only once a habit reads it, never on a
+                // bare first launch. The add sheet asks first when one is saved.
+                guard usesHealth else { return }
                 try? await health.requestAuthorization()
                 await health.syncHealthKitHabits(in: modelContext)
                 // HealthKit change notifications keep health tiles near
                 // real-time instead of waiting on the polling tick.
                 health.startObservingHealthKitHabits(in: modelContext)
-
-                // Permission is requested lazily when a reminder is turned on.
-                await notifications.syncReminders(for: habits)
             }
             .onChange(of: reminderSignature) { _, _ in
                 Task { await notifications.syncReminders(for: habits) }
