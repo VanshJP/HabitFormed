@@ -1,0 +1,71 @@
+import SwiftUI
+
+/// A one-of-many chip: a timer length, an interval, a layout.
+struct ChoiceChip: View {
+    let title: String
+    var icon: String? = nil
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            guard !isSelected else { return }
+            Haptics.selection()
+            action()
+        } label: {
+            ChipFace(title: title, icon: icon, isOn: isSelected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// A chip that switches one thing on or off, for picking several: the
+/// habits and extras a report card shows. `tint` colors the glyph while on.
+struct ToggleChip: View {
+    let title: String
+    var icon: String? = nil
+    var tint: Color? = nil
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            Haptics.selection()
+            isOn.toggle()
+        } label: {
+            ChipFace(title: title, icon: icon, tint: tint, isOn: isOn)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Both chips' face, flat: solid white with ink when on, a faint tint with
+/// dimmed text when off.
+private struct ChipFace: View {
+    let title: String
+    let icon: String?
+    var tint: Color? = nil
+    let isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isOn ? tint ?? AppColors.inkOnLight : Color.white.opacity(0.45))
+            }
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .foregroundStyle(isOn ? AppColors.inkOnLight : Color.white.opacity(0.7))
+        .padding(.horizontal, 14)
+        .frame(minHeight: 34)
+        .background(Capsule().fill(isOn ? AppColors.solidWhite : Color.white.opacity(0.08)))
+        .frame(minHeight: AppLayout.minHitTarget)
+        .contentShape(.rect)
+        .motion(AppMotion.snap, value: isOn)
+    }
+}

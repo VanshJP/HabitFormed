@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Settings, pushed from Today's gear: the report's name and evening nudge,
-/// the app's look, and feedback.
+/// Settings, pushed from Today's gear: how Today looks and sounds, the
+/// reports' name and reminders, and the app's look. One flat panel per
+/// section, and few-way choices as chips in their row.
 struct SettingsView: View {
     @Environment(NotificationService.self) private var notifications
 
@@ -21,13 +22,13 @@ struct SettingsView: View {
     var body: some View {
         PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+                todaySection
                 reportSection
                 lookSection
-                habitsSection
                 about
             }
-            .padding(.horizontal, AppLayout.pageHorizontal)
-            .padding(.vertical, AppLayout.pageBottom)
+            .padding(.top, 8)
+            .pageContentInsets()
         }
         .scrollDismissesKeyboard(.interactively)
         .background { AppBackground() }
@@ -43,36 +44,61 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Report
+    // MARK: - Today
+
+    private var todaySection: some View {
+        GlassSection("Today") {
+            Panel {
+                SettingsRow("Layout", icon: "square.grid.2x2") {
+                    ForEach(TodayLayout.allCases) { layout in
+                        ChoiceChip(title: layout.title, isSelected: layoutRaw == layout.rawValue) {
+                            layoutRaw = layout.rawValue
+                        }
+                    }
+                }
+                Button {
+                    Haptics.light()
+                    showArrange = true
+                } label: {
+                    SettingsRow("Arrange habits", icon: "arrow.up.arrow.down", trailing: .chevron)
+                }
+                .buttonStyle(RowPressStyle())
+                SettingsRow("Log sound", icon: "speaker.wave.2", isOn: $logSound)
+            }
+        }
+    }
+
+    // MARK: - Reports
 
     private var reportSection: some View {
         GlassSection("Reports") {
-            VStack(alignment: .leading, spacing: 8) {
-                GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                    SettingsRow("Your name", icon: "person") {
-                        TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
-                            .textContentType(.givenName)
-                            .submitLabel(.done)
-                            .multilineTextAlignment(.trailing)
-                            .focused($nameFocused)
-                            .frame(maxWidth: 160)
-                    }
-                    SettingsRow("Evening nudge", icon: "bell.badge", isOn: $reminderOn)
-                    if reminderOn {
-                        SettingsRow("Time", icon: "clock") {
-                            DatePicker("Nudge time", selection: reminderTime, displayedComponents: .hourAndMinute)
-                                .labelsHidden()
-                        }
-                    }
-                    SettingsRow("Sunday recap", icon: "calendar.badge.checkmark", caption: "Sundays at 7 PM, your week as one card", isOn: $recapOn)
+            Panel {
+                SettingsRow("Name on cards", icon: "person") {
+                    TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
+                        .textContentType(.givenName)
+                        .submitLabel(.done)
+                        .multilineTextAlignment(.trailing)
+                        .focused($nameFocused)
+                        .frame(maxWidth: 140)
                 }
-                .motion(AppMotion.settle, value: reminderOn)
-
-                Text("Your name prints on every card, so a forwarded card still says whose day it was.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                SettingsRow("Daily reminder", icon: "bell", accessoryIsLabelled: true) {
+                    if reminderOn {
+                        DatePicker("Reminder time", selection: reminderTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                    SettingsToggle(title: "Daily reminder", isOn: $reminderOn)
+                }
+                SettingsRow("Sunday recap", icon: "calendar", accessoryIsLabelled: true) {
+                    if recapOn {
+                        Text("7 PM")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    SettingsToggle(title: "Sunday recap at 7 PM", isOn: $recapOn)
+                }
             }
+            .motion(AppMotion.snap, value: reminderOn)
+            .motion(AppMotion.snap, value: recapOn)
         }
     }
 
@@ -98,84 +124,28 @@ struct SettingsView: View {
     // MARK: - Look
 
     private var lookSection: some View {
-        GlassSection("App look") {
+        GlassSection("Look") {
             VStack(alignment: .leading, spacing: 12) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    ForEach(AppCanvas.allCases) { canvas in
-                        canvasSwatch(canvas)
+                SwatchRail(
+                    items: AppCanvas.allCases,
+                    selection: Binding(
+                        get: { AppCanvas(rawValue: canvasRaw) ?? .classic },
+                        set: { canvasRaw = $0.rawValue }
+                    ),
+                    name: \.displayName
+                ) { canvas in
+                    CanvasLookView(look: canvas.look)
+                }
+                Panel {
+                    SettingsRow("Glass", icon: "circle.lefthalf.filled") {
+                        ForEach(GlassAppearance.allCases) { glass in
+                            ChoiceChip(title: glass.displayName, isSelected: glassRaw == glass.rawValue) {
+                                glassRaw = glass.rawValue
+                            }
+                        }
                     }
                 }
-
-                SectionPicker(
-                    sections: GlassAppearance.allCases,
-                    selection: Binding(
-                        get: { GlassAppearance(rawValue: glassRaw) ?? .light },
-                        set: { glassRaw = $0.rawValue }
-                    ),
-                    label: { "\($0.displayName) glass" },
-                    style: .compact
-                )
             }
-        }
-    }
-
-    private func canvasSwatch(_ canvas: AppCanvas) -> some View {
-        let isSelected = canvasRaw == canvas.rawValue
-        return Button {
-            guard !isSelected else { return }
-            Haptics.selection()
-            canvasRaw = canvas.rawValue
-        } label: {
-            VStack(spacing: 6) {
-                CanvasLookView(look: canvas.look)
-                    .frame(height: 76)
-                    .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                            .strokeBorder(isSelected ? Color.white.opacity(0.9) : AppColors.cardStroke, lineWidth: isSelected ? 2 : 1)
-                    }
-                Text(canvas.displayName)
-                    .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-            }
-        }
-        .buttonStyle(GlassPressStyle())
-        .accessibilityLabel(canvas.displayName)
-        .accessibilityHint(canvas.look.summary)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-
-    // MARK: - Habits
-
-    private var habitsSection: some View {
-        GlassSection("Habits") {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionPicker(
-                    sections: TodayLayout.allCases,
-                    selection: Binding(
-                        get: { TodayLayout(rawValue: layoutRaw) ?? .tiles },
-                        set: { layoutRaw = $0.rawValue }
-                    ),
-                    label: { $0.title },
-                    icon: { $0.icon },
-                    style: .compact
-                )
-                habitRows
-            }
-        }
-    }
-
-    private var habitRows: some View {
-        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-            Button {
-                Haptics.light()
-                showArrange = true
-            } label: {
-                SettingsRow("Arrange habits", icon: "arrow.up.arrow.down", caption: "The order of habits on Today.", trailing: .chevron)
-            }
-            .buttonStyle(RowPressStyle())
-
-            SettingsRow("Log sound", icon: "speaker.wave.2", caption: "A soft chime when you log a habit.", isOn: $logSound)
         }
     }
 

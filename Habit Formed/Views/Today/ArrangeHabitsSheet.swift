@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Drag habits into the order the Today grid shows them.
+/// Drag habits into the order Today shows them.
 struct ArrangeHabitsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -28,7 +28,7 @@ struct ArrangeHabitsSheet: View {
                     }
                     .onMove(perform: move)
                 } footer: {
-                    Text("Drag the handles. Today's grid follows this order.")
+                    Text("Drag to reorder. Today follows this order.")
                 }
             }
             .environment(\.editMode, .constant(.active))

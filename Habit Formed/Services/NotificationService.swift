@@ -342,7 +342,7 @@ final class NotificationService {
         guard isAuthorized else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Daily report"
+        content.title = "Today's report"
         content.body = "Send today's report to your people before the day ends."
         content.sound = .default
         content.interruptionLevel = .active
@@ -376,7 +376,7 @@ final class NotificationService {
         guard isAuthorized else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Your week is in"
+        content.title = "Your week recap"
         content.body = "See how the last seven days went, then send the recap."
         content.sound = .default
         content.interruptionLevel = .active

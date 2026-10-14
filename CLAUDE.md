@@ -66,10 +66,11 @@ Habit Formed/
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
 └── Views/
-    ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, StatTile, PageTitle, ...)
+    ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, PageTitle, ...) and the
+│                             #   app's own flat ones: Panel, Chips (ChoiceChip, ToggleChip), SwatchRail
     ├── Today/                # WeekStrip, TodayHabitList, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
-    ├── History/              # ConsistencyHeatMap
+    ├── History/              # HistoryHero, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
     ├── Settings/             # SettingsView
@@ -79,7 +80,7 @@ Habit Formed/
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
     ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
-    ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
+    ├── HistoryView.swift     # One page: hero, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
@@ -116,10 +117,16 @@ the header):
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
   of filled squares and needs no other line to say so.
-- **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
-  one stats strip, a 12-week consistency map and per-habit streak rows (tap
-  opens the detail sheet); Log is day by day, each day header carrying a
-  Share link for that day's report.
+- **History**: `HistoryView`, one page with no picker. `HistoryHero` is
+  the perfect-day streak as one big number, with the best and the last
+  seven days under it and a "Recap" button. Then the 12-week map with its
+  legend, per-habit streak rows (tap opens the detail sheet), and the days:
+  each a `DayRow` (name, logged glyphs, "2 of 3") that opens in place to
+  list its logs (long-press one to remove it) and a "Share report" row.
+- **Settings**: pushed from the gear. Today (layout, arrange, log sound),
+  Reports (name on cards, daily reminder with its time, Sunday recap) and
+  Look (canvas rail, glass). No captions; few-way choices are chips in
+  their row.
 
 The rule across screens: say each fact once, keep captions for what is not
 obvious, paint only the selected choice in a grid, and prefer one line of
@@ -232,14 +239,16 @@ things out. No templates, layouts or placeholder tokens.
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
   on canvas or paper; `ReportCardRenderer` renders it (scale 2 for the
   preview, 3 for sending).
-- `DailyReportSheet`: live preview, theme row, "Habits" and "Also show"
-  switches, a note, then Text it (`MessageComposer`, Messages with the image
+- `DailyReportSheet`: live preview, theme rail, "On the card" as
+  `ToggleChip`s (the habits, then Streaks, Habit notes, Last 7 days,
+  Calories, Activity), one panel of fields (name the first time, calories
+  eaten while Calories is on, this card's note), then Text it (`MessageComposer`, Messages with the image
   attached) and Share (`SharePresenter`; Save and Copy live in the share
   sheet). Both send the card alone, with no text typed under it. The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
-- An optional evening nudge (`report-reminder`) opens today's report.
+- An optional daily reminder (`report-reminder`) opens today's report.
 
 ### Weekly recap
 
@@ -249,8 +258,8 @@ against the week before, each habit's seven `DayStatus` squares, the
 longest streak and the habit that climbed most), and `WeeklyRecapCardView`
 draws it under the daily card's rules. `WeeklyRecapSheet` shares the
 daily report's theme, hidden habits and name, and its preview, theme row
-and send bar (`ReportSheetParts`). It opens from History's "Last 7 days"
-section, from an optional Sunday 7 PM nudge (`recap-reminder`, switched on
+and send bar (`ReportSheetParts`). It opens from History's "Recap"
+button, from an optional Sunday 7 PM nudge (`recap-reminder`, switched on
 in Settings), or from `WidgetLink.recap`.
 
 ## Conventions
@@ -262,7 +271,10 @@ The design system is SpeakUp's; when in doubt, match
   (Liquid Glass). Never stack glass on glass: inside a card use
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
-  (card 20 / 16, tile 16 / 12, well 12).
+  (card 20 / 16, tile 16 / 12, well 12). History, Settings and the report
+  sheets are flat: rows sit on a `Panel` (one faint fill, hairlines), not
+  glass, and nothing there has a shadow or gradient. Names: the daily card
+  is the "report", the weekly one the "recap".
 - **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
   (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
   one solid use of a habit's color is Today's done fill, with the glyph

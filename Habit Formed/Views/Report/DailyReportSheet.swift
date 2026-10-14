@@ -93,12 +93,8 @@ struct DailyReportSheet: View {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     ReportPreview(image: preview)
                     ReportThemeRow(themeRaw: $themeRaw)
-                    if askForName {
-                        nameRow
-                    }
-                    habitsSection
-                    extrasSection
-                    noteSection
+                    contentsSection
+                    fields
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, AppLayout.pageBottom)
@@ -132,31 +128,23 @@ struct DailyReportSheet: View {
 
     // MARK: - What to share
 
-    private var habitsSection: some View {
-        GlassSection("Habits") {
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                ForEach(habits) { habit in
-                    ListRowLabel(icon: habit.symbol, tint: habit.color, title: habit.title, trailing: .none) {
-                        Toggle(habit.title, isOn: includes(habit))
-                            .labelsHidden()
-                            .tint(AppColors.primary)
+    /// Everything the card can show, as chips: the habits first, then the
+    /// extras. The preview above shows each one come and go.
+    private var contentsSection: some View {
+        GlassSection("On the card") {
+            VStack(alignment: .leading, spacing: 4) {
+                FlowLayout(spacing: 8) {
+                    ForEach(habits) { habit in
+                        ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
                     }
                 }
-            }
-        }
-    }
-
-    /// Asked once, the first time there is no name, so a forwarded card says
-    /// whose day it was.
-    private var nameRow: some View {
-        GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-            SettingsRow("Your name", icon: "person", caption: "Printed on the card") {
-                TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
-                    .textContentType(.givenName)
-                    .submitLabel(.done)
-                    .multilineTextAlignment(.trailing)
-                    .focused($focusedField, equals: .name)
-                    .frame(maxWidth: 140)
+                FlowLayout(spacing: 8) {
+                    ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
+                    ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
+                    ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
+                    ToggleChip(title: "Calories", icon: "fork.knife", isOn: $showCalories)
+                    ToggleChip(title: "Activity", icon: "figure.walk", isOn: $showActivity)
+                }
             }
         }
     }
@@ -168,57 +156,57 @@ struct DailyReportSheet: View {
                 var hidden = ReportOptions.hiddenIDs(from: hiddenRaw)
                 if isOn { hidden.remove(habit.id) } else { hidden.insert(habit.id) }
                 hiddenRaw = ReportOptions.raw(from: hidden)
-                Haptics.selection()
             }
         )
     }
 
-    private var extrasSection: some View {
-        GlassSection("Also show") {
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                SettingsRow("Streaks", icon: "flame", isOn: $showStreaks)
-                SettingsRow("Notes", icon: "text.quote", isOn: $showNotes)
-                SettingsRow("Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
-                SettingsRow("Calories in vs out", icon: "fork.knife", isOn: $showCalories)
-                if showCalories {
-                    SettingsRow(
-                        "Calories eaten",
-                        icon: "number",
-                        caption: metrics.eatenKcal == nil ? "Not in Apple Health. Type a total." : "From Apple Health"
-                    ) {
-                        TextField(
-                            "",
-                            text: $eatenText,
-                            prompt: Text(metrics.eatenKcal.map { $0.safeRounded.formatted() } ?? "kcal")
-                                .foregroundStyle(.white.opacity(0.4))
-                        )
-                        .keyboardType(.numberPad)
+    /// What you type onto the card, in one panel: your name (asked once,
+    /// the first time there is none), calories eaten while they are on, and
+    /// this card's note.
+    private var fields: some View {
+        Panel {
+            if askForName {
+                SettingsRow("Name on cards", icon: "person") {
+                    TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
+                        .textContentType(.givenName)
+                        .submitLabel(.done)
                         .multilineTextAlignment(.trailing)
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .focused($focusedField, equals: .eaten)
-                        .frame(maxWidth: 90)
-                    }
+                        .focused($focusedField, equals: .name)
+                        .frame(maxWidth: 140)
                 }
-                SettingsRow("Steps, sleep and exercise", icon: "figure.walk", isOn: $showActivity)
             }
-            .motion(AppMotion.settle, value: showCalories)
+            if showCalories {
+                SettingsRow("Calories eaten", icon: "fork.knife") {
+                    TextField(
+                        "",
+                        text: $eatenText,
+                        prompt: Text(metrics.eatenKcal.map { $0.safeRounded.formatted() } ?? "kcal")
+                            .foregroundStyle(.white.opacity(0.4))
+                    )
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .focused($focusedField, equals: .eaten)
+                    .frame(maxWidth: 90)
+                }
+            }
+            HStack(spacing: RowLayout.spacing) {
+                RowGlyph(icon: "square.and.pencil", tint: .secondary)
+                TextField(
+                    "",
+                    text: $note,
+                    prompt: Text("Add a note to this card").foregroundStyle(.white.opacity(0.4)),
+                    axis: .vertical
+                )
+                .font(.subheadline)
+                .lineLimit(1...3)
+                .focused($focusedField, equals: .note)
+            }
+            .padding(.horizontal, RowLayout.horizontalPadding)
+            .padding(.vertical, RowLayout.verticalPadding)
+            .frame(minHeight: AppLayout.minHitTarget)
         }
-    }
-
-    private var noteSection: some View {
-        GlassSection("Note") {
-            TextField(
-                "",
-                text: $note,
-                prompt: Text("Add a line to this card").foregroundStyle(.white.opacity(0.4)),
-                axis: .vertical
-            )
-            .lineLimit(1...3)
-            .focused($focusedField, equals: .note)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .glassCard()
-        }
+        .motion(AppMotion.settle, value: showCalories)
     }
 
     // MARK: - Health

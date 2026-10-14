@@ -51,7 +51,7 @@ struct WeeklyRecapSheet: View {
             .safeAreaBar(edge: .bottom) {
                 ReportSendBar { ReportCardRenderer.render(recap: recap, theme: theme) }
             }
-            .navigationTitle("Your week")
+            .navigationTitle("Week recap")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

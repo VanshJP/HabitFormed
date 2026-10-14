@@ -1,9 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// The long view, in two sections. Overview: the perfect-day numbers, this
-/// week with its recap, a 12-week consistency map and every habit's streak.
-/// Log: day by day, where each day can be sent as a report.
+/// The long view, on one page: the perfect-day streak with the week's recap,
+/// a 12-week map, every habit's streak, then the days. A day opens in place
+/// to list its logs (long-press one to remove it) and share its report.
 struct HistoryView: View {
     var onShareReport: (Date) -> Void = { _ in }
     var onShareWeek: () -> Void = {}
@@ -17,41 +17,26 @@ struct HistoryView: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
-    @State private var section: HistorySection = .overview
     @State private var detailHabit: Habit?
-    /// How many days of the log are drawn; "Show earlier days" adds a month.
+    @State private var openDay: Date?
+    /// How many days are listed; "Show earlier days" adds a month.
     @State private var logDays = 30
 
     private static let mapWeeks = 12
 
     var body: some View {
-        // Re-render at midnight so "Today" headers and stats stay correct.
+        // Re-render at midnight so "Today" names and stats stay correct.
         let _ = dayTracker.today
 
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                // A tab with sections opens on its picker rather than a title.
-                SectionPicker(
-                    sections: HistorySection.allCases,
-                    selection: $section,
-                    label: { $0.title }
-                )
-                .padding(.top, 4)
-
                 if completions.isEmpty && habits.isEmpty {
-                    EmptyStateCard(
-                        icon: "calendar",
-                        title: "No logs yet",
-                        message: "Log something on Today and it shows up here."
-                    )
+                    EmptyStateInline(icon: "calendar", message: "Slide a habit on Today and it shows up here.")
+                        .padding(.top, 80)
                 } else {
-                    switch section {
-                    case .overview:
-                        overview
-                        streaksSection
-                    case .log:
-                        log
-                    }
+                    overview
+                    streaksSection
+                    daysSection
                 }
             }
             .pageContentInsets()
@@ -61,67 +46,35 @@ struct HistoryView: View {
         }
     }
 
+    private var tracks: [HabitTrack] { habits.map(\.track) }
+
     // MARK: - Overview
 
     private var overview: some View {
-        let tracks = habits.map(\.track)
+        let tracks = tracks
         let summaries = DayLedger.summaries(endingOn: dayTracker.today, count: Self.mapWeeks * 7, tracks: tracks)
         let byDay = Dictionary(uniqueKeysWithValues: summaries.map { ($0.date, $0) })
         let perfect = summaries.filter(\.isPerfect).count
 
         return VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-            GlassCard {
-                HStack(spacing: 0) {
-                    StatPair(value: "\(DayLedger.perfectStreak(tracks: tracks))", label: "Perfect streak", valueFont: .metricValue)
-                        .frame(maxWidth: .infinity)
-                    statDivider
-                    StatPair(value: "\(DayLedger.bestPerfectStreak(tracks: tracks))", label: "Best", valueFont: .metricValue)
-                        .frame(maxWidth: .infinity)
-                    statDivider
-                    StatPair(value: "\(completions.count)", label: "All-time logs", valueFont: .metricValue)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-
-            thisWeek(Array(summaries.suffix(7)))
+            HistoryHero(
+                streak: DayLedger.perfectStreak(tracks: tracks),
+                best: DayLedger.bestPerfectStreak(tracks: tracks),
+                perfectLastWeek: summaries.suffix(7).filter(\.isPerfect).count,
+                onShareRecap: onShareWeek
+            )
+            .padding(.top, 8)
 
             GlassSection("Last 12 weeks", meta: perfect == 1 ? "1 perfect day" : "\(perfect) perfect days") {
-                GlassCard {
-                    ConsistencyHeatMap(summaries: byDay, weeks: Self.mapWeeks)
+                Panel {
+                    VStack(alignment: .trailing, spacing: 12) {
+                        ConsistencyHeatMap(summaries: byDay, weeks: Self.mapWeeks)
+                        ConsistencyLegend()
+                    }
+                    .padding(14)
                 }
             }
         }
-    }
-
-    /// The last seven days in two numbers, with the way to send them as the
-    /// Sunday recap card.
-    private func thisWeek(_ days: [DaySummary]) -> some View {
-        let perfect = days.filter(\.isPerfect).count
-        let logged = days.reduce(0) { $0 + $1.done }
-        let expected = days.reduce(0) { $0 + $1.expected }
-
-        return GlassSection("Last 7 days") {
-            GlassCard {
-                HStack(spacing: 0) {
-                    StatPair(value: "\(perfect) of 7", label: "Perfect days", valueFont: .metricValue)
-                        .frame(maxWidth: .infinity)
-                    statDivider
-                    StatPair(value: "\(logged) of \(expected)", label: "Logged", valueFont: .metricValue)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-        } accessory: {
-            Button(action: onShareWeek) {
-                HeaderLinkLabel("Share recap", icon: "square.and.arrow.up")
-            }
-            .buttonStyle(.textLink)
-        }
-    }
-
-    private var statDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .frame(width: 0.5, height: 32)
     }
 
     // MARK: - Streaks
@@ -130,14 +83,14 @@ struct HistoryView: View {
     private var streaksSection: some View {
         if !habits.isEmpty {
             GlassSection("Streaks") {
-                GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                    ForEach(habitsByStreak) { habit in
+                Panel {
+                    ForEach(habits.sorted { $0.displayStreak > $1.displayStreak }) { habit in
                         Button {
                             Haptics.light()
                             detailHabit = habit
                         } label: {
                             ListRowLabel(icon: habit.symbol, tint: habit.color, title: habit.title) {
-                                Text(streakText(habit))
+                                Text("\(habit.displayStreak) \(habit.streakUnit(for: habit.displayStreak))")
                                     .font(.subheadline.weight(.semibold).monospacedDigit())
                                     .foregroundStyle(habit.displayStreak > 0 ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
                             }
@@ -149,63 +102,71 @@ struct HistoryView: View {
         }
     }
 
-    private var habitsByStreak: [Habit] {
-        habits.sorted { $0.displayStreak > $1.displayStreak }
-    }
-
-    private func streakText(_ habit: Habit) -> String {
-        let streak = habit.displayStreak
-        return "\(streak) \(habit.streakUnit(for: streak))"
-    }
-
-    // MARK: - Log
+    // MARK: - Days
 
     @ViewBuilder
-    private var log: some View {
+    private var daysSection: some View {
         let groups = grouped
         let shown = groups.prefix { $0.date >= dayTracker.today.adding(days: -logDays) }
 
-        if groups.isEmpty {
-            EmptyStateCard(
-                icon: "list.bullet",
-                title: "No logs yet",
-                message: "Slide a tile on Today and the day shows up here."
-            )
-        } else {
-            VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                ForEach(Array(shown)) { group in
-                    daySection(group)
-                }
-
-                if shown.count < groups.count {
-                    Button {
-                        Haptics.light()
-                        logDays += 30
-                    } label: {
-                        Text("Show earlier days")
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+        if !groups.isEmpty {
+            GlassSection("Days") {
+                VStack(spacing: 4) {
+                    Panel(dividerInset: RowLayout.horizontalPadding) {
+                        ForEach(Array(shown)) { group in
+                            day(group)
+                        }
                     }
-                    .buttonStyle(.textLink)
+
+                    if shown.count < groups.count {
+                        Button {
+                            Haptics.light()
+                            logDays += 30
+                        } label: {
+                            Text("Show earlier days")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+                        }
+                        .buttonStyle(.textLink)
+                    }
                 }
             }
         }
     }
 
-    private func daySection(_ group: DayGroup) -> some View {
-        GlassSection(group.date.relativeDayName) {
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                ForEach(group.completions) { completion in
-                    CompletionRow(completion: completion, onDelete: { delete(completion) })
-                }
+    /// The day's row, and while it is open its logs and its report, set a
+    /// shade deeper so they read as inside the day.
+    @ViewBuilder
+    private func day(_ group: DayGroup) -> some View {
+        let isOpen = openDay == group.date
+        Button {
+            Haptics.light()
+            withAnimation(AppMotion.settle) { openDay = isOpen ? nil : group.date }
+        } label: {
+            DayRow(
+                date: group.date,
+                completions: group.completions,
+                summary: DayLedger.summary(on: group.date, tracks: tracks, today: dayTracker.today),
+                isOpen: isOpen
+            )
+        }
+        .buttonStyle(RowPressStyle())
+
+        if isOpen {
+            ForEach(group.completions) { completion in
+                CompletionRow(completion: completion, onDelete: { delete(completion) })
+                    .background(Color.black.opacity(0.14))
             }
-        } accessory: {
             Button {
                 onShareReport(group.date)
             } label: {
-                HeaderLinkLabel("Share", icon: "square.and.arrow.up")
+                Label("Share report", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+                    .background(Color.black.opacity(0.14))
             }
-            .buttonStyle(.textLink)
+            .buttonStyle(RowPressStyle())
             .accessibilityLabel("Share the report for \(group.date.relativeDayName)")
         }
     }
@@ -226,22 +187,6 @@ struct HistoryView: View {
         Haptics.warning()
         modelContext.delete(completion)
         try? modelContext.save()
-    }
-}
-
-// MARK: - Sections
-
-nonisolated enum HistorySection: String, CaseIterable, Identifiable, Sendable {
-    case overview
-    case log
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .overview: return "Overview"
-        case .log: return "Log"
-        }
     }
 }
 

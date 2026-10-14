@@ -1,51 +1,5 @@
 import SwiftUI
 
-// MARK: - Choice Chip
-
-/// A one-of-many chip: a timer length, an interval. Selected is the solid
-/// white pill with ink text; idle is the painted plate, because these sit on
-/// cards (no glass on glass).
-struct ChoiceChip: View {
-    let title: String
-    var icon: String? = nil
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            guard !isSelected else { return }
-            Haptics.selection()
-            action()
-        } label: {
-            HStack(spacing: 5) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.caption.weight(.semibold))
-                }
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-            }
-            .foregroundStyle(isSelected ? AppColors.inkOnLight : Color.white.opacity(0.85))
-            .padding(.horizontal, 14)
-            .frame(minHeight: 34)
-            .background {
-                if isSelected {
-                    Capsule().fill(AppColors.solidWhite)
-                } else {
-                    Capsule()
-                        .fill(Color.white.opacity(0.10))
-                        .overlay { Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 1) }
-                }
-            }
-            .frame(minHeight: AppLayout.minHitTarget)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
 // MARK: - Templates
 
 /// A rail of ready-made habits. One tap fills the form; the name stays

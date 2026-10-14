@@ -47,13 +47,39 @@ struct ConsistencyHeatMap: View {
 
     private func color(for summary: DaySummary?) -> Color {
         guard let summary, summary.expected > 0 else { return Color.white.opacity(0.05) }
-        if summary.isPerfect { return AppColors.success }
-        if summary.done == 0 { return Color.white.opacity(0.09) }
-        return AppColors.success.opacity(0.22 + 0.5 * summary.fraction)
+        return Self.ramp(summary.isPerfect ? 1 : summary.fraction)
+    }
+
+    /// A day's cell by how much of it got done: faint at nothing, solid green
+    /// when perfect.
+    static func ramp(_ fraction: Double) -> Color {
+        if fraction >= 1 { return AppColors.success }
+        if fraction <= 0 { return Color.white.opacity(0.09) }
+        return AppColors.success.opacity(0.22 + 0.5 * fraction)
     }
 
     private var accessibilitySummary: String {
         let perfect = summaries.values.filter(\.isPerfect).count
         return "\(perfect) perfect days in the last \(weeks) weeks"
+    }
+}
+
+/// The map's key: the ramp from nothing logged to a perfect day.
+struct ConsistencyLegend: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("Less")
+                .padding(.trailing, 2)
+            ForEach([0, 0.35, 0.7, 1.0], id: \.self) { fraction in
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(ConsistencyHeatMap.ramp(fraction))
+                    .frame(width: 11, height: 11)
+            }
+            Text("Perfect")
+                .padding(.leading, 2)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
     }
 }

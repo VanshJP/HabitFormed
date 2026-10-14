@@ -17,9 +17,8 @@ struct ReportPreview: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
                     }
-                    .shadow(color: .black.opacity(0.55), radius: 24, y: 14)
                     .accessibilityLabel("Card preview")
             } else {
                 RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
@@ -35,57 +34,26 @@ struct ReportPreview: View {
 
 // MARK: - Theme
 
-/// The card's theme as a row of swatches. Both cards share one stored theme,
-/// so a week's recap looks like the days it sums up.
+/// The card's theme as a rail of swatches. Both cards share one stored
+/// theme, so a week's recap looks like the days it sums up.
 struct ReportThemeRow: View {
     @Binding var themeRaw: String
 
     var body: some View {
-        GlassSection("Theme") {
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(ReportTheme.allCases) { theme in
-                        swatch(theme)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-            .scrollIndicators(.hidden)
-            .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
-            .padding(.horizontal, -AppLayout.pageHorizontal)
-        }
-    }
-
-    private func swatch(_ theme: ReportTheme) -> some View {
-        let isSelected = themeRaw == theme.rawValue
-        return Button {
-            guard !isSelected else { return }
-            Haptics.selection()
-            themeRaw = theme.rawValue
-        } label: {
-            VStack(spacing: 6) {
-                Group {
-                    if let look = theme.look {
-                        CanvasLookView(look: look, mood: .session)
-                    } else {
-                        ReportPalette(theme: theme).paper
-                    }
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous)
-                        .strokeBorder(isSelected ? Color.white.opacity(0.95) : AppColors.cardStroke, lineWidth: isSelected ? 2 : 1)
-                }
-
-                Text(theme.displayName)
-                    .font(.caption2.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+        SwatchRail(
+            items: ReportTheme.allCases,
+            selection: Binding(
+                get: { ReportTheme(rawValue: themeRaw) ?? .classic },
+                set: { themeRaw = $0.rawValue }
+            ),
+            name: \.displayName
+        ) { theme in
+            if let look = theme.look {
+                CanvasLookView(look: look, mood: .session)
+            } else {
+                ReportPalette(theme: theme).paper
             }
         }
-        .buttonStyle(GlassPressStyle())
-        .accessibilityLabel(theme.displayName)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
