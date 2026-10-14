@@ -3,8 +3,8 @@ import SwiftUI
 /// Slide-to-log track, mirroring iOS's slide-to-answer. As the knob travels
 /// its chevron fades and a check draws itself in, finishing at 75% where it
 /// arms (a tick and a small pop); let go to log, or pull back to disarm. A confident
-/// flick from halfway logs too. The knob is the one raised thing on the
-/// tile, lit from above: a contact shadow at rest, a deeper one while held.
+/// flick from halfway logs too. Lit from above: the knob is a domed button
+/// glowing its own color, the pill a groove with the label pressed into it.
 /// Once logged the channel goes and the knob melts into the filled square,
 /// leaving only its check. 44pt tall so the knob meets the hit target.
 ///
@@ -36,15 +36,19 @@ struct SlideToLogTrack: View {
             let p = min(max(progress, 0), 1)
 
             ZStack(alignment: .leading) {
-                // The pill is what is left to slide: it shrinks behind the
-                // knob, uncovering the fill it rides on.
-                Capsule()
-                    .fill(Color.white.opacity(isLogged ? 0 : 0.08))
+                // The pill is what is left to slide: a groove that shrinks
+                // behind the knob, uncovering the fill it rides on.
+                groove
+                    .opacity(isLogged ? 0 : 1)
                     .padding(.leading, p * maxX)
 
+                // Pressed into the groove: shadowed along the top of each
+                // letter, lit along the bottom.
                 Text("Slide to log")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
+                    .foregroundStyle(.white.opacity(0.5).shadow(.inner(color: .black.opacity(0.55), radius: 0.5, y: 1)))
+                    .shadow(color: .white.opacity(0.1), radius: 0, y: 0.75)
+                    .opacity(max(0, 1 - p * 2))
                     .padding(.leading, Self.knobSize * 0.6)
                     .frame(maxWidth: .infinity)
                     .allowsHitTesting(false)
@@ -70,35 +74,71 @@ struct SlideToLogTrack: View {
         .onChange(of: isLogged) { isArmed = false }
     }
 
-    private func knob(progress p: CGFloat) -> some View {
-        let stroke = StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round)
-        return Circle()
-            .fill(LinearGradient(
-                colors: [accent.mix(with: .white, by: 0.18), accent],
-                startPoint: .top,
-                endPoint: .bottom
-            ))
-            .opacity(isLogged ? 0 : 1)
+    /// Sunk into the tile: shade under the top edge, a lit bottom lip.
+    private var groove: some View {
+        Capsule()
+            .fill(Color.white.opacity(0.07).shadow(.inner(color: .black.opacity(0.4), radius: 3, y: 1.5)))
             .overlay {
-                ZStack {
-                    Glyph.chevron
-                        .stroke(.white, style: stroke)
-                        .opacity(1 - Self.ramp(p, from: 0.04, to: 0.2))
-                    Glyph.check
-                        .trim(from: 0, to: Self.ramp(p, from: 0.2, to: armRatio))
-                        .stroke(.white, style: stroke)
-                }
-                .frame(width: 16, height: 16)
+                Capsule().strokeBorder(
+                    LinearGradient(colors: [.black.opacity(0.2), .white.opacity(0.12)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.75
+                )
             }
-            .shadow(
-                color: .black.opacity(isLogged ? 0 : isHeld ? 0.32 : 0.2),
-                radius: isHeld ? 7 : 2,
-                y: isHeld ? 4 : 1
+    }
+
+    /// A domed button lit from above: a rim lighter on top and deeper below,
+    /// a thin highlight ring inside it, a specular on the crown, and a glow
+    /// of its own color where it sits. Everything but the glyph melts away
+    /// once logged, so Done keeps only the check.
+    private func knob(progress p: CGFloat) -> some View {
+        let size = Self.knobSize
+        let stroke = StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round)
+        return ZStack {
+            Circle().fill(RadialGradient(
+                colors: [accent.mix(with: .white, by: 0.2), accent, accent.mix(with: .black, by: 0.12)],
+                center: UnitPoint(x: 0.5, y: 0.28),
+                startRadius: 0,
+                endRadius: size * 0.7
+            ))
+            Ellipse()
+                .fill(LinearGradient(colors: [.white.opacity(isHeld ? 0.34 : 0.26), .white.opacity(0)], startPoint: .top, endPoint: .bottom))
+                .frame(width: size * 0.6, height: size * 0.32)
+                .blur(radius: 0.6)
+                .offset(y: -size * 0.24)
+            Circle()
+                .strokeBorder(
+                    LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.04), .white.opacity(0.24)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1
+                )
+                .padding(1.5)
+            Circle().strokeBorder(
+                LinearGradient(colors: [accent.mix(with: .white, by: 0.35), accent.mix(with: .black, by: 0.4)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                lineWidth: 1.5
             )
-            .frame(width: Self.knobSize, height: Self.knobSize)
-            .scaleEffect(isHeld ? (isArmed ? 1.12 : 1.06) : 1)
-            .motion(AppMotion.snap, value: isHeld)
-            .motion(AppMotion.snap, value: isArmed)
+        }
+        .opacity(isLogged ? 0 : 1)
+        .overlay {
+            ZStack {
+                Glyph.chevron
+                    .stroke(.white, style: stroke)
+                    .opacity(1 - Self.ramp(p, from: 0.04, to: 0.2))
+                Glyph.check
+                    .trim(from: 0, to: Self.ramp(p, from: 0.2, to: armRatio))
+                    .stroke(.white, style: stroke)
+            }
+            .frame(width: 16, height: 16)
+            .shadow(color: accent.mix(with: .black, by: 0.6).opacity(0.7), radius: 0.5, y: 0.75)
+        }
+        .shadow(color: .black.opacity(isLogged ? 0 : 0.3), radius: 1, y: 1)
+        .shadow(
+            color: accent.opacity(isLogged ? 0 : isHeld ? 0.6 : 0.4),
+            radius: isHeld ? 12 : 7,
+            y: isHeld ? 6 : 3
+        )
+        .frame(width: size, height: size)
+        .scaleEffect(isHeld ? (isArmed ? 1.12 : 1.06) : 1)
+        .motion(AppMotion.snap, value: isHeld)
+        .motion(AppMotion.snap, value: isArmed)
     }
 
     /// 0 before `from`, 1 after `to`, eased between: the chevron is gone
