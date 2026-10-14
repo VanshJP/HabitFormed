@@ -50,11 +50,11 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         if response.actionIdentifier == NotificationService.logAction,
            let raw = response.notification.request.content.userInfo[NotificationService.habitIDKey] as? String,
            let habitID = UUID(uuidString: raw) {
-            // The handler runs after the save, so iOS keeps the app awake
-            // long enough to write the log.
+            // The handler runs after the log and the reminder rebuild, so iOS
+            // keeps the app awake long enough for both.
             Task { @MainActor in
                 if let container = self.modelContainer {
-                    HabitLifecycle.logToday(habitID: habitID, in: container.mainContext)
+                    await HabitLifecycle.logToday(habitID: habitID, in: container.mainContext)
                 }
                 completionHandler()
             }

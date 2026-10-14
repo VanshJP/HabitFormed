@@ -13,18 +13,24 @@ struct TodayLog {
 /// Steps that have to happen in order: logging from outside the grid and
 /// teardown when a habit goes away.
 enum HabitLifecycle {
-    /// Logs today for one habit, the way a slide on its tile does, and
-    /// refreshes the widget. Shared by a reminder's "Log it" and Siri.
+    /// Logs today for one habit, the way a slide on its tile does, then
+    /// refreshes the widget and reminders. Shared by a reminder's "Log it"
+    /// and Siri, which usually run with no window open, so Today's own
+    /// resync would not quiet a reminder still due later today.
     @discardableResult
-    static func logToday(habitID: UUID, in context: ModelContext) -> TodayLog? {
+    static func logToday(habitID: UUID, in context: ModelContext) async -> TodayLog? {
         let all = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)])
         guard let habits = try? context.fetch(all),
               let habit = habits.first(where: { $0.id == habitID }) else { return nil }
         let wasLogged = habit.log(on: Date(), in: context) != nil
-        if wasLogged { WidgetSync.refresh(habits: habits, in: context) }
+        if wasLogged {
+            WidgetSync.refresh(habits: habits, in: context)
+            // ponytail: a fresh service, not the app's; a rebuild removes and
+            // re-adds every reminder by id, so racing the app's own sync is harmless.
+            await NotificationService().syncReminders(for: habits)
+        }
         return TodayLog(habit: habit, wasLogged: wasLogged, habits: habits)
     }
-
 
     static func delete(
         _ habit: Habit,

@@ -28,7 +28,7 @@ struct LogHabitTodayIntent: AppIntent {
             return .result(dialog: "\(match.title) logs itself from Apple Health.")
         }
 
-        guard let log = HabitLifecycle.logToday(habitID: habit.id, in: context) else {
+        guard let log = await HabitLifecycle.logToday(habitID: habit.id, in: context) else {
             return .result(dialog: "That habit is gone.")
         }
         let title = log.habit.title
