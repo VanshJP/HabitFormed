@@ -3,7 +3,8 @@ import SwiftUI
 /// One habit as a compact row for Today's Rows layout: glyph, name and status
 /// line, with the way to log at the trailing end (the slide, a timer, a
 /// health reading, or a past day's toggle). Same gestures as a tile: tap
-/// opens the habit, slide logs, long press opens the shared menu.
+/// opens the habit, slide logs, long press opens the shared menu. Done fills
+/// the row with the habit's color, from the knob when it is slid.
 struct HabitRowView: View {
     let habit: Habit
     /// The day the list is showing. Equals today in normal use.
@@ -19,6 +20,11 @@ struct HabitRowView: View {
     /// Wide enough for "Slide to log" beside the knob.
     private let trailingWidth: CGFloat = 136
 
+    /// The slide knob's place, 0...1. Manual habits on today fill from it.
+    @State private var slide: CGFloat = 0
+    /// The fill for everything without a slide: health, timers, past days.
+    @State private var doneFill: CGFloat = 0
+
     private var isDone: Bool {
         if habit.frequency == .weekly {
             return !habit.completionsInWeek(of: selectedDate).isEmpty
@@ -31,7 +37,7 @@ struct HabitRowView: View {
         let _ = dayTracker.today
 
         return HStack(spacing: 12) {
-            IconChip(icon: habit.symbol, tint: habit.color, size: 26)
+            IconChip(icon: habit.symbol, tint: isFilled ? .white : habit.color, size: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(habit.title)
                     .font(.subheadline.weight(.semibold))
@@ -48,6 +54,7 @@ struct HabitRowView: View {
         .padding(.trailing, 10)
         .padding(.vertical, 10)
         .opacity(habit.restingDaysLeft == nil || isPastDay ? 1 : 0.6)
+        .background { completionFill }
         .glassCard(
             cornerRadius: AppLayout.tileRadius,
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
@@ -60,6 +67,37 @@ struct HabitRowView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(habit.title), \(isDone ? "done" : "not done")")
         .accessibilityHint("Opens history. Long press for options.")
+        .onAppear { syncFill(fillState, animation: nil) }
+        .onChange(of: fillState) { old, new in
+            // A log or an undo plays; moving to another day just shows it.
+            syncFill(new, animation: old.day == new.day ? AppMotion.settle : nil)
+        }
+    }
+
+    // MARK: - Fill
+
+    /// True when the slide is the trailing control, so the fill follows the knob.
+    private var fillsFromSlide: Bool {
+        !isPastDay && habit.trackKind == .manual && habit.restingDaysLeft == nil
+    }
+
+    private var isFilled: Bool {
+        fillsFromSlide ? habit.isCompletedToday : isDone
+    }
+
+    private var completionFill: some View {
+        CompletionFill(color: habit.color, amount: fillsFromSlide ? slide : doneFill)
+    }
+
+    private var fillState: CompletionFill.Key {
+        CompletionFill.Key(day: selectedDate.startOfDay, done: isDone, doneToday: habit.isCompletedToday)
+    }
+
+    private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
+        withAnimation(animation) {
+            slide = state.doneToday ? 1 : 0
+            doneFill = state.done ? 1 : 0
+        }
     }
 
     // MARK: - Trailing
@@ -80,7 +118,7 @@ struct HabitRowView: View {
                         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                         .background(Capsule().fill(Color.white.opacity(0.06)))
                 } else {
-                    SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
+                    SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide) {
                         actions.log()
                     }
                 }
@@ -95,7 +133,7 @@ struct HabitRowView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                 .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
-                .background(Capsule().fill(logged ? habit.color.opacity(0.28) : Color.white.opacity(0.08)))
+                .background(Capsule().fill(Color.white.opacity(logged ? 0.18 : 0.08)))
                 .contentShape(Capsule())
         }
         .buttonStyle(GlassPressStyle())

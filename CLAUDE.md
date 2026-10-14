@@ -58,7 +58,7 @@ the one sanctioned `pbxproj` edit for files.
 ```
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
-├── ContentView.swift         # Today tab: month control, week strip, open habits, Done shelf, undo toast
+├── ContentView.swift         # Today tab: month control, week strip, the habits, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
 │                             #   renderer, share, Messages
@@ -67,7 +67,7 @@ Habit Formed/
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
 └── Views/
     ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, StatTile, PageTitle, ...)
-    ├── Today/                # WeekStrip, TodayHabitList, DoneShelf, DateBrowserSheet, ArrangeHabitsSheet
+    ├── Today/                # WeekStrip, TodayHabitList, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
     ├── History/              # ConsistencyHeatMap
     ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
@@ -81,6 +81,7 @@ Habit Formed/
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
     ├── HistoryView.swift     # Overview (stats, 12-week map, streaks) and Log (days with Share)
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
+    ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
 
 Habit Formed Widget/          # Widget extension (see the membership note above)
@@ -111,13 +112,10 @@ the header):
   titled "Habits" for today or the browsed day's name, with the day's count
   beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
   while browsing another day). Progress is said once, in that header.
-  The section lists the habits still open, as tiles or rows
-  (`TodayLayout`, picked in Settings). Today, logged habits step out onto
-  the **Done shelf** under it (`DoneShelf`, one chip each); a habit logged
-  by slide lingers about a second first so its glow plays. Once today is
-  perfect, one "Everything is logged today." line sits above whatever is
-  still optional (a weekly habit's free day, a resting interval). A past day
-  keeps every habit in place, since its tiles are for fixing logs.
+  The section lists every habit, as tiles or rows (`TodayLayout`, picked
+  in Settings), and each stays in place: **done is the tile or row filled
+  with its habit's color** (`CompletionFill`), so a finished day is a grid
+  of filled squares and needs no other line to say so.
 - **History**: `HistoryView`, opening on a `SectionPicker`. Overview has
   one stats strip, a 12-week consistency map and per-habit streak rows (tap
   opens the detail sheet); Log is day by day, each day header carrying a
@@ -127,8 +125,7 @@ The rule across screens: say each fact once, keep captions for what is not
 obvious, paint only the selected choice in a grid, and prefer one line of
 text over another card.
 
-Each habit tile responds to three gestures, and so do rows and done chips
-(which have no slide). They all take one `HabitActions` and share
+Each habit tile responds to three gestures, and so do rows. They all take one `HabitActions` and share
 `HabitContextMenu`; keep it that way for new surfaces:
 
 | Gesture                  | Action                                |
@@ -137,12 +134,18 @@ Each habit tile responds to three gestures, and so do rows and done chips
 | **Slide knob right**     | Log today in place (`SlideToLogTrack`) |
 | **Long-press**           | `contextMenu`: Log / Undo today, Start timer, Edit, Arrange, Delete |
 
-The slide-to-log knob mirrors iOS's slide-to-answer: past ~75% it arms (a
-tick, a check on the knob, "Release") and letting go logs; release earlier
-to cancel, and a flick from halfway logs too. The track is 44pt tall. Once
-logged the trail fills it and it settles into a "Logged" pill. Every log
-from the grid shows an `UndoToast` for four seconds; the log that finishes
-a perfect day turns it into "Perfect day" with a "Send report" button for
+The slide-to-log knob mirrors iOS's slide-to-answer. As it travels, the
+tile fills with the habit's color from the leading edge (the edge stays
+about under the knob), the chevron fades and a check draws itself in; at
+~75% the check is whole and it arms (a tick and a small pop), and letting
+go logs. Release earlier to cancel; a flick from halfway logs too. The
+surface owns the knob's `progress`, so an undo plays it all backwards. The
+track is 44pt tall and its channel is the knob's height, so there is no
+rim. Light comes from above: the knob is the one raised thing, with a
+contact shadow at rest and a deeper one while held. Done, the channel and
+the knob melt into the fill and only the white check stays. Every log from
+the grid shows an `UndoToast` for four seconds; the log that finishes a
+perfect day turns it into "Perfect day" with a "Send report" button for
 six.
 
 Logs from Today chime through `ContentView.logToday`, a pentatonic step
@@ -259,9 +262,10 @@ The design system is SpeakUp's; when in doubt, match
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
   (card 20 / 16, tile 16 / 12, well 12).
 - **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
-  (`AppColors.identityTint`) and 0.10 when featured or done
-  (`featuredTint`). A habit's glyph uses `color.glyphTone` (lifted toward
-  white). Habit colors come from `AppColors.tilePalette`.
+  (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
+  one solid use of a habit's color is Today's done fill, with the glyph
+  turning white on it. A habit's glyph otherwise uses `color.glyphTone`
+  (lifted toward white). Habit colors come from `AppColors.tilePalette`.
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);
   words-only buttons use `.buttonStyle(.textLink)`. Selected chips and

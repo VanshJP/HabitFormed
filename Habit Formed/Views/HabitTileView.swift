@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// One habit on the Today grid: its glyph, name and one status line, over a
-/// bottom row that depends on how it is tracked:
+/// bottom row that depends on how it is tracked. Done is the tile filled with
+/// the habit's color; a slide fills it from the knob as it moves.
 /// - Manual: the slide-to-log track
 /// - HealthKit: today's reading against the target, with a meter
 /// - Timer: the week's dots and a play capsule
@@ -21,9 +22,10 @@ struct HabitTileView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
 
-    // Drives the radial reveal of `completionGlow`: 0 is empty, 1 bathes the
-    // tile. Swept from the slide knob when the user logs by slide.
-    @State private var sweepProgress: CGFloat = 0
+    /// The slide knob's place, 0...1. Manual habits on today fill from it.
+    @State private var slide: CGFloat = 0
+    /// The fill for everything without a slide: health, timers, past days.
+    @State private var doneFill: CGFloat = 0
     @State private var showStopConfirm = false
 
     private let padding = AppLayout.tilePadding
@@ -42,7 +44,7 @@ struct HabitTileView: View {
         let _ = dayTracker.today
 
         return ZStack(alignment: .topLeading) {
-            completionGlow
+            completionFill
             content
                 // A resting interval habit recedes so it reads as "sitting out
                 // today" yet stays discoverable.
@@ -71,13 +73,10 @@ struct HabitTileView: View {
         } message: {
             Text("This session won't be logged.")
         }
-        .onAppear { sweepProgress = effectiveCompleted ? 1 : 0 }
-        .onChange(of: effectiveCompleted) { _, isLogged in
-            if isLogged, habit.trackKind == .manual, !isPastDay {
-                withAnimation(.easeOut(duration: 0.5)) { sweepProgress = 1 }
-            } else {
-                sweepProgress = isLogged ? 1 : 0
-            }
+        .onAppear { syncFill(fillState, animation: nil) }
+        .onChange(of: fillState) { old, new in
+            // A log or an undo plays; moving to another day just shows it.
+            syncFill(new, animation: old.day == new.day ? AppMotion.settle : nil)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel)
@@ -104,37 +103,37 @@ struct HabitTileView: View {
         .padding(padding)
     }
 
-    // Always present so a circular mask driven by `sweepProgress` can animate
-    // it in. For manual habits the reveal sweeps from the slide knob's resting
-    // end (bottom trailing); for health and timer habits it snaps in.
-    private var completionGlow: some View {
-        GeometryReader { proxy in
-            let w = proxy.size.width
-            let h = proxy.size.height
-            let half = SlideToLogTrack.trackHeight / 2
-            let origin = CGPoint(x: w - padding - half, y: h - padding - half)
-            let maxRadius = hypot(origin.x, origin.y)
+    // MARK: - Fill
 
-            RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [habit.color.opacity(0.30), habit.color.opacity(0.06)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .mask(
-                    Circle()
-                        .frame(width: maxRadius * 2 * sweepProgress, height: maxRadius * 2 * sweepProgress)
-                        .position(origin)
-                )
+    /// True when the slide is the bottom row, so the fill follows the knob.
+    private var fillsFromSlide: Bool {
+        !isPastDay && habit.trackKind == .manual && intervalRestingDays == nil
+    }
+
+    private var isFilled: Bool {
+        fillsFromSlide ? habit.isCompletedToday : effectiveCompleted
+    }
+
+    private var completionFill: some View {
+        CompletionFill(color: habit.color, amount: fillsFromSlide ? slide : doneFill)
+    }
+
+    private var fillState: CompletionFill.Key {
+        CompletionFill.Key(day: selectedDate.startOfDay, done: effectiveCompleted, doneToday: habit.isCompletedToday)
+    }
+
+    private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
+        withAnimation(animation) {
+            slide = state.doneToday ? 1 : 0
+            doneFill = state.done ? 1 : 0
         }
-        .allowsHitTesting(false)
     }
 
     // MARK: - Header
 
     private var topRow: some View {
         HStack(alignment: .top) {
-            IconChip(icon: habit.symbol, tint: habit.color, size: 30)
+            IconChip(icon: habit.symbol, tint: isFilled ? .white : habit.color, size: 30)
             Spacer()
             statusBadge
         }
@@ -147,7 +146,7 @@ struct HabitTileView: View {
         if effectiveCompleted && habit.trackKind == .health && !isPastDay {
             Image(systemName: "checkmark.circle.fill")
                 .font(.body)
-                .foregroundStyle(habit.color.glyphTone)
+                .foregroundStyle(.white)
         }
     }
 
@@ -180,7 +179,7 @@ struct HabitTileView: View {
             .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
             .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
             .background(
-                Capsule().fill(logged ? habit.color.opacity(0.28) : Color.white.opacity(0.08))
+                Capsule().fill(Color.white.opacity(logged ? 0.18 : 0.08))
             )
             .contentShape(Capsule())
         }
@@ -278,7 +277,7 @@ struct HabitTileView: View {
         if let remaining = intervalRestingDays {
             intervalRestingPill(days: remaining)
         } else {
-            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday) {
+            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide) {
                 actions.log()
             }
         }
