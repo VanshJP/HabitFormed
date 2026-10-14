@@ -15,8 +15,8 @@ enum OnDeviceModel {
         let session = LanguageModelSession(instructions: instructions)
         guard let reply = try? await session.respond(to: prompt).content else { return nil }
         let text = reply
-            .replacingOccurrences(of: " — ", with: ", ")
-            .replacingOccurrences(of: "—", with: ", ")
+            .replacingOccurrences(of: " \u{2014} ", with: ", ")
+            .replacingOccurrences(of: "\u{2014}", with: ", ")
             .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"")))
         return text.isEmpty ? nil : text
     }
