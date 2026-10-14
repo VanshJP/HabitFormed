@@ -44,44 +44,42 @@ struct HabitTileView: View {
         // Re-render at midnight so today-driven state updates.
         let _ = dayTracker.today
 
-        return ZStack(alignment: .topLeading) {
-            completionFill
-            content
-                // A resting interval habit recedes so it reads as "sitting out
-                // today" yet stays discoverable.
-                .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
-        }
-        .frame(minHeight: 152)
-        .glassCard(
-            cornerRadius: AppLayout.tileRadius,
-            tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
-        )
-        .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
-        .onTapGesture { Haptics.light(); actions.open() }
-        .contextMenu {
-            HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
-        }
-        .confirmationDialog(
-            "Stop the timer for \(habit.title)?",
-            isPresented: $showStopConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Stop", role: .destructive) {
-                Haptics.warning()
-                timerCenter.stop()
+        return content
+            // A resting interval habit recedes so it reads as "sitting out
+            // today" yet stays discoverable.
+            .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
+            .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
+            .completionFill(habit.color, amount: fillsFromSlide ? slide : doneFill)
+            .glassCard(
+                cornerRadius: AppLayout.tileRadius,
+                tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
+            )
+            .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
+            .onTapGesture { Haptics.light(); actions.open() }
+            .contextMenu {
+                HabitContextMenu(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions, timerCenter: timerCenter)
             }
-            Button("Keep going", role: .cancel) {}
-        } message: {
-            Text("This session won't be logged.")
-        }
-        .onAppear { syncFill(fillState, animation: nil) }
-        .onChange(of: fillState) { old, new in
-            // A log or an undo plays; moving to another day just shows it.
-            syncFill(new, animation: old.day == new.day ? AppMotion.settle : nil)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Opens history. Long press for options.")
+            .confirmationDialog(
+                "Stop the timer for \(habit.title)?",
+                isPresented: $showStopConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Stop", role: .destructive) {
+                    Haptics.warning()
+                    timerCenter.stop()
+                }
+                Button("Keep going", role: .cancel) {}
+            } message: {
+                Text("This session won't be logged.")
+            }
+            .onAppear { syncFill(fillState, animation: nil) }
+            .onChange(of: fillState) { old, new in
+                // A log or an undo plays; moving to another day just shows it.
+                syncFill(new, animation: old.day == new.day ? AppMotion.settle : nil)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint("Opens history. Long press for options.")
     }
 
     // MARK: - Layout
@@ -113,10 +111,6 @@ struct HabitTileView: View {
 
     private var isFilled: Bool {
         fillsFromSlide ? habit.isCompletedToday : effectiveCompleted
-    }
-
-    private var completionFill: some View {
-        CompletionFill(color: habit.color, amount: fillsFromSlide ? slide : doneFill)
     }
 
     private var fillState: CompletionFill.Key {

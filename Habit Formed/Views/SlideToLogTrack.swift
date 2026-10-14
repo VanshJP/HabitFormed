@@ -8,9 +8,10 @@ import SwiftUI
 /// Once logged the channel goes and the knob melts into the filled square,
 /// leaving only its check. 44pt tall so the knob meets the hit target.
 ///
-/// `progress` is owned by the surface the track sits on, which fills with
-/// the habit's color as the knob moves (see `CompletionFill`), and sets it
-/// back to 0 or 1 when the log is undone or made elsewhere.
+/// `progress` is owned by the surface the track sits on, whose fill pours
+/// out of the knob as it moves (see `CompletionFill`, which finds the track
+/// through `BoundsKey`), and sets it back to 0 or 1 when the log is undone
+/// or made elsewhere.
 struct SlideToLogTrack: View {
     let accent: Color
     let isLogged: Bool
@@ -20,9 +21,9 @@ struct SlideToLogTrack: View {
     @State private var isArmed = false
     @GestureState private var isHeld = false
 
-    static let trackHeight: CGFloat = 44
-    static let knobSize: CGFloat = 36
-    static let inset: CGFloat = (trackHeight - knobSize) / 2
+    nonisolated static let trackHeight: CGFloat = 44
+    nonisolated static let knobSize: CGFloat = 36
+    nonisolated static let inset: CGFloat = (trackHeight - knobSize) / 2
     private let armRatio: CGFloat = 0.75
     /// Disarms a little below the arm point, so a thumb resting on the line
     /// does not tick on and off.
@@ -35,12 +36,8 @@ struct SlideToLogTrack: View {
             let p = min(max(progress, 0), 1)
 
             ZStack(alignment: .leading) {
-                // The knob's own height, so the knob is its left end rather
-                // than sitting in a lighter rim.
                 Capsule()
                     .fill(Color.white.opacity(isLogged ? 0 : 0.08))
-                    .frame(height: Self.knobSize)
-                    .padding(.horizontal, Self.inset)
 
                 Text("Slide to log")
                     .font(.caption.weight(.semibold))
@@ -57,6 +54,7 @@ struct SlideToLogTrack: View {
             .motion(AppMotion.settle, value: isLogged)
         }
         .frame(height: Self.trackHeight)
+        .anchorPreference(key: BoundsKey.self, value: .bounds) { $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isLogged ? "Logged today" : "Slide to log")
         .accessibilityAddTraits(isLogged ? [] : .isButton)
@@ -135,6 +133,23 @@ struct SlideToLogTrack: View {
                 }
                 isArmed = false
             }
+    }
+}
+
+extension SlideToLogTrack {
+    /// The track's bounds, read by the surface's fill to find the knob.
+    nonisolated struct BoundsKey: PreferenceKey {
+        static var defaultValue: Anchor<CGRect>? { nil }
+
+        static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+            value = value ?? nextValue()
+        }
+    }
+
+    /// Where the knob's center sits in `track` at `progress`.
+    nonisolated static func knobCenter(in track: CGRect, progress: CGFloat) -> CGPoint {
+        let travel = max(track.width - knobSize - inset * 2, 0)
+        return CGPoint(x: track.minX + inset + knobSize / 2 + progress * travel, y: track.midY)
     }
 }
 

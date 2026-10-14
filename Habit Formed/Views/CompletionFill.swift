@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// A habit's surface filling with its color, which is how Today shows done:
-/// the color runs in from the leading edge until the shape is a filled
-/// square. While the slide knob moves, `amount` is its progress, so in a
-/// tile the edge travels just under the thumb. 0 is empty, 1 is filled.
+/// A habit's surface filling with its color, which is how Today shows done.
+/// The color pours out of the slide knob: a circle centred on it that grows
+/// as the knob travels and reaches the farthest corner as it arrives, so the
+/// thumb is always where the color comes from. Without a knob (health,
+/// timers, past days) it grows from the bottom trailing corner, where those
+/// controls sit. 0 is empty, 1 is filled.
 struct CompletionFill: View {
     let color: Color
     let amount: CGFloat
+    /// The slide track's bounds in the fill's space, when there is one.
+    var track: CGRect?
     var cornerRadius: CGFloat = AppLayout.tileRadius
 
     var body: some View {
@@ -16,11 +20,7 @@ struct CompletionFill: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ))
-            .mask(alignment: .leading) {
-                GeometryReader { proxy in
-                    Rectangle().frame(width: proxy.size.width * min(max(amount, 0), 1))
-                }
-            }
+            .mask { Bloom(amount: amount, track: track) }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -34,5 +34,44 @@ extension CompletionFill {
         let day: Date
         let done: Bool
         let doneToday: Bool
+    }
+}
+
+extension View {
+    /// Fills this surface with `color` by `amount`, pouring out of the slide
+    /// knob inside it when there is one.
+    func completionFill(_ color: Color, amount: CGFloat) -> some View {
+        backgroundPreferenceValue(SlideToLogTrack.BoundsKey.self) { anchor in
+            GeometryReader { proxy in
+                CompletionFill(color: color, amount: amount, track: anchor.map { proxy[$0] })
+            }
+        }
+    }
+}
+
+/// The circle the color fills, animatable by `amount` so an undo shrinks it
+/// back into the knob as the knob slides home.
+private struct Bloom: Shape {
+    var amount: CGFloat
+    let track: CGRect?
+
+    var animatableData: CGFloat {
+        get { amount }
+        set { amount = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let a = min(max(amount, 0), 1)
+        guard a > 0 else { return Path() }
+        let center = track.map { SlideToLogTrack.knobCenter(in: $0, progress: a) }
+            ?? CGPoint(x: rect.maxX - 22, y: rect.maxY - 22)
+        let corners = [
+            CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+            CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY),
+        ]
+        let reach = corners.map { hypot($0.x - center.x, $0.y - center.y) }.max() ?? 0
+        let start = SlideToLogTrack.knobSize / 2
+        let radius = start + (reach - start) * a
+        return Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
     }
 }
