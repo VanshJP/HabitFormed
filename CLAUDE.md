@@ -141,7 +141,8 @@ draws itself in; at
 ~75% the check is whole and it arms (a tick and a small pop), and letting
 go logs. Release earlier to cancel; a flick from halfway logs too. The
 surface owns the knob's `progress`, so an undo plays it all backwards. The
-track is 44pt tall with the 36pt knob inset in it. Light comes from above: the knob is the one raised thing, with a
+track is 44pt tall with the 36pt knob inset in it; its gray pill is what
+is left to slide, shrinking behind the knob over the fill. Light comes from above: the knob is the one raised thing, with a
 contact shadow at rest and a deeper one while held. Done, the channel and
 the knob melt into the fill and only the white check stays. Every log from
 the grid shows an `UndoToast` for four seconds; the log that finishes a

@@ -36,8 +36,11 @@ struct SlideToLogTrack: View {
             let p = min(max(progress, 0), 1)
 
             ZStack(alignment: .leading) {
+                // The pill is what is left to slide: it shrinks behind the
+                // knob, uncovering the fill it rides on.
                 Capsule()
                     .fill(Color.white.opacity(isLogged ? 0 : 0.08))
+                    .padding(.leading, p * maxX)
 
                 Text("Slide to log")
                     .font(.caption.weight(.semibold))
