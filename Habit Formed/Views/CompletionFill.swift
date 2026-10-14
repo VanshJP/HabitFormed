@@ -8,7 +8,9 @@ import SwiftUI
 /// controls sit. 0 is empty, 1 is filled.
 struct CompletionFill: View {
     let color: Color
-    let amount: CGFloat
+    /// Read only in this body, so a drag redraws the fill alone, not the
+    /// tile that owns the state.
+    @Binding var amount: CGFloat
     /// The slide track's bounds in the fill's space, when there is one.
     var track: CGRect?
     var cornerRadius: CGFloat = AppLayout.tileRadius
@@ -36,7 +38,7 @@ extension CompletionFill {
 extension View {
     /// Fills this surface with `color` by `amount`, pouring out of the slide
     /// knob inside it when there is one.
-    func completionFill(_ color: Color, amount: CGFloat) -> some View {
+    func completionFill(_ color: Color, amount: Binding<CGFloat>) -> some View {
         backgroundPreferenceValue(SlideToLogTrack.BoundsKey.self) { anchor in
             GeometryReader { proxy in
                 CompletionFill(color: color, amount: amount, track: anchor.map { proxy[$0] })

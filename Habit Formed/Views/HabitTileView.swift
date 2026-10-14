@@ -49,7 +49,7 @@ struct HabitTileView: View {
             // today" yet stays discoverable.
             .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
             .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
-            .completionFill(habit.color, amount: fillsFromSlide ? slide : doneFill)
+            .completionFill(habit.color, amount: fillsFromSlide ? $slide : $doneFill)
             .glassCard(
                 cornerRadius: AppLayout.tileRadius,
                 tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)

@@ -54,7 +54,7 @@ struct HabitRowView: View {
         .padding(.trailing, 10)
         .padding(.vertical, 10)
         .opacity(habit.restingDaysLeft == nil || isPastDay ? 1 : 0.6)
-        .completionFill(habit.color, amount: fillsFromSlide ? slide : doneFill)
+        .completionFill(habit.color, amount: fillsFromSlide ? $slide : $doneFill)
         .glassCard(
             cornerRadius: AppLayout.tileRadius,
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
