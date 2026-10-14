@@ -189,7 +189,9 @@ struct ContentView: View {
                 .readableColumn()
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .task(id: "\(undo.id)-\(undo.completesDay)") {
-                    try? await Task.sleep(for: .seconds(undo.completesDay ? 6 : 4))
+                    // Cancelled means the toast just became "Perfect day";
+                    // the task that replaced this one closes it.
+                    guard (try? await Task.sleep(for: .seconds(undo.completesDay ? 6 : 4))) != nil else { return }
                     if self.undo?.id == undo.id { self.undo = nil }
                 }
         }
