@@ -349,7 +349,16 @@ The design system is SpeakUp's; when in doubt, match
 6. **Tests:** there is no test target yet. If adding logic that benefits
    from tests (streak math, `DayLedger`, `ReminderTiming`, HealthKit value
    mapping), surface the suggestion to the user before
-   scaffolding a target.
+   scaffolding a target. The day math already has a check: run
+   `Scripts/check-day-math.sh` after touching `Date+Helpers` or
+   `DayLedger`; it compares them with brute-force versions across time
+   zones, including one where clocks change at midnight.
+7. **Performance:** round a date to its day (`startOfDay`) as little as
+   possible; each call is about a microsecond. Check many dates against
+   one day with `dayRange`, step days with `previousDayStart` /
+   `nextDayStart`, read `Habit.track` once per render and pass it down, and
+   keep drag-driven state out of a tile's body (read it in the child that
+   draws it, as `CompletionFill` does).
 
 ## Known gaps / future work
 
