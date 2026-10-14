@@ -67,7 +67,7 @@ Habit Formed/
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
 └── Views/
     ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, PageTitle, ...) and the
-│                             #   app's own flat ones: Panel, Chips (ChoiceChip, ToggleChip), SwatchRail
+│                             #   app's own: Panel, Chips (ChoiceChip, ToggleChip), SwatchRail
     ├── Today/                # WeekStrip, TodayHabitList, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often, reminder), asked as plain questions with chips
@@ -272,10 +272,13 @@ The design system is SpeakUp's; when in doubt, match
   (Liquid Glass). Never stack glass on glass: inside a card use
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
-  (card 20 / 16, tile 16 / 12, well 12). History, Settings and the report
-  sheets are flat: rows sit on a `Panel` (one faint fill, hairlines), not
-  glass, and nothing there has a shadow or gradient. Names: the daily card
-  is the "report", the weekly one the "recap".
+  (card 20 / 16, tile 16 / 12, well 12). Groups of rows (History,
+  Settings, the report and add sheets) sit on a `Panel`, one pane of glass
+  with hairlines. Chips use `controlChrome`, so a row of them on the canvas
+  is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
+  panel they are plates. The material is glass; nothing draws its own
+  bevel, gradient or glow. Names: the daily card is the "report", the
+  weekly one the "recap".
 - **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
   (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
   one solid use of a habit's color is Today's done fill, with the glyph

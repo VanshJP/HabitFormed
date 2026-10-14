@@ -14,10 +14,14 @@ struct HabitIdeas: View {
     var body: some View {
         GlassSection("Ideas") {
             if showAll {
-                FlowLayout(spacing: 8) { chips }
+                GlassEffectContainer(spacing: 8) {
+                    FlowLayout(spacing: 8) { chips }
+                }
             } else {
                 ScrollView(.horizontal) {
-                    HStack(spacing: 8) { chips }
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) { chips }
+                    }
                 }
                 .scrollIndicators(.hidden)
                 .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
@@ -177,10 +181,12 @@ struct HabitTrackSection: View {
     var body: some View {
         GlassSection("How do you log it?") {
             VStack(alignment: .leading, spacing: 10) {
-                FlowLayout(spacing: 8) {
-                    ForEach(HabitTrackKind.allCases) { kind in
-                        ChoiceChip(title: kind.label, icon: kind.symbol, isSelected: draft.kind == kind) {
-                            withAnimation(AppMotion.settle) { draft.setKind(kind) }
+                GlassEffectContainer(spacing: 8) {
+                    FlowLayout(spacing: 8) {
+                        ForEach(HabitTrackKind.allCases) { kind in
+                            ChoiceChip(title: kind.label, icon: kind.symbol, isSelected: draft.kind == kind) {
+                                withAnimation(AppMotion.settle) { draft.setKind(kind) }
+                            }
                         }
                     }
                 }
@@ -292,10 +298,12 @@ struct HabitScheduleSection: View {
     var body: some View {
         GlassSection("How often?") {
             VStack(alignment: .leading, spacing: 10) {
-                FlowLayout(spacing: 8) {
-                    ForEach(options) { frequency in
-                        ChoiceChip(title: frequency.shortLabel, isSelected: draft.frequency == frequency) {
-                            withAnimation(AppMotion.settle) { draft.setFrequency(frequency) }
+                GlassEffectContainer(spacing: 8) {
+                    FlowLayout(spacing: 8) {
+                        ForEach(options) { frequency in
+                            ChoiceChip(title: frequency.shortLabel, isSelected: draft.frequency == frequency) {
+                                withAnimation(AppMotion.settle) { draft.setFrequency(frequency) }
+                            }
                         }
                     }
                 }

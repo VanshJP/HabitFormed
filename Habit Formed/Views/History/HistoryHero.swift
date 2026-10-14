@@ -34,7 +34,7 @@ struct HistoryHero: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 36)
-                    .background(Capsule().fill(Color.white.opacity(0.1)))
+                    .controlChrome(in: Capsule())
                     .frame(minHeight: AppLayout.minHitTarget)
                     .contentShape(.rect)
             }

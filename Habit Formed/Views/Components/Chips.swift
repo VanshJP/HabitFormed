@@ -42,9 +42,11 @@ struct ToggleChip: View {
     }
 }
 
-/// Both chips' face, flat: solid white with ink when on, a faint tint with
-/// dimmed text when off. An off toggle dims its glyph too, unless
-/// `keepsTint`.
+/// Both chips' face: solid white with ink when on, `controlChrome` when off
+/// (interactive glass on the canvas, a plate inside a glass panel). The
+/// glass stays put and the white sits on it, so choosing never rebuilds
+/// the glass. An off toggle dims its glyph too, unless `keepsTint`. Put a
+/// row of chips on the canvas in a `GlassEffectContainer`.
 private struct ChipFace: View {
     let title: String
     let icon: String?
@@ -67,7 +69,8 @@ private struct ChipFace: View {
         .foregroundStyle(isOn ? AppColors.inkOnLight : Color.white.opacity(0.7))
         .padding(.horizontal, 14)
         .frame(minHeight: 34)
-        .background(Capsule().fill(isOn ? AppColors.solidWhite : Color.white.opacity(0.08)))
+        .background(Capsule().fill(isOn ? AppColors.solidWhite : .clear))
+        .controlChrome(in: Capsule())
         .frame(minHeight: AppLayout.minHitTarget)
         .contentShape(.rect)
         .motion(AppMotion.snap, value: isOn)

@@ -132,18 +132,20 @@ struct DailyReportSheet: View {
     /// extras. The preview above shows each one come and go.
     private var contentsSection: some View {
         GlassSection("On the card") {
-            VStack(alignment: .leading, spacing: 4) {
-                FlowLayout(spacing: 8) {
-                    ForEach(habits) { habit in
-                        ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
+            GlassEffectContainer(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    FlowLayout(spacing: 8) {
+                        ForEach(habits) { habit in
+                            ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
+                        }
                     }
-                }
-                FlowLayout(spacing: 8) {
-                    ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
-                    ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
-                    ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
-                    ToggleChip(title: "Calories", icon: "fork.knife", isOn: $showCalories)
-                    ToggleChip(title: "Activity", icon: "figure.walk", isOn: $showActivity)
+                    FlowLayout(spacing: 8) {
+                        ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
+                        ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
+                        ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
+                        ToggleChip(title: "Calories", icon: "fork.knife", isOn: $showCalories)
+                        ToggleChip(title: "Activity", icon: "figure.walk", isOn: $showActivity)
+                    }
                 }
             }
         }
