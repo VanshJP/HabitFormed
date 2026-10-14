@@ -53,7 +53,6 @@ final class HealthKitService {
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
     var hasRequestedAuthorization: Bool = false
-    var lastSyncDate: Date?
 
     /// Latest today-value per source (keyed by `HealthKitSource.rawValue`).
     /// Updated every sync; tiles read from here without extra queries.
@@ -266,6 +265,7 @@ final class HealthKitService {
 
         var fetchedDailySources = Set<String>()
         var fetchedWeeklySources = Set<String>()
+        var logged = false
 
         for habit in habits {
             let key = habit.source.rawValue
@@ -273,7 +273,9 @@ final class HealthKitService {
 
             if isWeekly {
                 if !fetchedWeeklySources.contains(key) {
-                    if let value = await weekValue(for: habit.source) {
+                    // Only a real change is written: every write redraws each
+                    // tile that reads these values.
+                    if let value = await weekValue(for: habit.source), liveWeeklyValues[key] != value {
                         liveWeeklyValues[key] = value
                     }
                     fetchedWeeklySources.insert(key)
@@ -282,9 +284,10 @@ final class HealthKitService {
                 guard value >= habit.targetValue else { continue }
                 guard !habit.isCompletedThisWeek else { continue }
                 context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
+                logged = true
             } else {
                 if !fetchedDailySources.contains(key) {
-                    if let value = await todayValue(for: habit.source) {
+                    if let value = await todayValue(for: habit.source), liveValues[key] != value {
                         liveValues[key] = value
                     }
                     fetchedDailySources.insert(key)
@@ -293,11 +296,11 @@ final class HealthKitService {
                 guard value >= habit.targetValue else { continue }
                 guard !habit.isCompletedToday else { continue }
                 context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
+                logged = true
             }
         }
 
-        try? context.save()
-        lastSyncDate = Date()
+        if logged { try? context.save() }
     }
 
     // MARK: - Live observers
@@ -306,7 +309,7 @@ final class HealthKitService {
     /// about. As soon as new samples land (e.g. iPhone records more steps),
     /// the observer fires and we re-run the sync, keeping tiles like the
     /// step challenge up-to-date in near real-time instead of waiting on
-    /// the 15s polling fallback.
+    /// the slow polling fallback.
     @MainActor
     func startObservingHealthKitHabits(in context: ModelContext) {
         guard isAvailable else { return }
@@ -338,9 +341,10 @@ final class HealthKitService {
         store.execute(query)
         activeObservers[key] = query
 
-        // Background delivery means the observer keeps firing even when the
-        // app is suspended, so the next foregrounding has fresh data ready.
-        store.enableBackgroundDelivery(for: sampleType, frequency: .immediate) { _, _ in }
+        // Background delivery keeps the observer firing while the app is
+        // suspended, so a goal reached in the background is logged by the
+        // next look. Hourly: immediate wakes the app on every Watch sync.
+        store.enableBackgroundDelivery(for: sampleType, frequency: .hourly) { _, _ in }
     }
 
     private func sampleType(for source: HealthKitSource) -> HKSampleType? {

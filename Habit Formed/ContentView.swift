@@ -229,8 +229,11 @@ struct ContentView: View {
                 try? await health.requestAuthorization(for: healthSources)
                 await health.syncHealthKitHabits(in: modelContext)
                 // HealthKit change notifications keep health tiles near
-                // real-time instead of waiting on the polling tick.
+                // real-time; the slow poll only catches what they miss.
                 health.startObservingHealthKitHabits(in: modelContext)
+                while (try? await Task.sleep(for: .seconds(300))) != nil {
+                    await health.syncHealthKitHabits(in: modelContext)
+                }
             }
             .onChange(of: reminderSignature) { _, _ in
                 Task { await notifications.syncReminders(for: habits) }
@@ -240,13 +243,6 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .habitLoggedFromWidget)) { _ in
                 WidgetSync.refresh(habits: habits, in: modelContext)
-            }
-            .task(id: "health-sync") {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(15))
-                    guard !Task.isCancelled else { break }
-                    await health.syncHealthKitHabits(in: modelContext)
-                }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
