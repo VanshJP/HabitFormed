@@ -78,4 +78,12 @@ nonisolated enum ReminderTiming {
         let rounded = Int((Double(early) / 5).rounded(.down)) * 5
         return ReminderTime(minuteOfDay: rounded)
     }
+
+    /// The report nudge for days that usually end at `minute` (the day's last
+    /// log): `leadMinutes` later, rounded up to five minutes.
+    static func reminder(afterTypical minute: Int) -> ReminderTime {
+        let late = minute + leadMinutes
+        let rounded = Int((Double(late) / 5).rounded(.up)) * 5
+        return ReminderTime(minuteOfDay: rounded)
+    }
 }

@@ -2,10 +2,12 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-/// The daily report: one card with everything on it. Pick a theme, switch off
-/// anything you'd rather not share, add a note if you like, then text it or
-/// share it. The card carries your name and the date, so a friend can forward
-/// it and it still makes sense.
+/// The daily report: one card with everything on it, in the look set ahead
+/// of time, so sending is the card, a note if you like, and Text it or Share.
+/// Edit opens the theme and what is on the card; whatever is picked there is
+/// the look next time too. Settings opens the same sheet as a preset
+/// (`isPreset`), with nothing to send. The card carries your name and the
+/// date, so a friend can forward it and it still makes sense.
 struct DailyReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(HealthKitService.self) private var health
@@ -23,7 +25,10 @@ struct DailyReportSheet: View {
     @AppStorage(AppPreferences.reportShowActivity) private var showActivity = false
 
     let day: Date
+    /// Opened from Settings to set the look: always editing, nothing to send.
+    let isPreset: Bool
 
+    @State private var isEditing = false
     @State private var note = ""
     @State private var eatenText = ""
     @State private var metrics: DayHealthMetrics = .empty
@@ -34,8 +39,9 @@ struct DailyReportSheet: View {
 
     private enum Field { case name, note, eaten }
 
-    init(day: Date) {
+    init(day: Date, isPreset: Bool = false) {
         self.day = day.startOfDay
+        self.isPreset = isPreset
     }
 
     // MARK: - Derived
@@ -76,6 +82,7 @@ struct DailyReportSheet: View {
     }
 
     private var title: String {
+        if isPreset { return "Report card" }
         if day.isToday { return "Today's report" }
         if day.isYesterday { return "Yesterday's report" }
         return day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
@@ -93,23 +100,35 @@ struct DailyReportSheet: View {
                     ReportPreview(width: ReportCardView.width) {
                         ReportCardView(report: report, options: options)
                     }
-                    ReportThemeRow(themeRaw: $themeRaw)
-                    contentsSection
-                    fields
+                    if isPreset || isEditing {
+                        ReportThemeRow(themeRaw: $themeRaw)
+                        contentsSection
+                    }
+                    if !isPreset {
+                        fields
+                    }
                 }
+                .motion(AppMotion.settle, value: isEditing)
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, AppLayout.pageBottom)
             }
             .scrollDismissesKeyboard(.interactively)
             .background { AppBackground(style: .subtle) }
             .safeAreaBar(edge: .bottom) {
-                ReportSendBar { ReportCardRenderer.render(report: report, options: options) }
+                if !isPreset {
+                    ReportSendBar { ReportCardRenderer.render(report: report, options: options) }
+                }
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(role: .close) { dismiss() }
+                }
+                if !isPreset {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ReportEditButton(isEditing: $isEditing)
+                    }
                 }
             }
         }

@@ -133,7 +133,9 @@ struct GlassSectionHeader<Accessory: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        // One baseline for the title, its fact and the accessory: a link's
+        // 44pt hit area would otherwise centre it a hair off the words.
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
                     .font(.headline.weight(.semibold))

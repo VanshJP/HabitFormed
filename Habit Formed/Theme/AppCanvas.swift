@@ -5,10 +5,17 @@ import SwiftUI
 /// The app-wide background menu: Settings → App look, painted behind every
 /// screen. A thin persisted list over the shared `CanvasLook` catalogue.
 ///
-/// Raw values are persisted (`AppPreferences.appCanvas`); do not reorder
-/// existing cases. Adding a look is one new case plus one line in `look`.
+/// Raw values are persisted (`AppPreferences.appCanvas`); never change an
+/// existing one. The rail follows declaration order. Adding a look is one new
+/// case plus one line in `look`.
 nonisolated enum AppCanvas: Int, CaseIterable, Identifiable, Sendable {
     case classic = 0
+    // The plain ones sit up front: the quiet choice should not need a scroll.
+    case black = 9
+    case graphite = 10
+    case navy = 11
+    case plum = 12
+    case forest = 13
     case midnight = 1
     case mist = 2
     case aurora = 3
@@ -31,6 +38,11 @@ nonisolated enum AppCanvas: Int, CaseIterable, Identifiable, Sendable {
         case .tide: return "Tide"
         case .dusk: return "Dusk"
         case .noir: return "Noir"
+        case .black: return "Black"
+        case .graphite: return "Graphite"
+        case .navy: return "Navy"
+        case .plum: return "Plum"
+        case .forest: return "Forest"
         }
     }
 
@@ -46,6 +58,11 @@ nonisolated enum AppCanvas: Int, CaseIterable, Identifiable, Sendable {
         case .tide: return .tide
         case .dusk: return .dusk
         case .noir: return .noir
+        case .black: return .black
+        case .graphite: return .graphite
+        case .navy: return .navy
+        case .plum: return .plum
+        case .forest: return .forest
         }
     }
 }

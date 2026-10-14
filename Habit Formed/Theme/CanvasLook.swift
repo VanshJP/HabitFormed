@@ -20,6 +20,11 @@ nonisolated enum CanvasLook: CaseIterable, Hashable, Sendable {
     case tide
     case dusk
     case noir
+    case black
+    case graphite
+    case navy
+    case plum
+    case forest
 
     var summary: String {
         switch self {
@@ -32,6 +37,11 @@ nonisolated enum CanvasLook: CaseIterable, Hashable, Sendable {
         case .tide: return "Ocean blue and teal rising from below"
         case .dusk: return "Soft amber light meeting cool teal"
         case .noir: return "Graphite black with one teal slash"
+        case .black: return "True black"
+        case .graphite: return "Plain dark gray"
+        case .navy: return "Plain deep navy"
+        case .plum: return "Plain deep plum"
+        case .forest: return "Plain deep green"
         }
     }
 }
@@ -75,6 +85,11 @@ extension CanvasLook {
         case .tide: paintTide(&g, f)
         case .dusk: paintDusk(&g, f)
         case .noir: paintNoir(&g, f)
+        case .black: paintPlain(&g, f, Color(red: 0, green: 0, blue: 0))
+        case .graphite: paintPlain(&g, f, Color(red: 0.115, green: 0.118, blue: 0.128))
+        case .navy: paintPlain(&g, f, Color(red: 0.070, green: 0.095, blue: 0.200))
+        case .plum: paintPlain(&g, f, Color(red: 0.140, green: 0.075, blue: 0.165))
+        case .forest: paintPlain(&g, f, Color(red: 0.050, green: 0.120, blue: 0.095))
         }
     }
 }
@@ -305,6 +320,14 @@ private func paintNoir(_ g: inout GraphicsContext, _ f: CanvasFrame) {
     g.blendMode = .normal
 
     canvasVignette(&g, f.size, strength: 0.40)
+}
+
+// MARK: Plain
+
+/// One flat colour with a hair of falloff toward the foot, for anyone who
+/// wants the screen quiet. No glow, so nothing competes with the habits.
+private func paintPlain(_ g: inout GraphicsContext, _ f: CanvasFrame, _ base: Color) {
+    canvasWash(&g, f.size, [base, base, base.mix(with: .black, by: 0.35)])
 }
 
 // MARK: - Shared tones

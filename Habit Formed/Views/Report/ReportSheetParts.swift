@@ -62,6 +62,22 @@ struct ReportThemeRow: View {
     }
 }
 
+// MARK: - Edit
+
+/// Opens and closes a sheet's look controls. The look is set ahead of time
+/// (Settings, Report card), so sending needs none of them.
+struct ReportEditButton: View {
+    @Binding var isEditing: Bool
+
+    var body: some View {
+        Button(isEditing ? "Done" : "Edit") {
+            Haptics.light()
+            isEditing.toggle()
+        }
+        .accessibilityLabel(isEditing ? "Done editing the card" : "Edit the card")
+    }
+}
+
 // MARK: - Send
 
 /// Text it and Share. The card goes alone, with no message typed under it,

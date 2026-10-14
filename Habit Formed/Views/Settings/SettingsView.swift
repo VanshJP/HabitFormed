@@ -21,6 +21,7 @@ struct SettingsView: View {
     private var habits: [Habit]
 
     @State private var showArrange = false
+    @State private var showReportCard = false
     @FocusState private var nameFocused: Bool
 
     var body: some View {
@@ -40,7 +41,15 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .restoresNavigationBar()
         .sheet(isPresented: $showArrange) { ArrangeHabitsSheet() }
-        .onChange(of: reminderOn) { _, _ in syncReminder() }
+        .sheet(isPresented: $showReportCard) { DailyReportSheet(day: Date(), isPreset: true) }
+        .onChange(of: reminderOn) { _, isOn in
+            // Turning it on lands it just after the day usually wraps up.
+            if isOn, let suggested = suggestedReminder {
+                reminderHour = suggested.hour
+                reminderMinute = suggested.minute
+            }
+            syncReminder()
+        }
         .onChange(of: reminderHour) { _, _ in syncReminder() }
         .onChange(of: reminderMinute) { _, _ in syncReminder() }
         .onChange(of: recapOn) { _, isOn in
@@ -53,13 +62,10 @@ struct SettingsView: View {
     private var todaySection: some View {
         GlassSection("Today") {
             Panel {
-                SettingsRow("Layout", icon: "square.grid.2x2") {
-                    ForEach(TodayLayout.allCases) { layout in
-                        ChoiceChip(title: layout.title, isSelected: layoutRaw == layout.rawValue) {
-                            layoutRaw = layout.rawValue
-                        }
-                    }
-                }
+                LayoutPicker(selection: Binding(
+                    get: { TodayLayout(rawValue: layoutRaw) ?? .tiles },
+                    set: { layoutRaw = $0.rawValue }
+                ))
                 Button {
                     Haptics.light()
                     showArrange = true
@@ -69,14 +75,14 @@ struct SettingsView: View {
                 .buttonStyle(RowPressStyle())
                 SettingsRow("Log sound", icon: "speaker.wave.2", isOn: $logSound)
                 // Voice commands are invisible until someone says the words.
-                SettingsRow("Siri", icon: "mic", caption: siriPhrases)
+                SettingsRow("Siri", icon: "mic", caption: siriPhrase)
             }
         }
     }
 
-    private var siriPhrases: String {
+    private var siriPhrase: String {
         let habit = habits.first(where: { $0.trackKind != .health })?.title ?? "Read"
-        return "Say “Log \(habit) in Habit Formed” or “What’s left in Habit Formed”"
+        return "Say “Log \(habit) in Habit Formed”"
     }
 
     // MARK: - Reports
@@ -92,7 +98,14 @@ struct SettingsView: View {
                         .focused($nameFocused)
                         .frame(maxWidth: 140)
                 }
-                SettingsRow("Daily reminder", icon: "bell", accessoryIsLabelled: true) {
+                Button {
+                    Haptics.light()
+                    showReportCard = true
+                } label: {
+                    SettingsRow("Report card", icon: "rectangle.portrait", trailing: .chevron)
+                }
+                .buttonStyle(RowPressStyle())
+                SettingsRow("Daily reminder", icon: "bell", caption: reminderCaption, accessoryIsLabelled: true) {
                     if reminderOn {
                         DatePicker("Reminder time", selection: reminderTime, displayedComponents: .hourAndMinute)
                             .labelsHidden()
@@ -124,6 +137,30 @@ struct SettingsView: View {
                 reminderMinute = parts.minute ?? 0
             }
         )
+    }
+
+    /// When the day's last log usually lands, from logs made on their own day.
+    /// Health logs are written by sync, so they say nothing about the day.
+    private var usualDayEnd: Int? {
+        var last: [Date: Date] = [:]
+        for habit in habits where habit.trackKind != .health {
+            for log in habit.completions ?? [] where log.loggedAt.isSameDay(as: log.date) {
+                last[log.date] = max(last[log.date] ?? log.loggedAt, log.loggedAt)
+            }
+        }
+        return ReminderTiming.typicalMinute(of: last.values.sorted(by: >))
+    }
+
+    private var suggestedReminder: ReminderTime? {
+        usualDayEnd.map { ReminderTiming.reminder(afterTypical: $0) }
+    }
+
+    /// Why the suggested time, while it is the time (or would be, once on).
+    private var reminderCaption: String? {
+        guard let suggested = suggestedReminder else { return nil }
+        let why = "\(ReminderTiming.leadMinutes) min after your usual last log"
+        guard reminderOn else { return "\(suggested.label), \(why)" }
+        return suggested == ReminderTime(hour: reminderHour, minute: reminderMinute) ? why : nil
     }
 
     private func syncReminder() {

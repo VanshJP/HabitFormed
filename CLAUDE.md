@@ -76,7 +76,7 @@ Habit Formed/
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
-    ├── Settings/             # SettingsView
+    ├── Settings/             # SettingsView, LayoutPicker (tiles and rows drawn as pictures)
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
     ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
@@ -132,10 +132,10 @@ the header):
   legend, per-habit streak rows (tap opens the detail sheet), and the days:
   each a `DayRow` (name, logged glyphs, "2 of 3") that opens in place to
   list its logs (long-press one to remove it) and a "Share report" row.
-- **Settings**: pushed from the gear. Today (layout, arrange, log sound,
-  the Siri phrases with one of your habits),
-  Reports (name on cards, daily reminder with its time, Sunday recap) and
-  Look (canvas rail, glass). No captions except where the words are the
+- **Settings**: pushed from the gear. Today (layout as two small pictures,
+  arrange, log sound, the Siri phrase with one of your habits), Reports
+  (name on cards, Report card, daily reminder with its time, Sunday recap)
+  and Look (canvas rail, plain ones first after Classic, and glass). No captions except where the words are the
   content (the Siri phrases); few-way choices are chips in their row.
 
 The rule across screens: say each fact once, keep captions for what is not
@@ -266,16 +266,24 @@ things out. No templates, layouts or placeholder tokens.
   on canvas or paper. The sheets show that view live, scaled to fit
   (`ReportPreview`), so a theme or switch shows at once;
   `ReportCardRenderer` draws the image at 3x only when it is sent.
-- `DailyReportSheet`: live preview, theme rail, "On the card" as
-  `ToggleChip`s (the habits, then Streaks, Habit notes, Last 7 days,
-  Calories, Activity), one panel of fields (name the first time, calories
-  eaten while Calories is on, this card's note), then Text it (`MessageComposer`, Messages with the image
-  attached) and Share (`SharePresenter`; Save and Copy live in the share
-  sheet). Both send the card alone, with no text typed under it. The card prints the reporter's name
+- The look is set ahead of time, so sending carries no choices: Settings →
+  Report card opens `DailyReportSheet(isPreset: true)` (live preview, theme
+  rail, "On the card" as `ToggleChip`s: the habits, then Streaks, Habit
+  notes, Last 7 days, Calories, Activity; nothing to send).
+- `DailyReportSheet` to send: live preview, one panel of fields (name the
+  first time, calories eaten while Calories is on, this card's note), then
+  Text it (`MessageComposer`, Messages with the image attached) and Share
+  (`SharePresenter`; Save and Copy live in the share sheet). Edit
+  (`ReportEditButton`, top trailing) opens the theme rail and "On the
+  card"; what is picked there is the preset too. The recap sheet's Edit
+  opens its theme. Both send the card alone, with no text typed under it. The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
 - An optional daily reminder (`report-reminder`) opens today's report.
+  Turning it on sets it 30 minutes after the day's usual last log
+  (`ReminderTiming.reminder(afterTypical:)`), with that reason as the
+  row's caption; the time stays the person's to change.
 
 ### Siri and Apple Intelligence
 
