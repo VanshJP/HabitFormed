@@ -142,6 +142,7 @@ struct GlassSectionHeader<Accessory: View>: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .contentTransition(.numericText())
+                        .motion(AppMotion.snap, value: detail)
                 }
             }
             Spacer()
@@ -181,6 +182,8 @@ struct HeaderMeta: View {
             .font(.caption.weight(.semibold))
             .monospacedDigit()
             .foregroundStyle(.secondary)
+            .contentTransition(.numericText())
+            .motion(AppMotion.snap, value: text)
     }
 }
 

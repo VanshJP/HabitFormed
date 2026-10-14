@@ -100,10 +100,10 @@ struct AddHabitView: View {
     private func load() {
         guard !didLoad else { return }
         didLoad = true
+        // A new habit opens with the keyboard down, so the templates and the
+        // whole form show; tapping the name brings it up.
         if let habit {
             draft = HabitDraft(habit: habit)
-        } else {
-            nameFocused = true
         }
         original = draft
     }
@@ -114,7 +114,7 @@ struct AddHabitView: View {
         Task {
             // Ask for Health over this sheet, before the habit exists: once
             // the sheet starts closing, the Health prompt has nowhere to show.
-            if draft.kind == .health { try? await health.requestAuthorization() }
+            if draft.kind == .health { try? await health.requestAuthorization(for: [draft.source]) }
             if let habit {
                 draft.apply(to: habit)
             } else {

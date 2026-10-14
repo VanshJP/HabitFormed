@@ -137,11 +137,19 @@ Each habit tile responds to three gestures, and so do rows and done chips
 | **Slide knob right**     | Log today in place (`SlideToLogTrack`) |
 | **Long-press**           | `contextMenu`: Log / Undo today, Start timer, Edit, Arrange, Delete |
 
-The slide-to-log knob mirrors iOS's slide-to-answer: drag past ~75% and
-release to log; release earlier to cancel. The track is 44pt tall. Once
-logged it collapses into a "Logged" pill. Every log from the grid shows an
-`UndoToast` for four seconds; the log that finishes a perfect day turns it
-into "Perfect day" with a "Send report" button for six.
+The slide-to-log knob mirrors iOS's slide-to-answer: past ~75% it arms (a
+tick, a check on the knob, "Release") and letting go logs; release earlier
+to cancel, and a flick from halfway logs too. The track is 44pt tall. Once
+logged the trail fills it and it settles into a "Logged" pill. Every log
+from the grid shows an `UndoToast` for four seconds; the log that finishes
+a perfect day turns it into "Perfect day" with a "Send report" button for
+six.
+
+Logs from Today chime through `ContentView.logToday`, a pentatonic step
+higher as the day fills (`SoundEffects.logChime(progress:)`), so callers
+there play the haptic only. The perfect day adds `SoundEffects.perfectDay`
+(a rolled chord on its own player) and `Haptics.celebrate` over the
+confetti. Taking back your own log is `Haptics.undo`, not a warning.
 
 When the grid shows a **past day**, the bottom row of every tile becomes a
 pill that toggles that day's log (fixing a forgotten day is one tap). The
@@ -289,7 +297,9 @@ The design system is SpeakUp's; when in doubt, match
   `HealthKitSource` (label, defaultTarget, unitSuffix, symbol,
   compactValue) and add a matching branch in
   `HealthKitService.todayValue(for:)`. Report-only numbers live in
-  `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`.
+  `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`. Health is asked
+  for per type with `requestAuthorization(for:)`: by the add sheet when a
+  health habit is saved, and at launch only for types existing habits read.
 - **SwiftData:** persist enums as `String` raw values (`frequencyRaw`,
   `sourceRaw`) with a computed property exposing the enum. New stored properties always get a default so lightweight
   migration keeps working.

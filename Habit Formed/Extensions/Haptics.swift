@@ -41,6 +41,24 @@ enum Haptics {
         notificationGenerator.notificationOccurred(.success)
     }
 
+    /// Perfect day: four taps rising in strength, timed to the chord that
+    /// `SoundEffects.perfectDay` rolls, after the log's own success tap.
+    static func celebrate() {
+        mediumGenerator.prepare()
+        for (i, intensity) in [0.45, 0.6, 0.8, 1.0].enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12 + Double(i) * 0.06) {
+                mediumGenerator.impactOccurred(intensity: intensity)
+            }
+        }
+    }
+
+    /// Taking back your own log: a soft tap, not a warning, since nothing
+    /// went wrong.
+    static func undo() {
+        lightGenerator.prepare()
+        lightGenerator.impactOccurred(intensity: 0.7)
+    }
+
     /// Warning: yellow / cautionary states.
     static func warning() {
         notificationGenerator.prepare()

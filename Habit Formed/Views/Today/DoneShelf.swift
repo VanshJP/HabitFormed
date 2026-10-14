@@ -36,6 +36,7 @@ struct DoneShelf: View {
         .frame(minHeight: AppLayout.minHitTarget)
         .glassCard(cornerRadius: AppLayout.minHitTarget / 2, tint: AppColors.featuredTint(habit.color))
         .contentShape(Capsule())
+        .transition(.scale(scale: 0.85).combined(with: .opacity))
         .onTapGesture {
             Haptics.light()
             actions(habit).open()

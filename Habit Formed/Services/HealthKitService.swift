@@ -91,10 +91,14 @@ final class HealthKitService {
         return set
     }
 
-    func requestAuthorization() async throws {
+    /// Asks only for the types `sources` read, so a sleep habit's sheet lists
+    /// Sleep alone. Types already answered are not asked again.
+    func requestAuthorization(for sources: Set<HealthKitSource>) async throws {
         guard isAvailable else { throw HealthKitError.unavailable }
+        let types = Set(sources.compactMap { sampleType(for: $0) as HKObjectType? })
+        guard !types.isEmpty else { return }
         do {
-            try await store.requestAuthorization(toShare: [], read: readTypes)
+            try await store.requestAuthorization(toShare: [], read: types)
             hasRequestedAuthorization = true
         } catch {
             throw HealthKitError.authorizationFailed(error)

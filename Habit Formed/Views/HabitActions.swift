@@ -35,7 +35,6 @@ struct HabitContextMenu: View {
         } else {
             Button("Log today", systemImage: "checkmark.circle") {
                 Haptics.success()
-                SoundEffects.logChime()
                 actions.log()
             }
         }

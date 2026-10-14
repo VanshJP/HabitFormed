@@ -109,17 +109,19 @@ nonisolated enum HealthKitSource: String, Codable, CaseIterable, Identifiable, S
     }
 
     /// Formats a reading the way a tile and a report print it: "8.2k",
-    /// "7.5h", "32m". No unit for counts the label already names.
+    /// "7.5h", "32m", with a whole number left whole ("10k", "7h"). No unit
+    /// for counts the label already names.
     func compactValue(_ value: Double) -> String {
+        let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...1))
         switch self {
         case .steps, .activeCalories:
-            return value >= 1000 ? String(format: "%.1fk", value / 1000) : "\(value.safeRounded)"
+            return value >= 1000 ? "\((value / 1000).formatted(oneDecimal))k" : "\(value.safeRounded)"
         case .sleepHours, .standHours:
-            return String(format: "%.1fh", value)
+            return "\(value.formatted(oneDecimal))h"
         case .mindfulMinutes, .exerciseMinutes:
             return "\(value.safeRounded)m"
         case .walkingDistance:
-            return String(format: "%.1fkm", value)
+            return "\(value.formatted(oneDecimal))km"
         case .flightsClimbed:
             return "\(value.safeRounded)"
         case .none:

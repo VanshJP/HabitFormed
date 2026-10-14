@@ -35,8 +35,10 @@ struct ContentView: View {
 
     @AppStorage(AppPreferences.todayLayout) private var layoutRaw = TodayLayout.tiles.rawValue
 
-    private var usesHealth: Bool {
-        habits.contains { $0.trackKind == .health }
+    /// The Health types today's habits read, so Health is only ever asked
+    /// for those.
+    private var healthSources: Set<HealthKitSource> {
+        Set(habits.map(\.source).filter { $0 != .none })
     }
 
     private var isViewingToday: Bool {
@@ -139,7 +141,8 @@ struct ContentView: View {
         .onChange(of: todayIsPerfect) { wasPerfect, isPerfect in
             // Celebrate the log that finishes the day, never a page load.
             guard isPerfect, !wasPerfect, isViewingToday else { return }
-            Haptics.success()
+            Haptics.celebrate()
+            SoundEffects.perfectDay()
             celebration += 1
             // The log that finished the day offers to send it, right where
             // the thumb already is.
@@ -239,11 +242,11 @@ struct ContentView: View {
                 // Permission is requested lazily when a reminder is turned on.
                 await notifications.syncReminders(for: habits)
             }
-            .task(id: usesHealth) {
-                // Health is asked for only once a habit reads it, never on a
-                // bare first launch. The add sheet asks first when one is saved.
-                guard usesHealth else { return }
-                try? await health.requestAuthorization()
+            .task(id: healthSources) {
+                // Health is asked for only what habits read, never on a bare
+                // first launch. The add sheet asks first when one is saved.
+                guard !healthSources.isEmpty else { return }
+                try? await health.requestAuthorization(for: healthSources)
                 await health.syncHealthKitHabits(in: modelContext)
                 // HealthKit change notifications keep health tiles near
                 // real-time instead of waiting on the polling tick.
@@ -397,6 +400,9 @@ struct ContentView: View {
 
     private func logToday(_ habit: Habit) {
         guard isViewingToday, habit.log(on: Date(), in: modelContext) != nil else { return }
+        // Every log from Today lands here, so the chime can climb with the day.
+        let today = DayLedger.summary(on: dayTracker.today, tracks: habits.map(\.track))
+        SoundEffects.logChime(progress: today.fraction)
         undo = UndoLog(habit: habit, day: Date(), wasLogged: true)
         lingering.insert(habit.id)
         Task {
@@ -406,7 +412,7 @@ struct ContentView: View {
     }
 
     private func undoToday(_ habit: Habit) {
-        Haptics.warning()
+        Haptics.undo()
         habit.removeLog(on: Date(), in: modelContext)
     }
 
@@ -415,7 +421,7 @@ struct ContentView: View {
     private func togglePastDay(_ habit: Habit) {
         let day = selectedDate
         if habit.isCompleted(on: day) {
-            Haptics.warning()
+            Haptics.undo()
             habit.removeLog(on: day, in: modelContext)
             undo = UndoLog(habit: habit, day: day, wasLogged: false)
         } else {
