@@ -64,6 +64,8 @@ struct HistoryView: View {
             )
             .padding(.top, 8)
 
+            PatternsSection(habits: habits, tracks: tracks, completions: completions, today: dayTracker.today)
+
             GlassSection("Last 12 weeks", meta: perfect == 1 ? "1 perfect day" : "\(perfect) perfect days") {
                 Panel {
                     VStack(alignment: .trailing, spacing: 12) {
