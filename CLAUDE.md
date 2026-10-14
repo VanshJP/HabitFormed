@@ -74,9 +74,10 @@ Habit Formed/
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
-    ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
-    │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
-    ├── Settings/             # SettingsView, LayoutPicker (tiles and rows drawn as pictures)
+    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts), ReportStyleEditor,
+    │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
+    │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
+    ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
     ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
     ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
@@ -256,10 +257,15 @@ already logged today). Closing before completion does **not** log.
 Keep it simple: one report, everything on by default, switches to take
 things out. No templates, layouts or placeholder tokens.
 
-- `ReportOptions` is the whole configuration: a `ReportTheme` (six canvases
-  or paper), hidden habits, and switches for streaks, notes, last 7 days,
-  calories in vs out, and activity. The sheet keeps them in `@AppStorage`;
-  the optional note is for one card only.
+- `ReportOptions` is the whole configuration: a `ReportTheme` (the canvases,
+  the plain ones first, or paper), a `ReportLayout` (List, Grid like Today,
+  or Focus: one big ring and a strip of glyphs), an accent (empty follows
+  the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
+  (Default, Rounded, Serif, Mono), hidden habits, and switches for streaks,
+  notes, last 7 days, calories in vs out, and activity. Notes and the week's
+  dots exist only in List. All in `@AppStorage`; the note is for one card
+  only. `ReportStyleEditor` edits them and is the one editor for Settings →
+  Report card and the sheet's Edit.
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
@@ -268,15 +274,16 @@ things out. No templates, layouts or placeholder tokens.
   `ReportCardRenderer` draws the image at 3x only when it is sent.
 - The look is set ahead of time, so sending carries no choices: Settings →
   Report card opens `DailyReportSheet(isPreset: true)` (live preview, theme
-  rail, "On the card" as `ToggleChip`s: the habits, then Streaks, Habit
-  notes, Last 7 days, Calories, Activity; nothing to send).
+  layout as `SketchPicker` pictures, background rail, accent dots, type
+  chips, "On the card" as `ToggleChip`s; nothing to send).
 - `DailyReportSheet` to send: live preview, one panel of fields (name the
   first time, calories eaten while Calories is on, this card's note), then
   Text it (`MessageComposer`, Messages with the image attached) and Share
-  (`SharePresenter`; Save and Copy live in the share sheet). Edit
-  (`ReportEditButton`, top trailing) opens the theme rail and "On the
-  card"; what is picked there is the preset too. The recap sheet's Edit
-  opens its theme. Both send the card alone, with no text typed under it. The card prints the reporter's name
+  (`SharePresenter`; Save and Copy live in the share sheet), right under
+  the note. Edit (`ReportEditButton`, top trailing) opens
+  `ReportStyleEditor` and pins the send bar; what is picked there is the
+  preset too. The recap takes the theme, accent and type; its Edit opens
+  the theme. Both send the card alone, with no text typed under it. The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
@@ -334,7 +341,9 @@ The design system is SpeakUp's; when in doubt, match
   everything inside a card or tile sits `AppLayout.tilePadding` (14) in. The material is glass; nothing draws its own
   bevel, gradient or glow. Names: the daily card is the "report", the
   weekly one the "recap".
-- **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
+- **Colour:** only `AppColors`, plus the app look's accent
+  (`CanvasLook.accent`, read from `\.appCanvas`) for switches, the week
+  strip's rings and the calendar, so Ember runs copper and Forest sage. Identity tints stay at 0.06 on a tile
   (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
   one solid use of a habit's color is Today's done fill, with the glyph
   turning white on it. A habit's glyph otherwise uses `color.glyphTone`
