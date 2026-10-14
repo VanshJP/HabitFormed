@@ -27,7 +27,6 @@ struct DailyReportSheet: View {
     @State private var note = ""
     @State private var eatenText = ""
     @State private var metrics: DayHealthMetrics = .empty
-    @State private var preview: UIImage?
     @State private var askedHealth = false
     /// Decided once on open, so the field does not vanish after one letter.
     @State private var askForName = false
@@ -91,7 +90,9 @@ struct DailyReportSheet: View {
         return NavigationStack {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    ReportPreview(image: preview)
+                    ReportPreview(width: ReportCardView.width) {
+                        ReportCardView(report: report, options: options)
+                    }
                     ReportThemeRow(themeRaw: $themeRaw)
                     contentsSection
                     fields
@@ -118,12 +119,6 @@ struct DailyReportSheet: View {
             askForName = reporterName.trimmingCharacters(in: .whitespaces).isEmpty
         }
         .task(id: options.needsHealth) { await loadHealth(needsHealth: options.needsHealth) }
-        .task(id: PreviewKey(report: report, options: options)) {
-            // A short pause lets typing settle before the card re-renders.
-            try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
-            preview = ReportCardRenderer.render(report: report, options: options, scale: 2)
-        }
     }
 
     // MARK: - What to share
@@ -221,11 +216,4 @@ struct DailyReportSheet: View {
         }
         metrics = await health.dayMetrics(for: day)
     }
-}
-
-// MARK: - Keys
-
-private nonisolated struct PreviewKey: Equatable {
-    let report: DailyReport
-    let options: ReportOptions
 }

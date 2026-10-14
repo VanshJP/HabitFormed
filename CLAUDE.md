@@ -241,8 +241,9 @@ things out. No templates, layouts or placeholder tokens.
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
-  on canvas or paper; `ReportCardRenderer` renders it (scale 2 for the
-  preview, 3 for sending).
+  on canvas or paper. The sheets show that view live, scaled to fit
+  (`ReportPreview`), so a theme or switch shows at once;
+  `ReportCardRenderer` draws the image at 3x only when it is sent.
 - `DailyReportSheet`: live preview, theme rail, "On the card" as
   `ToggleChip`s (the habits, then Streaks, Habit notes, Last 7 days,
   Calories, Activity), one panel of fields (name the first time, calories
@@ -288,7 +289,8 @@ The design system is SpeakUp's; when in doubt, match
   (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
   one solid use of a habit's color is Today's done fill, with the glyph
   turning white on it. A habit's glyph otherwise uses `color.glyphTone`
-  (lifted toward white). Habit colors come from `AppColors.tilePalette`.
+  (lifted toward white). Habit colors come from `AppColors.tilePalette`;
+  a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);
   words-only buttons use `.buttonStyle(.textLink)`. Selected chips and

@@ -17,7 +17,6 @@ struct WeeklyRecapSheet: View {
     /// The week's last day.
     let end: Date
 
-    @State private var preview: UIImage?
 
     init(end: Date) {
         self.end = end.startOfDay
@@ -41,7 +40,9 @@ struct WeeklyRecapSheet: View {
         return NavigationStack {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    ReportPreview(image: preview)
+                    ReportPreview(width: WeeklyRecapCardView.width) {
+                        WeeklyRecapCardView(recap: recap, theme: theme)
+                    }
                     ReportThemeRow(themeRaw: $themeRaw)
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)
@@ -61,13 +62,5 @@ struct WeeklyRecapSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground { AppBackground(style: .subtle) }
-        .task(id: RecapPreviewKey(recap: recap, theme: theme)) {
-            preview = ReportCardRenderer.render(recap: recap, theme: theme, scale: 2)
-        }
     }
-}
-
-private nonisolated struct RecapPreviewKey: Equatable {
-    let recap: WeeklyRecap
-    let theme: ReportTheme
 }

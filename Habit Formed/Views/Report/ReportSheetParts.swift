@@ -3,32 +3,37 @@ import UIKit
 
 // MARK: - Preview
 
-/// The rendered card as the sheet shows it, with a placeholder while the
-/// first render runs. Shared by the daily report and the weekly recap.
-struct ReportPreview: View {
-    let image: UIImage?
+/// The card as the sheet shows it: the card view itself, live and scaled
+/// to fit, so a theme or a switch shows the moment it is tapped. The image
+/// is drawn only when the card is sent (`ReportCardRenderer`). Shared by
+/// the daily report and the weekly recap; `width` is the card's own.
+struct ReportPreview<Card: View>: View {
+    let width: CGFloat
+    @ViewBuilder let card: Card
+
+    @State private var available: CGFloat = 0
+    @State private var height: CGFloat = 0
 
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                    }
-                    .accessibilityLabel("Card preview")
-            } else {
-                RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                    .fill(AppColors.surfaceLift)
-                    .aspectRatio(0.7, contentMode: .fit)
-                    .overlay { ProgressView().tint(.white) }
+        let scale = available > 0 ? min(available / width, 1) : 1
+        let shape = RoundedRectangle(cornerRadius: AppLayout.cardRadius / scale, style: .continuous)
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: height * scale)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { available = $0 }
+            .overlay(alignment: .top) {
+                card
+                    .fixedSize(horizontal: false, vertical: true)
+                    .clipShape(shape)
+                    .overlay { shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1 / scale) }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+                    .scaleEffect(scale, anchor: .top)
+                    .allowsHitTesting(false)
             }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Card preview")
     }
 }
 

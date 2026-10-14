@@ -46,6 +46,9 @@ struct SwatchRail<Item: Identifiable & Hashable, Swatch: View>: View {
                     .font(.caption2.weight(isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
             }
+            // The looks ignore touches, so without this only the name is a
+            // target.
+            .contentShape(.rect)
             .motion(AppMotion.snap, value: isSelected)
         }
         .buttonStyle(GlassPressStyle())
