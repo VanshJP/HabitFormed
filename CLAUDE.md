@@ -145,10 +145,12 @@ Each habit tile responds to three gestures, and so do rows. They all take one `H
 
 The slide-to-log knob mirrors iOS's slide-to-answer. As it travels, the
 habit's color pours out of it (a circle centred on the knob that reaches
-the tile's far corner as the knob arrives) and its chevron turns a quarter
-clockwise into a check (`KnobGlyph`: each leg keeps its angle and length
-from the corner); at ~75% the check is whole and it arms (a tick and a
-small pop), and letting go logs. Release earlier to cancel; a flick from halfway logs too. The
+the tile's far corner as the knob arrives) and its chevron winds clockwise
+into clock hands showing the time right now (the knob's disc is the face),
+holds there, then folds into a check (`ClockGlyph`: one stroke, a corner
+and two legs moving between poses); at ~75% the check is whole and it
+arms (a tick and a small pop), and letting go logs. Holding the knob keeps
+the long-press menu shut, so a pause mid-slide never opens it. Release earlier to cancel; a flick from halfway logs too. The
 surface owns the knob's `progress`, so an undo plays it all backwards. The
 track is 44pt tall with the 36pt knob inset in it; its gray pill is what
 is left to slide, shrinking behind the knob over the fill. Flat, no
