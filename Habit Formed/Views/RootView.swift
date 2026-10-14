@@ -38,7 +38,7 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab("Today", systemImage: "square.grid.2x2.fill", value: AppTab.today) {
+            Tab(value: AppTab.today) {
                 // The canvas is painted inside each stack: SwiftUI hosts
                 // navigation content in an opaque view, so a background behind
                 // the TabView would never show.
@@ -50,9 +50,11 @@ struct RootView: View {
                     .background { AppBackground() }
                     .toolbar(.hidden, for: .navigationBar)
                 }
+            } label: {
+                tabLabel("Today", icon: "square.grid.2x2", tab: .today)
             }
 
-            Tab("History", systemImage: "calendar", value: AppTab.history) {
+            Tab(value: AppTab.history) {
                 NavigationStack {
                     HistoryView(
                         onShareReport: { date in openReport(for: date) },
@@ -61,6 +63,8 @@ struct RootView: View {
                         .background { AppBackground() }
                         .toolbar(.hidden, for: .navigationBar)
                 }
+            } label: {
+                tabLabel("History", icon: "calendar", tab: .history)
             }
         }
         .tint(.white)
@@ -140,6 +144,16 @@ struct RootView: View {
         .environment(\.glassAppearance, GlassAppearance(rawValue: glassRaw) ?? .light)
         .environment(\.appCanvas, AppCanvas(rawValue: canvasRaw) ?? .classic)
         .preferredColorScheme(.dark)
+    }
+
+    /// The selected tab's glyph is filled and the other is outlined, so the
+    /// bar says where you are twice over. The bar fills any symbol it is
+    /// handed by name, so the outline goes in as an image it cannot restyle.
+    private func tabLabel(_ title: String, icon: String, tab: AppTab) -> some View {
+        let glyph = selectedTab == tab
+            ? Image(systemName: icon)
+            : Image(uiImage: UIImage(systemName: icon) ?? UIImage())
+        return Label { Text(title) } icon: { glyph }
     }
 
     private func openReport(for date: Date) {

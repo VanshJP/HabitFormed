@@ -257,8 +257,9 @@ already logged today). Closing before completion does **not** log.
 Keep it simple: one report, everything on by default, switches to take
 things out. No templates, layouts or placeholder tokens.
 
-- `ReportOptions` is the whole configuration: a `ReportTheme` (the canvases,
-  the plain ones first, or paper), a `ReportLayout` (List, Grid like Today,
+- `ReportOptions` is the whole configuration: a `ReportTheme` (App look by
+  default, which paints whatever `AppCanvas` the app wears via
+  `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
   or Focus: one big ring and a strip of glyphs), an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
   (Default, Rounded, Serif, Mono), hidden habits, and switches for streaks,

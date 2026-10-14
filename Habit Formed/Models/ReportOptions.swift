@@ -2,9 +2,13 @@ import Foundation
 
 // MARK: - Report Theme
 
-/// The look of the daily report card: one of the app's canvases, or paper.
-/// Persisted by raw value (`AppPreferences.reportTheme`); do not rename cases.
+/// The look of the daily report card: the app's own look (the default), one
+/// of the canvases, or paper. Persisted by raw value
+/// (`AppPreferences.reportTheme`); do not rename cases.
 nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
+    /// Whatever the app wears (`AppCanvas`), so the card matches without a
+    /// second choice.
+    case app
     case classic
     // The plain ones up front, as on the app's look rail.
     case black
@@ -23,6 +27,7 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
+        case .app: return "App look"
         case .classic: return "Classic"
         case .midnight: return "Midnight"
         case .aurora: return "Aurora"
@@ -38,9 +43,11 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The canvas behind the card, or nil for paper.
-    var look: CanvasLook? {
+    /// The canvas behind the card, or nil for paper. `appLook` is the app's
+    /// current one, used by `.app`.
+    func look(appLook: CanvasLook) -> CanvasLook? {
         switch self {
+        case .app: return appLook
         case .classic: return .classic
         case .midnight: return .midnight
         case .aurora: return .aurora
@@ -111,7 +118,9 @@ nonisolated enum ReportFont: String, CaseIterable, Identifiable, Sendable {
 /// by default; the switches take things out. Kept in `@AppStorage`, set in
 /// Settings → Report card or the sheet's Edit, so sending needs no choices.
 nonisolated struct ReportOptions: Sendable, Hashable {
-    var theme: ReportTheme = .classic
+    var theme: ReportTheme = .app
+    /// The app's look, which `.app` paints.
+    var appLook: CanvasLook = .classic
     var layout: ReportLayout = .list
     /// A palette colour's hex for the ring, mark and note bar, or empty to
     /// follow the theme's own accent.
@@ -126,6 +135,9 @@ nonisolated struct ReportOptions: Sendable, Hashable {
     var showActivity = false
     /// A line for this card only ("Rest day tomorrow"). Not kept.
     var note = ""
+
+    /// The canvas behind the card, or nil for paper.
+    var look: CanvasLook? { theme.look(appLook: appLook) }
 
     /// True when the card needs Apple Health numbers.
     var needsHealth: Bool { showCalories || showActivity }

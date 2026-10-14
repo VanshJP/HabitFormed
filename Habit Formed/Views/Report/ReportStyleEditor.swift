@@ -9,7 +9,7 @@ struct ReportStyleEditor: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
-    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.classic.rawValue
+    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.app.rawValue
     @AppStorage(AppPreferences.reportLayout) private var layoutRaw = ReportLayout.list.rawValue
     @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
     @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
@@ -20,9 +20,12 @@ struct ReportStyleEditor: View {
     @AppStorage(AppPreferences.reportShowCalories) private var showCalories = false
     @AppStorage(AppPreferences.reportShowActivity) private var showActivity = false
 
-    private var theme: ReportTheme { ReportTheme(rawValue: themeRaw) ?? .classic }
+    @Environment(\.appCanvas) private var canvas
+
+    private var theme: ReportTheme { ReportTheme(rawValue: themeRaw) ?? .app }
+    private var look: CanvasLook? { theme.look(appLook: canvas.look) }
     private var layout: ReportLayout { ReportLayout(rawValue: layoutRaw) ?? .list }
-    private var palette: ReportPalette { ReportPalette(theme: theme, accentHex: accentHex) }
+    private var palette: ReportPalette { ReportPalette(look: look, accentHex: accentHex) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
@@ -62,7 +65,7 @@ struct ReportStyleEditor: View {
 
     /// The background's own accent first, then the habit palette.
     private var accentGrid: some View {
-        let own = ReportPalette(theme: theme).accent
+        let own = ReportPalette(look: look).accent
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 6)], spacing: 6) {
             accentDot(hex: "", fill: own, label: "Match the background")
             ForEach(AppColors.tilePalette, id: \.hexString) { color in

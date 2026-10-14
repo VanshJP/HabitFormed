@@ -12,7 +12,8 @@ struct WeeklyRecapSheet: View {
     private var habits: [Habit]
 
     @AppStorage(AppPreferences.reporterName) private var reporterName = ""
-    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.classic.rawValue
+    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.app.rawValue
+    @Environment(\.appCanvas) private var canvas
     @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
     @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
     @AppStorage(AppPreferences.reportHiddenHabits) private var hiddenRaw = ""
@@ -28,7 +29,8 @@ struct WeeklyRecapSheet: View {
 
     private var options: ReportOptions {
         ReportOptions(
-            theme: ReportTheme(rawValue: themeRaw) ?? .classic,
+            theme: ReportTheme(rawValue: themeRaw) ?? .app,
+            appLook: canvas.look,
             accentHex: accentHex,
             font: ReportFont(rawValue: fontRaw) ?? .standard
         )

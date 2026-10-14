@@ -17,7 +17,7 @@ struct ReportCardView: View {
     /// height in a chat.
     static let maxItems = 12
 
-    private var palette: ReportPalette { ReportPalette(theme: options.theme, accentHex: options.accentHex) }
+    private var palette: ReportPalette { ReportPalette(look: options.look, accentHex: options.accentHex) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -54,7 +54,7 @@ struct ReportCardView: View {
 
     @ViewBuilder
     private var background: some View {
-        if let look = options.theme.look {
+        if let look = options.look {
             CanvasLookView(look: look, mood: .session)
         } else {
             palette.paper
@@ -318,18 +318,19 @@ struct ReportCardView: View {
 // MARK: - Palette
 
 /// Ink, wells and accents for a theme: white on the canvases, near-black on
-/// paper. The accent is the theme's own unless a palette colour is picked.
+/// paper. The accent is the look's own unless a palette colour is picked.
 struct ReportPalette {
     let isLight: Bool
     let accent: Color
 
-    init(theme: ReportTheme, accentHex: String = "") {
-        isLight = theme.look == nil
+    /// `look` is the card's canvas, or nil for paper.
+    init(look: CanvasLook?, accentHex: String = "") {
+        isLight = look == nil
         if !accentHex.isEmpty {
             let picked = Color(hex: accentHex)
             accent = isLight ? picked : picked.glyphTone
         } else {
-            accent = theme.look?.accent ?? AppColors.primary
+            accent = look?.accent ?? AppColors.primary
         }
     }
 

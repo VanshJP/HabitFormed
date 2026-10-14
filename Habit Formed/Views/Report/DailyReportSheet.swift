@@ -16,7 +16,8 @@ struct DailyReportSheet: View {
     private var habits: [Habit]
 
     @AppStorage(AppPreferences.reporterName) private var reporterName = ""
-    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.classic.rawValue
+    @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.app.rawValue
+    @Environment(\.appCanvas) private var canvas
     @AppStorage(AppPreferences.reportLayout) private var layoutRaw = ReportLayout.list.rawValue
     @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
     @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
@@ -51,7 +52,8 @@ struct DailyReportSheet: View {
 
     private var options: ReportOptions {
         ReportOptions(
-            theme: ReportTheme(rawValue: themeRaw) ?? .classic,
+            theme: ReportTheme(rawValue: themeRaw) ?? .app,
+            appLook: canvas.look,
             layout: ReportLayout(rawValue: layoutRaw) ?? .list,
             accentHex: accentHex,
             font: ReportFont(rawValue: fontRaw) ?? .standard,

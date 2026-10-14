@@ -43,20 +43,21 @@ struct ReportPreview<Card: View>: View {
 /// theme, so a week's recap looks like the days it sums up.
 struct ReportThemeRow: View {
     @Binding var themeRaw: String
+    @Environment(\.appCanvas) private var canvas
 
     var body: some View {
         SwatchRail(
             items: ReportTheme.allCases,
             selection: Binding(
-                get: { ReportTheme(rawValue: themeRaw) ?? .classic },
+                get: { ReportTheme(rawValue: themeRaw) ?? .app },
                 set: { themeRaw = $0.rawValue }
             ),
             name: \.displayName
         ) { theme in
-            if let look = theme.look {
+            if let look = theme.look(appLook: canvas.look) {
                 CanvasLookView(look: look, mood: .session)
             } else {
-                ReportPalette(theme: theme).paper
+                ReportPalette(look: nil).paper
             }
         }
     }

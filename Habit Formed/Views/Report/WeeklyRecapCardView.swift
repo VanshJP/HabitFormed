@@ -14,8 +14,7 @@ struct WeeklyRecapCardView: View {
     /// Rows drawn before "+N more".
     static let maxRows = 12
 
-    private var theme: ReportTheme { options.theme }
-    private var palette: ReportPalette { ReportPalette(theme: theme, accentHex: options.accentHex) }
+    private var palette: ReportPalette { ReportPalette(look: options.look, accentHex: options.accentHex) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -38,7 +37,7 @@ struct WeeklyRecapCardView: View {
 
     @ViewBuilder
     private var background: some View {
-        if let look = theme.look {
+        if let look = options.look {
             CanvasLookView(look: look, mood: .session)
         } else {
             palette.paper
