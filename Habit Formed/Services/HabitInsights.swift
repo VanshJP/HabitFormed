@@ -28,10 +28,6 @@ nonisolated enum HabitInsights {
     static let windowDays = 56
     static let minimumDays = 14
     static let maximumShown = 3
-    /// `@AppStorage` keys for the Apple Intelligence tip and the facts and
-    /// day it was worded for.
-    static let tipKey = "insights.tip"
-    static let tipSourceKey = "insights.tip.source"
 
     static func find(in habits: [InsightHabit], today: Date = Date(), calendar: Calendar = .current) -> [Insight] {
         let today = today.startOfDay

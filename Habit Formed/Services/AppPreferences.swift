@@ -28,6 +28,10 @@ nonisolated enum AppPreferences {
     static let reportReminderMinute = "report.reminder.minute"
     /// Sunday evening nudge to send the week's recap.
     static let recapReminderEnabled = "recap.reminder.enabled"
+    /// History's Apple Intelligence tip, and the day and facts it was worded
+    /// for, so the model runs once a day per set of facts.
+    static let insightsTip = "insights.tip"
+    static let insightsTipSource = "insights.tip.source"
 
     static var isLogSoundOn: Bool {
         UserDefaults.standard.object(forKey: logSound) as? Bool ?? true

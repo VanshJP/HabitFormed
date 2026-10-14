@@ -11,8 +11,8 @@ struct PatternsSection: View {
     let completions: [HabitCompletion]
     let today: Date
 
-    @AppStorage(HabitInsights.tipKey) private var tip = ""
-    @AppStorage(HabitInsights.tipSourceKey) private var tipSource = ""
+    @AppStorage(AppPreferences.insightsTip) private var tip = ""
+    @AppStorage(AppPreferences.insightsTipSource) private var tipSource = ""
 
     var body: some View {
         let insights = HabitInsights.find(in: inputs, today: today)
