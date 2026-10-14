@@ -64,7 +64,7 @@ struct RootView: View {
                         .toolbar(.hidden, for: .navigationBar)
                 }
             } label: {
-                tabLabel("History", icon: "calendar", tab: .history)
+                tabLabel("History", icon: "clock", tab: .history)
             }
         }
         .tint(.white)
