@@ -9,7 +9,7 @@ struct Panel<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
         VStack(spacing: 0) {
             Group(subviews: content) { rows in
                 ForEach(rows) { row in
@@ -22,6 +22,6 @@ struct Panel<Content: View>: View {
             }
         }
         .clipShape(shape)
-        .glassCard(cornerRadius: AppLayout.tileRadius)
+        .glassCard(cornerRadius: AppLayout.cardRadius)
     }
 }

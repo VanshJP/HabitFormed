@@ -17,6 +17,7 @@ struct HabitDetailView: View {
     @State private var showingTimer = false
     @State private var showingEdit = false
     @State private var confirmDelete = false
+    @State private var pendingRemoval: HabitCompletion?
     private let calendarWeeks = 12
     /// The latest logs listed under the calendar, which already shows every day.
     private let recentCount = 10
@@ -68,6 +69,7 @@ struct HabitDetailView: View {
             .sheet(isPresented: $showingEdit) {
                 AddHabitView(habit: habit)
             }
+            .confirmsLogRemoval($pendingRemoval, remove: delete)
             .alert("Delete this habit?", isPresented: $confirmDelete) {
                 Button("Delete", role: .destructive) {
                     deleteOnClose = true
@@ -302,7 +304,7 @@ struct HabitDetailView: View {
         if !recent.isEmpty {
             GlassSection("Recent logs") {
                 HabitHistoryGroup(completions: recent, accent: habit.color) { completion in
-                    delete(completion)
+                    pendingRemoval = completion
                 }
             }
         }

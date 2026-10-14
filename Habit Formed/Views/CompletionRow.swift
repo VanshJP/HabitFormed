@@ -44,3 +44,28 @@ struct CompletionRow: View {
     private var symbol: String { completion.habit?.symbol ?? "circle.fill" }
     private var habitTitle: String { completion.habit?.title ?? "Deleted habit" }
 }
+
+extension View {
+    /// Asks before a log goes, the way deleting a habit does. `pending` is the
+    /// log a "Remove log" picked; `remove` runs once it is confirmed.
+    func confirmsLogRemoval(
+        _ pending: Binding<HabitCompletion?>,
+        remove: @escaping (HabitCompletion) -> Void
+    ) -> some View {
+        alert(
+            "Remove this log?",
+            isPresented: Binding(
+                get: { pending.wrappedValue != nil },
+                set: { if !$0 { pending.wrappedValue = nil } }
+            ),
+            presenting: pending.wrappedValue
+        ) { completion in
+            Button("Remove", role: .destructive) { remove(completion) }
+            Button("Cancel", role: .cancel) {}
+        } message: { completion in
+            let day = completion.date
+            let when = day.isToday || day.isYesterday ? day.relativeDayName.lowercased() : "on \(day.relativeDayName)"
+            Text("This removes the log for \(completion.habit?.title ?? "this habit") \(when).")
+        }
+    }
+}

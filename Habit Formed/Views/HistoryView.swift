@@ -19,6 +19,7 @@ struct HistoryView: View {
 
     @State private var detailHabit: Habit?
     @State private var openDay: Date?
+    @State private var pendingRemoval: HabitCompletion?
     /// How many days are listed; "Show earlier days" adds a month.
     @State private var logDays = 30
 
@@ -43,6 +44,7 @@ struct HistoryView: View {
             }
             .pageContentInsets()
         }
+        .confirmsLogRemoval($pendingRemoval, remove: delete)
         .sheet(item: $detailHabit) { habit in
             HabitDetailView(habit: habit)
         }
@@ -157,7 +159,7 @@ struct HistoryView: View {
 
         if isOpen {
             ForEach(group.completions) { completion in
-                CompletionRow(completion: completion, onDelete: { delete(completion) })
+                CompletionRow(completion: completion, onDelete: { pendingRemoval = completion })
                     .background(Color.black.opacity(0.14))
             }
             Button {

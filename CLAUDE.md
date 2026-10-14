@@ -112,7 +112,8 @@ the header):
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
   day). The selected day sits on a soft circle of glass, never solid
-  white. Strip taps only change the selected day; the strip itself moves
+  white, that slides to the day tapped (`matchedGeometryEffect`; a glass
+  container would draw it over the letters). Strip taps only change the selected day; the strip itself moves
   only when the calendar picks an older day (`stripAnchor`). Then the
   grid's section,
   titled "Habits" for today or the browsed day's name, with the day's count
@@ -333,7 +334,7 @@ The design system is SpeakUp's; when in doubt, match
   (Liquid Glass). Never stack glass on glass: inside a card use
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
-  (card 20 / 16, tile 16 / 12, well 12). Groups of rows (History,
+  (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles and rows the tile radius. Groups of rows (History,
   Settings, the report and add sheets) sit on a `Panel`, one pane of glass
   with hairlines. Chips use `controlChrome`, so a row of them on the canvas
   is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
@@ -366,7 +367,7 @@ The design system is SpeakUp's; when in doubt, match
 - **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
   close with `Button(role: .close)` top leading (no haptic), and a Done
   that commits is `Button(role: .confirm)`; deletes confirm with an
-  `.alert("Delete this X?")`, and stopping a running timer always asks
+  `.alert("Delete this X?")` (a log: "Remove this log?", `confirmsLogRemoval`), and stopping a running timer always asks
   "Stop the timer for X?". A habit's page zooms out of its tile or row
   (`zoomSource` + `.navigationTransition(.zoom)`), the timer out of the
   mini banner.

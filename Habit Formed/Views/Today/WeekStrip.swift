@@ -4,7 +4,8 @@ import SwiftUI
 /// weekday and date inside a ring that fills as the day's habits are logged
 /// and closes green on a perfect day. The selected day sits on a soft circle
 /// of glass rather than solid white, so the strip stays quieter than the
-/// tiles under it; its count lives in the grid's header. Drawn straight on
+/// tiles under it, and the glass slides to the day tapped; its count lives in
+/// the grid's header. Drawn straight on
 /// the canvas, so it reads as navigation rather than another card.
 struct WeekStrip: View {
     /// Seven summaries, oldest first.
@@ -13,6 +14,8 @@ struct WeekStrip: View {
 
     @Environment(\.glassAppearance) private var glassAppearance
     @Environment(\.appCanvas) private var canvas
+    /// One circle of glass, carried from day to day.
+    @Namespace private var selection
 
     private let ringSize: CGFloat = 44
     private let lineWidth: CGFloat = 3
@@ -40,12 +43,13 @@ struct WeekStrip: View {
             ZStack {
                 ring(for: day)
 
-                // Selection is a hard cut, never an animated fill.
                 if isSelected {
                     Color.clear
                         .glassEffect(.regular.tint(glassAppearance.glassTint), in: .circle)
                         .padding(lineWidth + 2)
-                        .transaction { $0.animation = nil }
+                        // Moved, not morphed: a glass container would draw the
+                        // glass over the day's letters.
+                        .matchedGeometryEffect(id: "selected", in: selection)
                 }
 
                 VStack(spacing: 0) {

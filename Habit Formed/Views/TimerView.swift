@@ -123,14 +123,9 @@ struct TimerView: View {
 
                 Circle()
                     .trim(from: 0, to: prog)
-                    .stroke(
-                        LinearGradient(
-                            colors: [habit.color.glyphTone, habit.color],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                    )
+                    // One flat colour, as the mini banner's ring: nothing draws
+                    // its own gradient.
+                    .stroke(habit.color.glyphTone, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 6) {
