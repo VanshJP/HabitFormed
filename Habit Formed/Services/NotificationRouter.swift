@@ -53,7 +53,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             // The handler runs after the save, so iOS keeps the app awake
             // long enough to write the log.
             Task { @MainActor in
-                self.logToday(habitID: habitID)
+                if let container = self.modelContainer {
+                    HabitLifecycle.logToday(habitID: habitID, in: container.mainContext)
+                }
                 completionHandler()
             }
             return
@@ -87,17 +89,5 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         }
 
         completionHandler()
-    }
-
-    /// Logs today for one habit, the same way a slide on its tile does.
-    private func logToday(habitID: UUID) {
-        guard let context = modelContainer?.mainContext else { return }
-        let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == habitID })
-        guard let habit = try? context.fetch(descriptor).first,
-              habit.log(on: Date(), in: context) != nil else { return }
-        let all = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)])
-        if let habits = try? context.fetch(all) {
-            WidgetSync.refresh(habits: habits, in: context)
-        }
     }
 }

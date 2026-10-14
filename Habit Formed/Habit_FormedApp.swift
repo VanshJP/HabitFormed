@@ -28,10 +28,12 @@ struct Habit_FormedApp: App {
         // notification is delivered for foreground banners + tap routing.
         UNUserNotificationCenter.current().delegate = router
         n.registerCategories()
-        router.modelContainer = sharedModelContainer
+        router.modelContainer = Self.sharedModelContainer
     }
 
-    let sharedModelContainer: ModelContainer = {
+    /// The one store, reachable without a view so Siri and notification
+    /// actions can log while no window is open.
+    static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Habit.self,
             HabitCompletion.self,
@@ -62,6 +64,6 @@ struct Habit_FormedApp: App {
                 .environment(timer)
                 .environment(dayTracker)
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(Self.sharedModelContainer)
     }
 }

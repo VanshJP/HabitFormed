@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import SwiftData
 
@@ -248,6 +249,10 @@ struct ContentView: View {
                 while (try? await Task.sleep(for: .seconds(300))) != nil {
                     await health.syncHealthKitHabits(in: modelContext)
                 }
+            }
+            .task(id: habits.map(\.title)) {
+                // Siri learns habit names only from this call.
+                HabitShortcuts.updateAppShortcutParameters()
             }
             .onChange(of: reminderSignature) { _, _ in
                 Task { await notifications.syncReminders(for: habits) }
