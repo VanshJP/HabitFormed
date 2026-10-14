@@ -138,6 +138,8 @@ struct AddHabitView: View {
         if let habit {
             draft = HabitDraft(habit: habit)
         } else {
+            let existing = (try? modelContext.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+            draft.colorHex = HabitDraft.freshColor(after: existing.map(\.colorHex))
             // The name is the one thing a new habit needs; the ideas sit
             // right under it, above the keyboard.
             Task {

@@ -45,6 +45,25 @@ struct HabitDraft: Equatable {
         learnedReminderTime = habit.learnedReminderTime
     }
 
+    /// The palette color the fewest habits wear, so each new habit starts
+    /// in a color of its own without anyone picking one. Among those, the
+    /// one farthest round the palette from the newest habit's, so the grid
+    /// alternates hues instead of stepping teal to teal. `used` is every
+    /// habit's color, oldest first.
+    static func freshColor(after used: [String]) -> String {
+        let palette = AppColors.tilePalette.map(\.hexString)
+        guard !palette.isEmpty else { return "#0D8488" }
+        let counts = Dictionary(used.map { ($0, 1) }, uniquingKeysWith: +)
+        let fewest = palette.map { counts[$0, default: 0] }.min() ?? 0
+        let open = palette.indices.filter { counts[palette[$0], default: 0] == fewest }
+        guard let newest = used.last.flatMap({ palette.firstIndex(of: $0) }) else { return palette[open[0]] }
+        func distance(_ index: Int) -> Int {
+            let gap = abs(index - newest)
+            return min(gap, palette.count - gap)
+        }
+        return palette[open.max { distance($0) < distance($1) } ?? open[0]]
+    }
+
     var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
