@@ -59,9 +59,11 @@ the one sanctioned `pbxproj` edit for files.
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today tab: month control, week strip, the habits, undo toast
-├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReportOptions (+ ReportTheme)
+├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
+│                             #   ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
-│                             #   renderer, share, Messages
+│                             #   renderer, share, Messages, HabitInsights, OnDeviceModel
+├── Intents/                  # Siri: HabitEntity, LogHabitTodayIntent, TodayStatusIntent, HabitShortcuts
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
@@ -70,8 +72,8 @@ Habit Formed/
 │                             #   app's own: Panel, Chips (ChoiceChip, ToggleChip), SwatchRail
     ├── Today/                # WeekStrip, TodayHabitList, DateBrowserSheet, ArrangeHabitsSheet
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
-│                             #   how often, reminder), asked as plain questions with chips
-    ├── History/              # HistoryHero, ConsistencyHeatMap (+ legend), DayRow
+│                             #   how often), HabitReminderSection, asked as plain questions with chips
+    ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
     ├── Settings/             # SettingsView
@@ -81,7 +83,7 @@ Habit Formed/
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
     ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
-    ├── HistoryView.swift     # One page: hero, 12-week map, streaks, days that open in place
+    ├── HistoryView.swift     # One page: hero, patterns, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
     └── SlideToLogTrack.swift # iPhone slide-to-answer style log knob
@@ -115,17 +117,23 @@ the header):
   titled "Habits" for today or the browsed day's name, with the day's count
   beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
   while browsing another day). Progress is said once, in that header.
+  Once today is perfect the link steps aside for a solid "Send today's
+  report" under the grid, the screen's one primary button.
   The section lists every habit, as tiles or rows (`TodayLayout`, picked
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
   of filled squares and needs no other line to say so.
 - **History**: `HistoryView`, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
-  seven days under it and a "Recap" button. Then the 12-week map with its
+  seven days under it and a "Recap" button. Then "Patterns" (up to three
+  lines `HabitInsights` found in the last eight weeks, plus an Apple
+  Intelligence tip when the model is there; hidden until two weeks of days
+  exist and something holds). Then the 12-week map with its
   legend, per-habit streak rows (tap opens the detail sheet), and the days:
   each a `DayRow` (name, logged glyphs, "2 of 3") that opens in place to
   list its logs (long-press one to remove it) and a "Share report" row.
-- **Settings**: pushed from the gear. Today (layout, arrange, log sound),
+- **Settings**: pushed from the gear. Today (layout, arrange, log sound,
+  the Siri phrases with one of your habits),
   Reports (name on cards, daily reminder with its time, Sunday recap) and
   Look (canvas rail, glass). No captions; few-way choices are chips in
   their row.
@@ -158,8 +166,8 @@ shadows: the knob is a disc a step lighter than the habit's color, so it
 stays distinct on the fill. Done, the channel and
 the knob melt into the fill and only the white check stays. Every log from
 the grid shows an `UndoToast` for four seconds; the log that finishes a
-perfect day turns it into "Perfect day" with a "Send report" button for
-six.
+perfect day turns it into "Perfect day" for six, and the report button
+under the grid takes it from there.
 
 Logs from Today chime through `ContentView.logToday`, a pentatonic step
 higher as the day fills (`SoundEffects.logChime(progress:)`), so callers
@@ -172,7 +180,10 @@ pill that toggles that day's log (fixing a forgotten day is one tap). The
 detail sheet's calendar does the same per day.
 
 All log writes go through `Habit.log(on:in:)` and `Habit.removeLog(on:in:)`
-so a day never holds two completions. Deleting a habit goes through
+so a day never holds two completions. Logs made with no window open (Siri,
+a reminder's "Log it") go through `HabitLifecycle.logToday`, which also
+refreshes the widget and rebuilds reminders so one due later today stays
+quiet. Deleting a habit goes through
 `HabitLifecycle.delete` (stops its timer and reminders first).
 
 ### Day ledger
@@ -205,6 +216,17 @@ next seven firings is handled, the habit's week splits into seven weekday
 requests, the handled ones becoming one-shots a week out, and the next sync
 folds it back. Habit reminders stay within `habitReminderBudget` (56 of
 iOS's 64 pending), and habits past it keep the plain daily alert.
+
+A new habit gets a suggested time while its name is typed
+(`ReminderSuggestion`): a word in the name ("meditate" mornings, "read"
+evenings, "at night") or, when another habit is usually logged near then,
+30 minutes before it. `HabitReminderSection` shows it with its reason in
+one line ("9:30 PM, evenings suit reading" while off; only the reason once
+on, since the Time row shows the time), adopts it when the switch turns on,
+and follows the name until the picker moves. The suggestion lives in view
+state, never in `HabitDraft`, so an untouched form stays clean; editing a
+habit never moves a set time. The habit page says the reminder in one line
+("Reminds you at 9:35 AM, before your usual 10:05 AM").
 
 ### Widgets
 
@@ -254,6 +276,25 @@ things out. No templates, layouts or placeholder tokens.
   it was. Calories eaten come from Apple Health and can be typed over before
   sending.
 - An optional daily reminder (`report-reminder`) opens today's report.
+
+### Siri and Apple Intelligence
+
+`Intents/` holds the app's App Intents: `LogHabitTodayIntent` ("Log Read in
+Habit Formed") logs today without opening the app and replies with the
+day's count, and `TodayStatusIntent` ("What's left in Habit Formed") lists
+what is open. `HabitEntity` matches a spoken name loosely. Siri learns habit
+names only from `HabitShortcuts.updateAppShortcutParameters()`, which Today
+calls when the titles change. Intents reach the store through
+`Habit_FormedApp.sharedModelContainer`. The widget's `LogHabitIntent` is
+separate (hidden, App Group queue).
+
+The on-device model (`Services/OnDeviceModel.swift`, FoundationModels) only
+words what the app has already worked out: the math decides, the model
+phrases. Every caller keeps a plain sentence for when it returns nil (most
+devices), never calls it from `body`, and checks the reply (length, no
+numbers it was not given) before showing it. Today it rewords a reminder
+suggestion's reason and writes History's one tip, cached a day per set of
+facts (`AppPreferences.insightsTip`).
 
 ### Weekly recap
 
@@ -354,7 +395,10 @@ The design system is SpeakUp's; when in doubt, match
    scaffolding a target. The day math already has a check: run
    `Scripts/check-day-math.sh` after touching `Date+Helpers` or
    `DayLedger`; it compares them with brute-force versions across time
-   zones, including one where clocks change at midnight.
+   zones, including one where clocks change at midnight. Likewise run
+   `Scripts/check-reminder-suggestion.sh` after touching
+   `ReminderSuggestion`, and `Scripts/check-insights.sh` after touching
+   `HabitInsights`.
 7. **Performance:** round a date to its day (`startOfDay`) as little as
    possible; each call is about a microsecond. Check many dates against
    one day with `dayRange`, step days with `previousDayStart` /
