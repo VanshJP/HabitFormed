@@ -75,11 +75,14 @@ struct ContentView: View {
                     EmptyStateCard(
                         icon: "circle.hexagongrid",
                         title: "No habits yet",
-                        message: "Pick a template or start from scratch. Slide a tile to log it each day.",
+                        message: "Pick an idea or name your own. Slide a tile to log it each day.",
                         buttonTitle: "Add a habit",
                         buttonAction: onAdd
                     )
                 } else {
+                    // A finished day's report is the one thing left to do, so
+                    // it becomes the page's solid button instead of a link.
+                    let sendsPerfectDay = isViewingToday && todayIsPerfect
                     // Names the day the grid shows once it is not today, and
                     // says its count once, here.
                     GlassSection(
@@ -104,13 +107,28 @@ struct ContentView: View {
                                 }
                                 .buttonStyle(.textLink)
                             }
-                            Button {
-                                onShareReport(selectedDate)
-                            } label: {
-                                HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
+                            if !sendsPerfectDay {
+                                Button {
+                                    onShareReport(selectedDate)
+                                } label: {
+                                    HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
+                                }
+                                .buttonStyle(.textLink)
                             }
-                            .buttonStyle(.textLink)
                         }
+                    }
+
+                    if sendsPerfectDay {
+                        GlassButton(
+                            title: "Send today's report",
+                            icon: "square.and.arrow.up",
+                            style: .primary,
+                            size: .large,
+                            fullWidth: true
+                        ) {
+                            onShareReport(Date())
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
             }
@@ -126,14 +144,15 @@ struct ContentView: View {
             }
         }
         .motion(AppMotion.settle, value: undo?.id)
+        .motion(AppMotion.settle, value: todayIsPerfect)
         .onChange(of: todayIsPerfect) { wasPerfect, isPerfect in
             // Celebrate the log that finishes the day, never a page load.
             guard isPerfect, !wasPerfect, isViewingToday else { return }
             Haptics.celebrate()
             SoundEffects.perfectDay()
             celebration += 1
-            // The log that finished the day offers to send it, right where
-            // the thumb already is.
+            // The toast that followed the finishing log says so; the report
+            // button under the grid takes it from there.
             if var last = undo, last.wasLogged, last.day.isToday {
                 last.completesDay = true
                 undo = last
@@ -160,12 +179,7 @@ struct ContentView: View {
             UndoToast(
                 message: undo.message,
                 tint: undo.tint,
-                onUndo: { revert(undo) },
-                actionTitle: undo.completesDay ? "Send report" : nil,
-                onAction: {
-                    self.undo = nil
-                    onShareReport(Date())
-                }
+                onUndo: { revert(undo) }
             )
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.top, 4)
@@ -437,7 +451,7 @@ struct UndoLog: Equatable {
     let day: Date
     /// True when the change added a log; false when it removed one.
     let wasLogged: Bool
-    /// Set when this log finished a perfect day, so the toast offers the report.
+    /// Set when this log finished a perfect day, so the toast says so.
     var completesDay = false
 
     init(habit: Habit, day: Date, wasLogged: Bool) {
