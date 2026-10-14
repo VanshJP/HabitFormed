@@ -34,9 +34,11 @@ struct HistoryView: View {
                     EmptyStateInline(icon: "calendar", message: "Slide a habit on Today and it shows up here.")
                         .padding(.top, 80)
                 } else {
-                    overview
+                    // One snapshot per habit for the whole page.
+                    let tracks = habits.map(\.track)
+                    overview(tracks)
                     streaksSection
-                    daysSection
+                    daysSection(tracks)
                 }
             }
             .pageContentInsets()
@@ -46,12 +48,9 @@ struct HistoryView: View {
         }
     }
 
-    private var tracks: [HabitTrack] { habits.map(\.track) }
-
     // MARK: - Overview
 
-    private var overview: some View {
-        let tracks = tracks
+    private func overview(_ tracks: [HabitTrack]) -> some View {
         let summaries = DayLedger.summaries(endingOn: dayTracker.today, count: Self.mapWeeks * 7, tracks: tracks)
         let byDay = Dictionary(uniqueKeysWithValues: summaries.map { ($0.date, $0) })
         let perfect = summaries.filter(\.isPerfect).count
@@ -84,15 +83,17 @@ struct HistoryView: View {
         if !habits.isEmpty {
             GlassSection("Streaks") {
                 Panel {
-                    ForEach(habits.sorted { $0.displayStreak > $1.displayStreak }) { habit in
+                    // Each streak once, not once per comparison.
+                    let rows = habits.map { (habit: $0, streak: $0.displayStreak) }.sorted { $0.streak > $1.streak }
+                    ForEach(rows, id: \.habit.id) { row in
                         Button {
                             Haptics.light()
-                            detailHabit = habit
+                            detailHabit = row.habit
                         } label: {
-                            ListRowLabel(icon: habit.symbol, tint: habit.color, title: habit.title) {
-                                Text("\(habit.displayStreak) \(habit.streakUnit(for: habit.displayStreak))")
+                            ListRowLabel(icon: row.habit.symbol, tint: row.habit.color, title: row.habit.title) {
+                                Text("\(row.streak) \(row.habit.streakUnit(for: row.streak))")
                                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(habit.displayStreak > 0 ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
+                                    .foregroundStyle(row.streak > 0 ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
                             }
                         }
                         .buttonStyle(RowPressStyle())
@@ -105,7 +106,7 @@ struct HistoryView: View {
     // MARK: - Days
 
     @ViewBuilder
-    private var daysSection: some View {
+    private func daysSection(_ tracks: [HabitTrack]) -> some View {
         let groups = grouped
         let shown = groups.prefix { $0.date >= dayTracker.today.adding(days: -logDays) }
 
@@ -114,7 +115,7 @@ struct HistoryView: View {
                 VStack(spacing: 4) {
                     Panel(dividerInset: RowLayout.horizontalPadding) {
                         ForEach(Array(shown)) { group in
-                            day(group)
+                            day(group, tracks: tracks)
                         }
                     }
 
@@ -137,7 +138,7 @@ struct HistoryView: View {
     /// The day's row, and while it is open its logs and its report, set a
     /// shade deeper so they read as inside the day.
     @ViewBuilder
-    private func day(_ group: DayGroup) -> some View {
+    private func day(_ group: DayGroup, tracks: [HabitTrack]) -> some View {
         let isOpen = openDay == group.date
         Button {
             Haptics.light()
