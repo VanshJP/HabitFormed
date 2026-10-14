@@ -100,7 +100,12 @@ struct SlideToLogTrack: View {
 
     private func drag(maxX: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 1)
-            .updating($isHeld) { _, held, _ in held = true }
+            .updating($isHeld) { _, held, _ in
+                // The first touch warms the sound, so a log's chime lands
+                // with its haptic.
+                if !held { SoundEffects.warm() }
+                held = true
+            }
             .onChanged { value in
                 let x = max(0, min(maxX, value.translation.width))
                 progress = x / maxX

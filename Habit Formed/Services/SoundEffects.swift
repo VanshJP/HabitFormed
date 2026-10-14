@@ -2,7 +2,10 @@ import AVFoundation
 
 /// Centralized sound effects. Buffers are synthesized once on first use and
 /// replayed through shared `AVAudioPlayerNode`s so each call is allocation-
-/// free and stays tight to the haptic that fires alongside it.
+/// free and stays tight to the haptic that fires alongside it. The engine
+/// runs only around a sound: `warm()` starts it when a log is coming (the
+/// knob's touch-down) and it stops a few seconds after the last one, so no
+/// audio thread runs while the app sits open.
 enum SoundEffects {
     private static let engine = AVAudioEngine()
     private static let player = AVAudioPlayerNode()
@@ -18,9 +21,24 @@ enum SoundEffects {
     /// pentatonic climb that tops out at the fifth.
     private static let dayScale = [0, 2, 4, 7]
 
-    /// Pre-warm the audio engine. Safe to call repeatedly.
-    static func prepare() {
+    private static var idleStop: Task<Void, Never>?
+
+    /// Starts the engine ahead of a sound, off the moment it is needed.
+    /// Safe to call repeatedly; it winds down on its own if nothing plays.
+    static func warm() {
+        guard AppPreferences.isLogSoundOn else { return }
         configure()
+        // Activation can block for a while, so on iOS 27 it runs async and
+        // the engine starts once it lands. iOS 26 has only the blocking call.
+        if #available(iOS 27.0, *) {
+            Task {
+                guard (try? await AVAudioSession.sharedInstance().activate(options: [])) == true else { return }
+                startEngine()
+            }
+        } else {
+            startEngine()
+        }
+        stopWhenIdle(after: 4)
     }
 
     /// Bright two-note bell that fires when a habit is logged. `progress` is
@@ -47,10 +65,28 @@ enum SoundEffects {
     }
 
     private static func play(_ buffer: AVAudioPCMBuffer, on node: AVAudioPlayerNode) {
-        if !engine.isRunning { try? engine.start() }
+        startEngine()
+        guard engine.isRunning else { return }
         node.stop()
         node.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
         node.play()
+        stopWhenIdle(after: Double(buffer.frameLength) / sampleRate + 1)
+    }
+
+    private static func startEngine() {
+        guard !engine.isRunning else { return }
+        try? AVAudioSession.sharedInstance().setActive(true)
+        try? engine.start()
+    }
+
+    /// Stops the engine once nothing has played for `seconds`; each sound
+    /// or warm-up pushes it back.
+    private static func stopWhenIdle(after seconds: Double) {
+        idleStop?.cancel()
+        idleStop = Task {
+            guard (try? await Task.sleep(for: .seconds(seconds))) != nil else { return }
+            engine.stop()
+        }
     }
 
     private static func chime(semitones: Int) -> AVAudioPCMBuffer? {
@@ -82,18 +118,6 @@ enum SoundEffects {
             engine.connect(node, to: engine.mainMixerNode, format: format)
         }
         chimeBuffers[0] = renderLogChime(format: format, semitones: 0)
-
-        // Activation can block for a while, so on iOS 27 it runs async and
-        // the engine starts once it lands. iOS 26 has only the blocking call.
-        if #available(iOS 27.0, *) {
-            Task {
-                guard (try? await AVAudioSession.sharedInstance().activate(options: [])) == true else { return }
-                if !engine.isRunning { try? engine.start() }
-            }
-        } else {
-            try? session.setActive(true)
-            try? engine.start()
-        }
     }
 
     // MARK: - Synthesis

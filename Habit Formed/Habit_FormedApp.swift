@@ -29,7 +29,6 @@ struct Habit_FormedApp: App {
         UNUserNotificationCenter.current().delegate = router
         n.registerCategories()
         router.modelContainer = sharedModelContainer
-        SoundEffects.prepare()
     }
 
     let sharedModelContainer: ModelContainer = {
