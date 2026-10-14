@@ -321,11 +321,14 @@ final class HealthKitService {
         guard activeObservers[key] == nil else { return }
         guard let sampleType = sampleType(for: source) else { return }
 
+        // The container is Sendable; the context is not, so resolve it back
+        // on the main actor (views hand us the container's mainContext).
+        let container = context.container
         let query = HKObserverQuery(sampleType: sampleType, predicate: nil) { [weak self] _, completionHandler, error in
             defer { completionHandler() }
             guard error == nil, let self else { return }
             Task { @MainActor in
-                await self.syncHealthKitHabits(in: context)
+                await self.syncHealthKitHabits(in: container.mainContext)
             }
         }
         store.execute(query)

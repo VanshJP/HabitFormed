@@ -38,16 +38,25 @@ enum SoundEffects {
         // be heard. mixWithOthers keeps any music or podcast playing through.
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, options: [.mixWithOthers])
-        try? session.setActive(true)
 
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
             return
         }
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
-        try? engine.start()
-
         logChimeBuffer = renderLogChime(format: format)
+
+        // Activation can block for a while, so on iOS 27 it runs async and
+        // the engine starts once it lands. iOS 26 has only the blocking call.
+        if #available(iOS 27.0, *) {
+            Task {
+                guard (try? await AVAudioSession.sharedInstance().activate(options: [])) == true else { return }
+                if !engine.isRunning { try? engine.start() }
+            }
+        } else {
+            try? session.setActive(true)
+            try? engine.start()
+        }
     }
 
     // MARK: - Synthesis
