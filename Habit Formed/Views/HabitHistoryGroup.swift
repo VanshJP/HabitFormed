@@ -1,37 +1,20 @@
 import SwiftUI
 
-/// One month-grouped block of completions inside `HabitDetailView`. Each row
-/// supports swipe-to-delete via a context menu so accidental logs are easy
-/// to undo.
+/// A habit's latest logs inside `HabitDetailView`, on one row group: the day,
+/// the time, and the note if there is one. Long-press a row to remove it.
 struct HabitHistoryGroup: View {
-    let title: String
     let completions: [HabitCompletion]
     let accent: Color
     let onDelete: (HabitCompletion) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 6)
-
-            VStack(spacing: 0) {
-                ForEach(Array(completions.enumerated()), id: \.element.id) { index, completion in
-                    HabitHistoryRow(completion: completion, accent: accent, onDelete: { onDelete(completion) })
-                    if index < completions.count - 1 {
-                        Divider()
-                            .background(Color.white.opacity(0.08))
-                            .padding(.leading, 52)
-                    }
+        GlassRowGroup(dividerInset: RowLayout.horizontalPadding) {
+            ForEach(completions) { completion in
+                HabitHistoryRow(completion: completion, accent: accent) {
+                    onDelete(completion)
                 }
             }
-            .padding(.bottom, 6)
         }
-        .glassCard(cornerRadius: 16, tint: AppColors.glassTintAccent)
     }
 }
 
@@ -41,66 +24,45 @@ private struct HabitHistoryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(accent.opacity(0.25))
-                    .frame(width: 32, height: 32)
-                Text(dayNumber)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(completion.date.relativeDayName)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
+                Spacer(minLength: 8)
+                Text(trailing)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(weekday)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text(loggedAtString)
+            if !completion.note.isEmpty {
+                Text(completion.note)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(3)
             }
-
-            Spacer()
-
-            if completion.value != 1 {
-                Text(formattedValue)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(accent)
-                .font(.title3)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, RowLayout.horizontalPadding)
+        .padding(.vertical, RowLayout.verticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .contextMenu {
-            Button("Remove Log", systemImage: "trash", role: .destructive) {
+            Button("Remove log", systemImage: "trash", role: .destructive) {
                 onDelete()
             }
         }
     }
 
-    private var dayNumber: String {
-        completion.date.formatted(.dateTime.day())
-    }
-
-    private var weekday: String {
-        if completion.date.isToday { return "Today" }
-        if completion.date.isYesterday { return "Yesterday" }
-        return completion.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-    }
-
-    private var loggedAtString: String {
-        "Logged at " + completion.loggedAt.formatted(date: .omitted, time: .shortened)
-    }
-
-    private var formattedValue: String {
-        let v = completion.value
-        if v.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f", v)
+    /// The logged time, plus the amount when a health log carried one. A log
+    /// added later for a past day shows no time, since it was not done then.
+    private var trailing: String {
+        var parts: [String] = []
+        if completion.loggedAt.isSameDay(as: completion.date) {
+            parts.append(completion.loggedAt.formatted(date: .omitted, time: .shortened))
         }
-        return String(format: "%.1f", v)
+        if completion.value != 1 {
+            let v = completion.value
+            parts.append(v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v))
+        }
+        return parts.joined(separator: " · ")
     }
 }

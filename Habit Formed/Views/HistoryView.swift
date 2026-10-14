@@ -1,175 +1,178 @@
 import SwiftUI
 import SwiftData
 
-/// Lifetime log feed: a stats strip plus one day-grouped timeline card.
+/// The long view, on one page: the perfect-day streak with the week's recap,
+/// a 12-week map, every habit's streak, then the days. A day opens in place
+/// to list its logs (long-press one to remove it) and share its report.
 struct HistoryView: View {
+    var onShareReport: (Date) -> Void = { _ in }
+    var onShareWeek: () -> Void = {}
+
     @Environment(\.modelContext) private var modelContext
     @Environment(DayTracker.self) private var dayTracker
 
     @Query(sort: [SortDescriptor(\HabitCompletion.date, order: .reverse)])
     private var completions: [HabitCompletion]
 
+    @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
+    private var habits: [Habit]
+
+    @State private var detailHabit: Habit?
+    @State private var openDay: Date?
+    /// How many days are listed; "Show earlier days" adds a month.
+    @State private var logDays = 30
+
+    private static let mapWeeks = 12
+
     var body: some View {
-        // Re-render at midnight so "Today"/"Yesterday" headers and
-        // today/week stats stay correct.
+        // Re-render at midnight so "Today" names and stats stay correct.
         let _ = dayTracker.today
 
-        return ZStack {
-            AppBackground(style: .primary).ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    statsStrip
-
-                    if grouped.isEmpty {
-                        emptyState
-                    } else {
-                        timelineHeader
-                        timelineCard
-                    }
-                    Spacer(minLength: 80)
+        return PageScrollView {
+            VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+                if completions.isEmpty && habits.isEmpty {
+                    EmptyStateInline(icon: "calendar", message: "Slide a habit on Today and it shows up here.")
+                        .padding(.top, 80)
+                } else {
+                    // One snapshot per habit for the whole page.
+                    let tracks = habits.map(\.track)
+                    overview(tracks)
+                    streaksSection
+                    daysSection(tracks)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 24)
             }
-            .scrollIndicators(.hidden)
+            .pageContentInsets()
         }
-        .navigationTitle("History")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
-    }
-
-    // MARK: - Stats strip
-
-    private var statsStrip: some View {
-        HStack(spacing: 0) {
-            statColumn(value: todayCount, label: "TODAY")
-            columnDivider
-            statColumn(value: weekCount, label: "THIS WEEK")
-            columnDivider
-            statColumn(value: completions.count, label: "ALL-TIME")
+        .sheet(item: $detailHabit) { habit in
+            HabitDetailView(habit: habit)
         }
-        .padding(16)
-        .glassCard(cornerRadius: 20, tint: AppColors.glassTintAccent)
     }
 
-    private func statColumn(value: Int, label: String) -> some View {
-        VStack(spacing: 5) {
-            Text("\(value)")
-                .font(.system(size: 26, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.system(size: 9, weight: .heavy, design: .rounded))
-                .tracking(1.1)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity)
-    }
+    // MARK: - Overview
 
-    private var columnDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .frame(width: 1)
-            .frame(maxHeight: 34)
-    }
+    private func overview(_ tracks: [HabitTrack]) -> some View {
+        let summaries = DayLedger.summaries(endingOn: dayTracker.today, count: Self.mapWeeks * 7, tracks: tracks)
+        let byDay = Dictionary(uniqueKeysWithValues: summaries.map { ($0.date, $0) })
+        let perfect = summaries.filter(\.isPerfect).count
 
-    // MARK: - Timeline
+        return VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+            HistoryHero(
+                streak: DayLedger.perfectStreak(tracks: tracks),
+                best: DayLedger.bestPerfectStreak(tracks: tracks),
+                perfectLastWeek: summaries.suffix(7).filter(\.isPerfect).count,
+                onShareRecap: onShareWeek
+            )
+            .padding(.top, 8)
 
-    private var timelineHeader: some View {
-        HStack {
-            Text("TIMELINE")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.5))
-            Spacer()
-        }
-        .padding(.horizontal, 4)
-    }
-
-    private var timelineCard: some View {
-        let groups = Array(grouped.prefix(60))
-        return VStack(alignment: .leading, spacing: 22) {
-            ForEach(groups) { group in
-                daySection(group)
+            GlassSection("Last 12 weeks", meta: perfect == 1 ? "1 perfect day" : "\(perfect) perfect days") {
+                Panel {
+                    VStack(alignment: .trailing, spacing: 12) {
+                        ConsistencyHeatMap(summaries: byDay, weeks: Self.mapWeeks)
+                        ConsistencyLegend()
+                    }
+                    .padding(AppLayout.tilePadding)
+                }
             }
         }
-        .padding(.vertical, 16)
-        .glassCard(cornerRadius: 20, tint: AppColors.glassTintAccent)
     }
 
-    private func daySection(_ group: DayGroup) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(headerTitle(for: group.date))
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .tracking(1.4)
-                    .foregroundStyle(.white.opacity(0.55))
-                Spacer()
-                Text("\(group.completions.count)")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(.white.opacity(0.08)))
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 6)
+    // MARK: - Streaks
 
-            VStack(spacing: 0) {
-                ForEach(Array(group.completions.enumerated()), id: \.element.id) { index, completion in
-                    CompletionRow(completion: completion, onDelete: { delete(completion) })
-                    if index < group.completions.count - 1 {
-                        Divider()
-                            .background(Color.white.opacity(0.08))
-                            .padding(.leading, 56)
+    @ViewBuilder
+    private var streaksSection: some View {
+        if !habits.isEmpty {
+            GlassSection("Streaks") {
+                Panel {
+                    // Each streak once, not once per comparison.
+                    let rows = habits.map { (habit: $0, streak: $0.displayStreak) }.sorted { $0.streak > $1.streak }
+                    ForEach(rows, id: \.habit.id) { row in
+                        Button {
+                            Haptics.light()
+                            detailHabit = row.habit
+                        } label: {
+                            ListRowLabel(icon: row.habit.symbol, tint: row.habit.color, title: row.habit.title) {
+                                Text("\(row.streak) \(row.habit.streakUnit(for: row.streak))")
+                                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                                    .foregroundStyle(row.streak > 0 ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
+                            }
+                        }
+                        .buttonStyle(RowPressStyle())
                     }
                 }
             }
         }
     }
 
-    /// "Today" / "Yesterday" / short weekday-date like "FRI AUG 21".
-    private func headerTitle(for date: Date) -> String {
-        if date.isToday { return "TODAY" }
-        if date.isYesterday { return "YESTERDAY" }
-        let cal = Calendar.current
-        let weekday = cal.shortWeekdaySymbols[cal.component(.weekday, from: date) - 1]
-        let month = cal.shortMonthSymbols[cal.component(.month, from: date) - 1]
-        return "\(weekday) \(month) \(cal.component(.day, from: date))".uppercased()
+    // MARK: - Days
+
+    @ViewBuilder
+    private func daysSection(_ tracks: [HabitTrack]) -> some View {
+        let groups = grouped
+        let shown = groups.prefix { $0.date >= dayTracker.today.adding(days: -logDays) }
+
+        if !groups.isEmpty {
+            GlassSection("Days") {
+                VStack(spacing: 4) {
+                    Panel(dividerInset: RowLayout.horizontalPadding) {
+                        ForEach(Array(shown)) { group in
+                            day(group, tracks: tracks)
+                        }
+                    }
+
+                    if shown.count < groups.count {
+                        Button {
+                            Haptics.light()
+                            logDays += 30
+                        } label: {
+                            Text("Show earlier days")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+                        }
+                        .buttonStyle(.textLink)
+                    }
+                }
+            }
+        }
     }
 
-    // MARK: - Empty state
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "list.bullet.circle")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.white.opacity(0.4))
-            Text("No logs yet")
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-            Text("Log something on Home and it shows up here.")
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.6))
+    /// The day's row, and while it is open its logs and its report, set a
+    /// shade deeper so they read as inside the day.
+    @ViewBuilder
+    private func day(_ group: DayGroup, tracks: [HabitTrack]) -> some View {
+        let isOpen = openDay == group.date
+        Button {
+            Haptics.light()
+            withAnimation(AppMotion.settle) { openDay = isOpen ? nil : group.date }
+        } label: {
+            DayRow(
+                date: group.date,
+                completions: group.completions,
+                summary: DayLedger.summary(on: group.date, tracks: tracks, today: dayTracker.today),
+                isOpen: isOpen
+            )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .buttonStyle(RowPressStyle())
+
+        if isOpen {
+            ForEach(group.completions) { completion in
+                CompletionRow(completion: completion, onDelete: { delete(completion) })
+                    .background(Color.black.opacity(0.14))
+            }
+            Button {
+                onShareReport(group.date)
+            } label: {
+                Label("Share report", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+                    .background(Color.black.opacity(0.14))
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityLabel("Share the report for \(group.date.relativeDayName)")
+        }
     }
 
     // MARK: - Aggregation
-
-    private var todayCount: Int {
-        completions.filter { $0.date.isToday }.count
-    }
-
-    private var weekCount: Int {
-        let cal = Calendar.current
-        return completions.filter {
-            cal.isDate($0.date, equalTo: Date(), toGranularity: .weekOfYear)
-        }.count
-    }
 
     private var grouped: [DayGroup] {
         let cal = Calendar.current

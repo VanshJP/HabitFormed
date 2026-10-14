@@ -51,6 +51,8 @@
 				Habit_Formed_WidgetBundle.swift,
 				Habit_Formed_WidgetLiveActivity.swift,
 				Info.plist,
+				TodayWidget.swift,
+				TodayWidgetViews.swift,
 			);
 			target = BBCC56D42F9FE83D00B05D15 /* Habit Formed */;
 		};
@@ -186,7 +188,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2640;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					BBCC56D42F9FE83D00B05D15 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -318,6 +320,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -375,6 +378,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -391,8 +395,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit-Formed-Info.plist";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, and mindful minutes from Apple Health to update your matching habits automatically.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed updates Apple Health when you log mindful sessions.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, mindful minutes, and calories eaten and burned from Apple Health to update your habits and fill in your daily report.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Habit Formed saves your daily report cards to Photos when you ask it to.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
@@ -429,8 +433,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit-Formed-Info.plist";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, and mindful minutes from Apple Health to update your matching habits automatically.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed updates Apple Health when you log mindful sessions.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, mindful minutes, and calories eaten and burned from Apple Health to update your habits and fill in your daily report.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Habit Formed saves your daily report cards to Photos when you ask it to.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
@@ -460,6 +464,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "Habit Formed Widget/Habit_Formed_Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
@@ -467,7 +472,7 @@
 				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Habit Formed Widget";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -491,6 +496,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "Habit Formed Widget/Habit_Formed_Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
@@ -498,7 +504,7 @@
 				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Habit Formed Widget";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

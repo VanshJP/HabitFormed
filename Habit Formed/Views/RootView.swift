@@ -3,74 +3,170 @@ import SwiftData
 
 enum AppTab: Hashable { case today, history }
 
+/// What the shell presents over both tabs: the add flow, a timer opened from
+/// a notification or the mini banner, and the daily report.
+enum RootSheet: Identifiable {
+    case addHabit
+    case timer(Habit)
+    case report(Date)
+    case recap(Date)
+
+    var id: String {
+        switch self {
+        case .addHabit: return "add"
+        case .timer(let habit): return "timer-\(habit.id.uuidString)"
+        case .report(let date): return "report-\(date.timeIntervalSince1970)"
+        case .recap(let date): return "recap-\(date.timeIntervalSince1970)"
+        }
+    }
+}
+
 struct RootView: View {
     @Environment(TimerCenter.self) private var timerCenter
+    @Environment(NotificationService.self) private var notifications
     @Environment(\.modelContext) private var modelContext
 
+    @AppStorage(AppPreferences.appCanvas) private var canvasRaw = AppCanvas.classic.rawValue
+    @AppStorage(AppPreferences.glassAppearance) private var glassRaw = GlassAppearance.light.rawValue
+    @AppStorage(AppPreferences.reportReminderEnabled) private var reportReminderOn = false
+    @AppStorage(AppPreferences.reportReminderHour) private var reportReminderHour = 21
+    @AppStorage(AppPreferences.reportReminderMinute) private var reportReminderMinute = 0
+    @AppStorage(AppPreferences.recapReminderEnabled) private var recapReminderOn = false
+
     @State private var selectedTab: AppTab = .today
-    @State private var showAddHabit = false
-    @State private var timerSheetHabit: Habit?
+    @State private var sheet: RootSheet?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house", value: AppTab.today) {
+            Tab("Today", systemImage: "square.grid.2x2.fill", value: AppTab.today) {
+                // The canvas is painted inside each stack: SwiftUI hosts
+                // navigation content in an opaque view, so a background behind
+                // the TabView would never show.
                 NavigationStack {
-                    ContentView(onAdd: { Haptics.light(); showAddHabit = true })
-                        .navigationBarTitleDisplayMode(.inline)
+                    ContentView(
+                        onAdd: { Haptics.light(); sheet = .addHabit },
+                        onShareReport: { date in openReport(for: date) }
+                    )
+                    .background { AppBackground() }
+                    .toolbar(.hidden, for: .navigationBar)
+                }
+            }
+
+            Tab("History", systemImage: "calendar", value: AppTab.history) {
+                NavigationStack {
+                    HistoryView(
+                        onShareReport: { date in openReport(for: date) },
+                        onShareWeek: { openRecap() }
+                    )
+                        .background { AppBackground() }
                         .toolbar(.hidden, for: .navigationBar)
                 }
             }
-
-
-            Tab("History", systemImage: "clock.arrow.circlepath", value: AppTab.history) {
-                NavigationStack {
-                    HistoryView()
-                }
-            }
         }
+        .tint(.white)
         .overlay(alignment: .bottom) {
             if timerCenter.isActive {
                 MiniTimerBanner {
                     if let habit = lookupActiveTimerHabit() {
                         Haptics.medium()
-                        timerSheetHabit = habit
+                        sheet = .timer(habit)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, 90)
+                .readableColumn()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.45, dampingFraction: 0.85), value: timerCenter.isActive)
             }
         }
-        .sheet(isPresented: $showAddHabit) {
-            AddHabitView()
-        }
-        .sheet(item: $timerSheetHabit) { habit in
-            TimerView(habit: habit)
+        .motion(AppMotion.settle, value: timerCenter.isActive)
+        .sheet(item: $sheet) { item in
+            switch item {
+            case .addHabit:
+                AddHabitView()
+            case .timer(let habit):
+                TimerView(habit: habit)
+            case .report(let date):
+                DailyReportSheet(day: date)
+            case .recap(let date):
+                WeeklyRecapSheet(end: date)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenTimerFromNotification)) { note in
             guard let habitID = note.userInfo?["habitID"] as? UUID,
-                  let habit = lookupActiveHabit(id: habitID) else { return }
+                  let habit = lookupHabit(id: habitID) else { return }
             Haptics.medium()
-            timerSheetHabit = habit
+            sheet = .timer(habit)
         }
-        .tint(AppColors.primary)
+        .onReceive(NotificationCenter.default.publisher(for: .habitOpenReportFromNotification)) { _ in
+            NotificationRouter.pendingRoute = nil
+            openReport(for: Date())
+        }
+        .onOpenURL { url in
+            guard url.scheme == WidgetLink.scheme else { return }
+            if url.host() == WidgetLink.reportHost {
+                openReport(for: Date())
+            } else if url.host() == WidgetLink.recapHost {
+                openRecap()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .habitOpenRecapFromNotification)) { _ in
+            NotificationRouter.pendingRoute = nil
+            openRecap()
+        }
+        .task {
+            // A reminder tapped on a cold launch, before onReceive listened.
+            if let route = NotificationRouter.pendingRoute {
+                NotificationRouter.pendingRoute = nil
+                if route == .habitOpenRecapFromNotification {
+                    openRecap()
+                } else {
+                    openReport(for: Date())
+                }
+            }
+
+            // Re-anchors the repeating report nudge after a reinstall or a
+            // permission change made in iOS Settings.
+            if reportReminderOn {
+                await notifications.syncReportReminder(
+                    enabled: true,
+                    hour: reportReminderHour,
+                    minute: reportReminderMinute
+                )
+            }
+            if recapReminderOn {
+                await notifications.syncRecapReminder(enabled: true)
+            }
+        }
+        .environment(\.glassAppearance, GlassAppearance(rawValue: glassRaw) ?? .light)
+        .environment(\.appCanvas, AppCanvas(rawValue: canvasRaw) ?? .classic)
         .preferredColorScheme(.dark)
     }
 
-    private func lookupActiveHabit(id: UUID) -> Habit? {
+    private func openReport(for date: Date) {
+        Haptics.medium()
+        sheet = .report(date.startOfDay)
+    }
+
+    private func openRecap() {
+        Haptics.medium()
+        sheet = .recap(Date().startOfDay)
+    }
+
+    private func lookupHabit(id: UUID) -> Habit? {
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id })
         return try? modelContext.fetch(descriptor).first
     }
 
     private func lookupActiveTimerHabit() -> Habit? {
         guard let id = timerCenter.habitID else { return nil }
-        return lookupActiveHabit(id: id)
+        return lookupHabit(id: id)
     }
 }
 
 // MARK: - Mini Timer Banner
 
+/// The running timer, floating over every tab: its ring, name and time. Tap to
+/// open the full timer.
 private struct MiniTimerBanner: View {
     @Environment(TimerCenter.self) private var center
     let onTap: () -> Void
@@ -86,60 +182,59 @@ private struct MiniTimerBanner: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(center.habitColor.opacity(0.30))
-                            .frame(width: 34, height: 34)
+                            .stroke(AppColors.meterTrack, lineWidth: 3)
                         Circle()
                             .trim(from: 0, to: CGFloat(progress))
-                            .stroke(center.habitColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .stroke(center.habitColor.glyphTone, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                            .frame(width: 34, height: 34)
                         Image(systemName: center.isRunning ? "waveform" : (isFinished ? "checkmark" : "pause.fill"))
-                            .font(.system(size: 12, weight: .heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                     }
+                    .frame(width: 34, height: 34)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(center.habitTitle)
-                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                         Text(stateLabel(isFinished: isFinished))
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.55))
+                            .eyebrowStyle()
                     }
 
                     Spacer()
 
                     Text(formatted(displaySeconds))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.statValue)
                         .foregroundStyle(.white)
-                        .monospacedDigit()
                         .contentTransition(.numericText())
 
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .glassEffect(.regular.tint(center.habitColor), in: .capsule)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+                .glassEffect(.regular.tint(AppColors.featuredTint(center.habitColor)).interactive(), in: .capsule)
+                .shadow(color: .black.opacity(0.25), radius: 10, y: 5)
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(center.habitTitle) timer")
+        .accessibilityHint("Opens the timer")
     }
 
     private func stateLabel(isFinished: Bool) -> String {
-        if isFinished { return "TAP TO LOG" }
-        if center.isRunning { return "RUNNING" }
-        return "PAUSED"
+        if isFinished { return "Tap to log" }
+        if center.isRunning { return "Running" }
+        return "Paused"
     }
 
     private func formatted(_ seconds: Int) -> String {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
-
 
 #Preview {
     let notifications = NotificationService()

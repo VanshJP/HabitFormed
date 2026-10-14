@@ -2,12 +2,12 @@ import Foundation
 import UserNotifications
 
 /// Owns all `UserNotifications` interactions: permission, per-habit
-/// reminders that respect each habit's cadence, and one-shot timer
-/// completion alerts.
+/// reminders that respect each habit's cadence, the daily report nudge, and
+/// one-shot timer completion alerts, and the Sunday recap nudge.
 ///
-/// Reminder ids use the `habit-reminder-` prefix and timer alerts use
-/// `timer-`, so a reminder rebuild never touches timer alerts and vice
-/// versa. Reminders are rebuilt from scratch on every `syncReminders`
+/// Reminder ids use the `habit-reminder-` prefix, timer alerts use `timer-`,
+/// and the report nudge is `report-reminder`, so a reminder rebuild never
+/// touches the others. Reminders are rebuilt from scratch on every `syncReminders`
 /// call; iOS dedupes by identifier, making the rebuild idempotent.
 @Observable
 final class NotificationService {
@@ -19,8 +19,16 @@ final class NotificationService {
     private var syncGeneration = 0
 
     private static let reminderPrefix = "habit-reminder-"
+    /// Habit reminders carry a "Log it" action, so a reminder can be answered
+    /// from the notification without opening the app.
+    nonisolated static let reminderCategory = "habit-reminder"
+    nonisolated static let logAction = "log"
+    nonisolated static let habitIDKey = "habitID"
     /// Rolling one-shots scheduled ahead for interval habits.
     private static let intervalHorizon = 4
+    /// iOS keeps 64 pending requests per app; habit reminders stay under
+    /// this so the report, recap and timer alerts always fit.
+    private static let habitReminderBudget = 56
 
     // MARK: - Authorization
 
@@ -42,6 +50,26 @@ final class NotificationService {
             isAuthorized = false
             hasRequestedAuthorization = true
         }
+    }
+
+    // MARK: - Categories
+
+    /// Registers the "Log it" action. Call once at launch, before any
+    /// reminder can be delivered.
+    func registerCategories() {
+        let log = UNNotificationAction(
+            identifier: Self.logAction,
+            title: "Log it",
+            options: [],
+            icon: UNNotificationActionIcon(systemImageName: "checkmark")
+        )
+        let reminder = UNNotificationCategory(
+            identifier: Self.reminderCategory,
+            actions: [log],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([reminder])
     }
 
     // MARK: - Habit reminders
@@ -67,8 +95,15 @@ final class NotificationService {
 
         guard isAuthorized else { return }
 
-        for habit in habits where habit.reminderEnabled {
-            for request in Self.reminderRequests(for: habit) {
+        // Splitting a week to skip a handled day costs six more requests;
+        // habits past the budget keep their plain daily alert.
+        let reminding = habits.filter(\.reminderEnabled)
+        var spare = Self.habitReminderBudget - reminding.reduce(0) { $0 + Self.baseRequestCount($1) }
+
+        for habit in reminding {
+            let splitWeek = spare >= 6 && Self.hasHandledDay(habit)
+            if splitWeek { spare -= 6 }
+            for request in Self.reminderRequests(for: habit, splitWeek: splitWeek) {
                 do {
                     try await center.add(request)
                 } catch {
@@ -93,21 +128,24 @@ final class NotificationService {
 
     /// Builds every notification request a habit needs right now.
     ///
-    /// - daily: repeating alert at the reminder time.
-    /// - weekly: repeating alert at the reminder time; body reflects
-    ///   this week's progress toward the target.
+    /// - daily: repeating alert at the reminder time, or with `splitWeek`
+    ///   one alert per weekday so a day already handled stays quiet.
+    /// - weekly: the same; body reflects this week's progress toward the
+    ///   target, and a week whose target is met stays quiet.
     /// - interval: rolling one-shots on upcoming cycle due dates (plus
     ///   catch-up nags while overdue). Never-logged interval habits get
     ///   a repeating nudge until the first log starts the countdown.
-    private static func reminderRequests(for habit: Habit) -> [UNNotificationRequest] {
+    private static func reminderRequests(for habit: Habit, splitWeek: Bool) -> [UNNotificationRequest] {
         switch habit.frequency {
         case .daily:
-            let content = content(for: habit, body: "Time to log.")
+            let content = content(for: habit, body: dailyBody(for: habit))
+            if splitWeek { return weekRequests(habit, content: content) }
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
         case .weekly:
             let body = "\(habit.completionsThisWeek) of \(habit.weeklyTarget) this week."
             let content = content(for: habit, body: body)
+            if splitWeek { return weekRequests(habit, content: content) }
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
         case .interval:
@@ -118,6 +156,79 @@ final class NotificationService {
             return intervalReminderRequests(habit)
         }
     }
+
+    /// Requests a habit needs before any week is split.
+    private static func baseRequestCount(_ habit: Habit) -> Int {
+        habit.frequency == .interval && habit.lastCompletionDate != nil ? intervalHorizon : 1
+    }
+
+    // MARK: - Skipping handled days
+
+    /// The next seven firings at the reminder time, one per weekday,
+    /// starting with today's while it is still ahead.
+    private static func upcomingFirings(_ habit: Habit, now: Date = Date()) -> [Date] {
+        let time = habit.reminderFireTime
+        guard var first = Calendar.current.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: now) else {
+            return []
+        }
+        if first <= now { first = first.adding(days: 1) }
+        return (0..<7).map { first.adding(days: $0) }
+    }
+
+    /// A firing that would nag about a day already handled: one that is
+    /// logged, or for a weekly habit, one in a week whose target is met.
+    private static func isHandled(_ firing: Date, habit: Habit) -> Bool {
+        if habit.isCompleted(on: firing) { return true }
+        return habit.frequency == .weekly
+            && habit.completionsInWeek(of: firing).count >= habit.weeklyTarget
+    }
+
+    private static func hasHandledDay(_ habit: Habit) -> Bool {
+        guard habit.frequency != .interval else { return false }
+        return upcomingFirings(habit).contains { isHandled($0, habit: habit) }
+    }
+
+    /// One alert per weekday. A weekday whose next firing is handled gets a
+    /// one-shot a week later instead of a repeating alert, so it comes back
+    /// even if the app is not opened again; the next sync, on any foreground
+    /// or log, folds the week back into one daily alert.
+    private static func weekRequests(_ habit: Habit, content: UNMutableNotificationContent) -> [UNNotificationRequest] {
+        let calendar = Calendar.current
+        let time = habit.reminderFireTime
+        return upcomingFirings(habit).enumerated().map { index, firing in
+            let handled = isHandled(firing, habit: habit)
+            let firstFire = handled ? firing.adding(days: 7) : firing
+            let trigger: UNCalendarNotificationTrigger
+            if handled {
+                var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: firstFire)
+                parts.timeZone = calendar.timeZone
+                trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+            } else {
+                var parts = DateComponents()
+                parts.weekday = calendar.component(.weekday, from: firing)
+                parts.hour = time.hour
+                parts.minute = time.minute
+                trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: true)
+            }
+            let dayContent = habit.frequency == .weekly
+                ? weeklyContent(habit, base: content, firstFire: firstFire)
+                : content
+            return request(id: "\(reminderID(habit))-d\(index)", content: dayContent, trigger: trigger)
+        }
+    }
+
+    /// A weekly alert whose first firing lands in a later week starts that
+    /// week at zero, not at this week's count.
+    private static func weeklyContent(
+        _ habit: Habit, base: UNMutableNotificationContent, firstFire: Date
+    ) -> UNMutableNotificationContent {
+        guard !Calendar.current.isDate(firstFire, equalTo: Date(), toGranularity: .weekOfYear),
+              let fresh = base.mutableCopy() as? UNMutableNotificationContent else { return base }
+        fresh.body = "0 of \(habit.weeklyTarget) this week."
+        return fresh
+    }
+
+    // MARK: - Interval chains
 
     /// One-shot per upcoming due date, horizon deep. Each app foreground
     /// or log re-syncs the chain, so fired slots are replaced with fresh
@@ -152,8 +263,8 @@ final class NotificationService {
 
         guard let last = habit.lastCompletionDate,
               var candidate = cal.date(
-                bySettingHour: habit.reminderHour,
-                minute: habit.reminderMinute,
+                bySettingHour: habit.reminderFireTime.hour,
+                minute: habit.reminderFireTime.minute,
                 second: 0,
                 of: last.adding(days: step)
               )
@@ -176,10 +287,17 @@ final class NotificationService {
     // MARK: - Reminder builders
 
     private static func repeatingTrigger(_ habit: Habit) -> UNCalendarNotificationTrigger {
+        let time = habit.reminderFireTime
         var components = DateComponents()
-        components.hour = habit.reminderHour
-        components.minute = habit.reminderMinute
+        components.hour = time.hour
+        components.minute = time.minute
         return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+    }
+
+    /// Says why the reminder came now when the time was learned.
+    private static func dailyBody(for habit: Habit) -> String {
+        guard habit.reminderLearnsTime, let usual = habit.usualLogMinute else { return "Time to log." }
+        return "You usually log this around \(ReminderTime(minuteOfDay: usual).label)."
     }
 
     private static func content(for habit: Habit, body: String) -> UNMutableNotificationContent {
@@ -189,6 +307,11 @@ final class NotificationService {
         content.sound = .default
         content.interruptionLevel = .active
         content.threadIdentifier = habit.id.uuidString
+        content.userInfo = [habitIDKey: habit.id.uuidString]
+        // Health habits log themselves from Apple Health, so they get no action.
+        if habit.trackKind != .health {
+            content.categoryIdentifier = reminderCategory
+        }
         return content
     }
 
@@ -200,6 +323,75 @@ final class NotificationService {
 
     private static func reminderID(_ habit: Habit) -> String {
         "\(reminderPrefix)\(habit.id.uuidString)"
+    }
+
+    // MARK: - Report reminder
+
+    private static let reportReminderID = "report-reminder"
+
+    /// The evening nudge to send the day's report: one repeating alert at the
+    /// chosen time, or none. Asks for permission the moment it is turned on.
+    @MainActor
+    func syncReportReminder(enabled: Bool, hour: Int, minute: Int) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.reportReminderID])
+        guard enabled else { return }
+
+        await refreshAuthorizationStatus()
+        if !isAuthorized { await requestAuthorization() }
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Today's report"
+        content.body = "Send today's report to your people before the day ends."
+        content.sound = .default
+        content.interruptionLevel = .active
+
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: Self.reportReminderID, content: content, trigger: trigger)
+        do {
+            try await center.add(request)
+        } catch {
+            print("Failed to schedule report reminder: \(error)")
+        }
+    }
+
+    // MARK: - Recap reminder
+
+    private static let recapReminderID = "recap-reminder"
+
+    /// Sundays at 7 PM, the nudge to send the week's recap. Asks for
+    /// permission the moment it is turned on.
+    @MainActor
+    func syncRecapReminder(enabled: Bool) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.recapReminderID])
+        guard enabled else { return }
+
+        await refreshAuthorizationStatus()
+        if !isAuthorized { await requestAuthorization() }
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Your week recap"
+        content.body = "See how the last seven days went, then send the recap."
+        content.sound = .default
+        content.interruptionLevel = .active
+
+        var components = DateComponents()
+        components.weekday = 1
+        components.hour = 19
+        components.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(identifier: Self.recapReminderID, content: content, trigger: trigger)
+        do {
+            try await center.add(request)
+        } catch {
+            print("Failed to schedule recap reminder: \(error)")
+        }
     }
 
     // MARK: - Timer completion

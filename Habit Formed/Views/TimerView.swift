@@ -18,16 +18,19 @@ struct TimerView: View {
     @State private var didAutoFinish: Bool = false
 
     var body: some View {
-        ZStack {
-            AppBackground(style: .focus).ignoresSafeArea()
+        ZStack(alignment: .topLeading) {
+            AppBackground(style: .recording)
 
             VStack(spacing: 28) {
                 Spacer()
 
-                Text(habit.title.uppercased())
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .foregroundStyle(.white.opacity(0.55))
+                HStack(spacing: 8) {
+                    Image(systemName: habit.symbol)
+                        .foregroundStyle(habit.color.glyphTone)
+                    Text(habit.title)
+                        .foregroundStyle(.white)
+                }
+                .font(.headline)
 
                 ring
 
@@ -37,28 +40,25 @@ struct TimerView: View {
 
                 Spacer()
 
-                HStack(spacing: 24) {
-                    Button(role: .cancel) {
+                if isOurTimer && center.isActive {
+                    Button("Stop timer") {
                         Haptics.light()
-                        dismiss()
-                    } label: {
-                        Text("Close")
+                        showStopConfirm = true
                     }
-                    .foregroundStyle(.white.opacity(0.65))
-
-                    if isOurTimer && center.isActive {
-                        Button(role: .destructive) {
-                            Haptics.light()
-                            showStopConfirm = true
-                        } label: {
-                            Text("Stop Timer")
-                        }
-                        .foregroundStyle(.red.opacity(0.9))
-                    }
+                    .font(.subheadline.weight(.medium))
+                    .frame(minHeight: AppLayout.minHitTarget)
+                    .buttonStyle(.textLink)
+                    .padding(.bottom, 12)
                 }
-                .padding(.bottom, 24)
             }
             .padding(.horizontal, 32)
+            .readableColumn()
+
+            SessionCloseButton(label: "Close timer") {
+                Haptics.light()
+                dismiss()
+            }
+            .padding(AppLayout.pageHorizontal)
         }
         .interactiveDismissDisabled(false)
         .onAppear { Haptics.medium() }
@@ -81,13 +81,13 @@ struct TimerView: View {
             isPresented: $showResetConfirm,
             titleVisibility: .visible
         ) {
-            Button("Reset to \(habit.timerDurationSeconds / 60) min", role: .destructive) {
+            Button("Reset to \(habit.timerDurationSeconds / 60) Min", role: .destructive) {
                 Haptics.warning()
                 center.reset()
             }
             Button("Keep going", role: .cancel) {}
         } message: {
-            Text("You'll lose this session's progress.")
+            Text("This session's progress will be lost.")
         }
         .confirmationDialog(
             "Stop timer?",
@@ -101,7 +101,7 @@ struct TimerView: View {
             }
             Button("Keep going", role: .cancel) {}
         } message: {
-            Text("Progress won't be logged.")
+            Text("This session won't be logged.")
         }
     }
 
@@ -119,34 +119,34 @@ struct TimerView: View {
 
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.08), lineWidth: 14)
+                    .stroke(AppColors.meterTrack, lineWidth: 14)
 
                 Circle()
                     .trim(from: 0, to: prog)
                     .stroke(
                         LinearGradient(
-                            colors: [habit.color, habit.color.opacity(0.6)],
-                            startPoint: .top, endPoint: .bottom
+                            colors: [habit.color.glyphTone, habit.color],
+                            startPoint: .top,
+                            endPoint: .bottom
                         ),
                         style: StrokeStyle(lineWidth: 14, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 6) {
-                    Image(systemName: isFinished ? "checkmark.seal.fill" : habit.symbol)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.8))
                     Text(formatted(displaySeconds))
-                        .font(.system(size: 56, weight: .heavy, design: .rounded))
+                        .font(.displayNumeral)
                         .foregroundStyle(.white)
-                        .monospacedDigit()
                         .contentTransition(.numericText())
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
                     Text(stateLabel(isFinished: isFinished))
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .tracking(2)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .eyebrowStyle()
                 }
+                .padding(.horizontal, 24)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(displaySeconds / 60) minutes \(displaySeconds % 60) seconds left, \(stateLabel(isFinished: isFinished))")
         }
         .frame(width: 280, height: 280)
     }
@@ -160,8 +160,8 @@ struct TimerView: View {
             let elapsed = max(0, total - Int(interval.rounded(.up)))
             if isOurTimer && center.isActive && elapsed > 0 && interval > 0 {
                 Text("\(formatted(elapsed)) completed this session")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 Color.clear.frame(height: 16)
             }
@@ -171,36 +171,19 @@ struct TimerView: View {
     // MARK: - Controls
 
     private var controls: some View {
-        HStack(spacing: 16) {
-            Button {
+        HStack(spacing: 12) {
+            GlassButton(title: "Reset", icon: "arrow.counterclockwise", style: .secondary, size: .large, fullWidth: true) {
                 guard isOurTimer else { return }
                 Haptics.light()
                 showResetConfirm = true
-            } label: {
-                controlLabel(icon: "arrow.counterclockwise", title: "Reset")
             }
             .disabled(!isOurTimer || !canReset)
+            .opacity(!isOurTimer || !canReset ? 0.5 : 1)
 
-            Button {
+            GlassButton(title: primaryTitle, icon: primaryIcon, style: .primary, size: .large, fullWidth: true) {
                 Haptics.medium()
                 handlePrimary()
-            } label: {
-                controlLabel(icon: primaryIcon, title: primaryTitle, primary: true)
             }
-        }
-    }
-
-    private func controlLabel(icon: String, title: String, primary: Bool = false) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon).font(.title3)
-            Text(title).font(.system(size: 13, weight: .heavy, design: .rounded))
-        }
-        .foregroundStyle(.white)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(primary ? habit.color.opacity(0.85) : Color.white.opacity(0.08))
         }
     }
 
@@ -216,11 +199,11 @@ struct TimerView: View {
     }
 
     private func stateLabel(isFinished: Bool) -> String {
-        guard isOurTimer else { return "READY" }
-        if isFinished { return "DONE" }
-        if center.isRunning { return "RUNNING" }
-        if center.isPaused { return "PAUSED" }
-        return "READY"
+        guard isOurTimer else { return "Ready" }
+        if isFinished { return "Done" }
+        if center.isRunning { return "Running" }
+        if center.isPaused { return "Paused" }
+        return "Ready"
     }
 
     private var primaryIcon: String {

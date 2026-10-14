@@ -27,7 +27,8 @@ struct Habit_FormedApp: App {
         // Retained by the @State above; must be attached before any
         // notification is delivered for foreground banners + tap routing.
         UNUserNotificationCenter.current().delegate = router
-        SoundEffects.prepare()
+        n.registerCategories()
+        router.modelContainer = sharedModelContainer
     }
 
     let sharedModelContainer: ModelContainer = {
@@ -56,7 +57,6 @@ struct Habit_FormedApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
-                .tint(AppColors.primary)
                 .environment(health)
                 .environment(notifications)
                 .environment(timer)
