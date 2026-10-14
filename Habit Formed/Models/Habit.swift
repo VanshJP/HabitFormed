@@ -24,12 +24,12 @@ nonisolated enum HabitFrequency: String, Codable, CaseIterable, Identifiable, Se
         }
     }
 
-    /// Short segment-picker title.
+    /// The add sheet's "How often?" choice.
     var shortLabel: String {
         switch self {
-        case .daily:    return "Daily"
-        case .weekly:   return "Per Week"
-        case .interval: return "Every N Days"
+        case .daily:    return "Every day"
+        case .weekly:   return "Weekly"
+        case .interval: return "Every few days"
         }
     }
 }
@@ -156,15 +156,15 @@ nonisolated enum HabitTrackKind: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .manual: return "Manual"
+        case .manual: return "Check off"
         case .timer:  return "Timer"
-        case .health: return "Health"
+        case .health: return "Apple Health"
         }
     }
 
     var symbol: String {
         switch self {
-        case .manual: return "hand.tap"
+        case .manual: return "checkmark.circle"
         case .timer:  return "timer"
         case .health: return "heart.fill"
         }

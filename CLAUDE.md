@@ -69,7 +69,8 @@ Habit Formed/
     ├── Components/           # Ported SpeakUp components (GlassCard, GlassButton, PageTitle, ...) and the
 │                             #   app's own flat ones: Panel, Chips (ChoiceChip, ToggleChip), SwatchRail
     ├── Today/                # WeekStrip, TodayHabitList, DateBrowserSheet, ArrangeHabitsSheet
-    ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections
+    ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
+│                             #   how often, reminder), asked as plain questions with chips
     ├── History/              # HistoryHero, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView, WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, send bar shared by both sheets)
@@ -220,7 +221,7 @@ apply pending logs before writing a snapshot.
 ### Timers
 
 Habits can carry an optional countdown timer
-(`Habit.timerDurationSeconds`, set in the add sheet's Track by → Timer).
+(`Habit.timerDurationSeconds`, set in the add sheet's "How do you log it?" → Timer).
 `TimerView` is a foreground session with a circular progress ring,
 pause/resume/reset, and auto-logs the habit on completion (only if not
 already logged today). Closing before completion does **not** log.

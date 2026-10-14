@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// A one-of-many chip: a timer length, an interval, a layout.
+/// A one-of-many chip: a timer length, an interval, a layout, an idea for
+/// a habit. `tint` colors the glyph, chosen or not.
 struct ChoiceChip: View {
     let title: String
     var icon: String? = nil
+    var tint: Color? = nil
     let isSelected: Bool
     let action: () -> Void
 
@@ -13,7 +15,7 @@ struct ChoiceChip: View {
             Haptics.selection()
             action()
         } label: {
-            ChipFace(title: title, icon: icon, isOn: isSelected)
+            ChipFace(title: title, icon: icon, tint: tint, isOn: isSelected, keepsTint: true)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -41,19 +43,21 @@ struct ToggleChip: View {
 }
 
 /// Both chips' face, flat: solid white with ink when on, a faint tint with
-/// dimmed text when off.
+/// dimmed text when off. An off toggle dims its glyph too, unless
+/// `keepsTint`.
 private struct ChipFace: View {
     let title: String
     let icon: String?
     var tint: Color? = nil
     let isOn: Bool
+    var keepsTint = false
 
     var body: some View {
         HStack(spacing: 6) {
             if let icon {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(isOn ? tint ?? AppColors.inkOnLight : Color.white.opacity(0.45))
+                    .foregroundStyle(glyphColor)
             }
             Text(title)
                 .font(.subheadline.weight(.semibold))
@@ -67,5 +71,11 @@ private struct ChipFace: View {
         .frame(minHeight: AppLayout.minHitTarget)
         .contentShape(.rect)
         .motion(AppMotion.snap, value: isOn)
+    }
+
+    private var glyphColor: Color {
+        if isOn { return tint ?? AppColors.inkOnLight }
+        if keepsTint, let tint { return tint.glyphTone }
+        return Color.white.opacity(0.45)
     }
 }

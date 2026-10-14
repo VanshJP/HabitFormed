@@ -1,47 +1,60 @@
 import SwiftUI
 
-// MARK: - Templates
+// MARK: - Ideas
 
-/// A rail of ready-made habits. One tap fills the form; the name stays
-/// editable.
-struct HabitTemplateRail: View {
+/// Ready-made habits: one tap fills the form, and the name stays editable.
+/// A rail at first; "Show all" wraps every idea into view. The one picked
+/// stays lit.
+struct HabitIdeas: View {
+    let pickedTitle: String
     let onPick: (HabitTemplate) -> Void
 
+    @State private var showAll = false
+
     var body: some View {
-        GlassSection("Start from a template") {
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(HabitTemplate.all) { template in
-                        Button {
-                            onPick(template)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: template.symbol)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Color(hex: template.colorHex).glyphTone)
-                                Text(template.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: AppLayout.minHitTarget)
-                            .controlChrome(in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
+        GlassSection("Ideas") {
+            if showAll {
+                FlowLayout(spacing: 8) { chips }
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) { chips }
                 }
+                .scrollIndicators(.hidden)
+                .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
+                .padding(.horizontal, -AppLayout.pageHorizontal)
             }
-            .scrollIndicators(.hidden)
-            .contentMargins(.horizontal, AppLayout.pageHorizontal, for: .scrollContent)
-            .padding(.horizontal, -AppLayout.pageHorizontal)
+        } accessory: {
+            Button {
+                Haptics.light()
+                withAnimation(AppMotion.settle) { showAll.toggle() }
+            } label: {
+                HeaderLinkLabel(showAll ? "Fewer" : "Show all", icon: showAll ? "chevron.up" : "chevron.down")
+            }
+            .buttonStyle(.textLink)
+            .accessibilityLabel(showAll ? "Show fewer ideas" : "Show all ideas")
+        }
+    }
+
+    @ViewBuilder
+    private var chips: some View {
+        ForEach(HabitTemplate.all) { template in
+            ChoiceChip(
+                title: template.title,
+                icon: template.symbol,
+                tint: Color(hex: template.colorHex),
+                isSelected: template.title == pickedTitle
+            ) {
+                onPick(template)
+            }
         }
     }
 }
 
 // MARK: - Appearance
 
-/// Colour and icon. The icon grid opens on the first row and expands on demand.
-struct HabitAppearanceSection: View {
+/// Colour and icon, inside the name card once opened. The icons open on
+/// two rows and expand on demand.
+struct HabitLookPicker: View {
     @Binding var draft: HabitDraft
     @State private var showAllIcons = false
 
@@ -56,40 +69,37 @@ struct HabitAppearanceSection: View {
     ]
 
     var body: some View {
-        GlassSection("Look") {
-            GlassCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 8)], spacing: 8) {
-                        ForEach(AppColors.tilePalette, id: \.hexString) { swatch in
-                            colorButton(swatch)
-                        }
-                    }
-
-                    MetricRowDivider()
-
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
-                        ForEach(visibleSymbols, id: \.self) { symbol in
-                            symbolButton(symbol)
-                        }
-                    }
-
-                    Button {
-                        Haptics.light()
-                        withAnimation(AppMotion.settle) { showAllIcons.toggle() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(showAllIcons ? "Fewer icons" : "More icons")
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                                .rotationEffect(.degrees(showAllIcons ? -180 : 0))
-                        }
-                        .font(.footnote.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
-                    }
-                    .buttonStyle(.textLink)
+        VStack(alignment: .leading, spacing: 14) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 8)], spacing: 8) {
+                ForEach(AppColors.tilePalette, id: \.hexString) { swatch in
+                    colorButton(swatch)
                 }
             }
+
+            MetricRowDivider()
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                ForEach(visibleSymbols, id: \.self) { symbol in
+                    symbolButton(symbol)
+                }
+            }
+
+            Button {
+                Haptics.light()
+                withAnimation(AppMotion.settle) { showAllIcons.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(showAllIcons ? "Fewer icons" : "More icons")
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .rotationEffect(.degrees(showAllIcons ? -180 : 0))
+                }
+                .font(.footnote.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
+            }
+            .buttonStyle(.textLink)
         }
+        .padding(14)
     }
 
     /// The first row, plus the chosen icon if it lives further down.
@@ -155,9 +165,9 @@ struct HabitAppearanceSection: View {
     }
 }
 
-// MARK: - Track by
+// MARK: - How do you log it?
 
-/// Manual, timer or Apple Health, and the one setting each needs.
+/// Check off, timer or Apple Health, and the one setting each needs.
 struct HabitTrackSection: View {
     @Binding var draft: HabitDraft
     @FocusState private var targetFocused: Bool
@@ -165,81 +175,77 @@ struct HabitTrackSection: View {
     private static let timerOptions: [Int] = [5, 10, 15, 20, 25, 30, 45, 60]
 
     var body: some View {
-        GlassSection("Track by") {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionPicker(
-                    sections: HabitTrackKind.allCases,
-                    selection: Binding(get: { draft.kind }, set: { draft.setKind($0) }),
-                    label: { $0.label },
-                    icon: { $0.symbol },
-                    style: .compact
-                )
+        GlassSection("How do you log it?") {
+            VStack(alignment: .leading, spacing: 10) {
+                FlowLayout(spacing: 8) {
+                    ForEach(HabitTrackKind.allCases) { kind in
+                        ChoiceChip(title: kind.label, icon: kind.symbol, isSelected: draft.kind == kind) {
+                            withAnimation(AppMotion.settle) { draft.setKind(kind) }
+                        }
+                    }
+                }
 
                 switch draft.kind {
                 case .manual:
                     EmptyView()
                 case .timer:
-                    timerCard
+                    timerPanel
                 case .health:
-                    healthCard
+                    healthPanel
                 }
             }
         }
     }
 
-    private var timerCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Timer length")
-                    .font(.subheadline.weight(.semibold))
-                FlowLayout(spacing: 8) {
-                    ForEach(Self.timerOptions, id: \.self) { minutes in
-                        ChoiceChip(title: "\(minutes) min", isSelected: draft.timerDurationSeconds == minutes * 60) {
-                            draft.timerDurationSeconds = minutes * 60
-                        }
+    private var timerPanel: some View {
+        Panel {
+            FlowLayout(spacing: 8) {
+                ForEach(Self.timerOptions, id: \.self) { minutes in
+                    ChoiceChip(title: "\(minutes) min", isSelected: draft.timerDurationSeconds == minutes * 60) {
+                        draft.timerDurationSeconds = minutes * 60
                     }
                 }
             }
+            .padding(12)
         }
     }
 
-    private var healthCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 14) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
-                    ForEach(HealthKitSource.allCases.filter { $0 != .none }) { source in
-                        metricButton(source)
-                    }
+    private var healthPanel: some View {
+        Panel {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
+                ForEach(HealthKitSource.allCases.filter { $0 != .none }) { source in
+                    metricButton(source)
                 }
+            }
+            .padding(12)
 
-                MetricRowDivider()
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(draft.frequency == .weekly ? "Weekly target" : "Daily target")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Logs itself when reached")
-                            .font(.caption)
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(draft.frequency == .weekly ? "Goal a week" : "Goal a day")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Checks itself off when you get there")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                HStack(spacing: 4) {
+                    TextField("", value: $draft.targetValue, format: .number)
+                        .keyboardType(.decimalPad)
+                        .font(.statValue)
+                        .multilineTextAlignment(.trailing)
+                        .focused($targetFocused)
+                        .frame(width: 80)
+                    let unit = draft.source.unitSuffix.trimmingCharacters(in: .whitespaces)
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
-                    HStack(spacing: 4) {
-                        TextField("", value: $draft.targetValue, format: .number)
-                            .keyboardType(.decimalPad)
-                            .font(.statValue)
-                            .multilineTextAlignment(.trailing)
-                            .focused($targetFocused)
-                            .frame(width: 80)
-                        let unit = draft.source.unitSuffix.trimmingCharacters(in: .whitespaces)
-                        if !unit.isEmpty {
-                            Text(unit)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .inputWell(isFocused: targetFocused)
                 }
+                .inputWell(isFocused: targetFocused)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
     }
 
@@ -271,9 +277,9 @@ struct HabitTrackSection: View {
     }
 }
 
-// MARK: - Schedule
+// MARK: - How often?
 
-/// Daily, a weekly target, or every N days (manual habits only).
+/// Every day, some times a week, or every few days (checked-off habits only).
 struct HabitScheduleSection: View {
     @Binding var draft: HabitDraft
 
@@ -284,41 +290,37 @@ struct HabitScheduleSection: View {
     }
 
     var body: some View {
-        GlassSection("Schedule") {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionPicker(
-                    sections: options,
-                    selection: Binding(get: { draft.frequency }, set: { draft.setFrequency($0) }),
-                    label: { $0.shortLabel },
-                    style: .compact
-                )
+        GlassSection("How often?") {
+            VStack(alignment: .leading, spacing: 10) {
+                FlowLayout(spacing: 8) {
+                    ForEach(options) { frequency in
+                        ChoiceChip(title: frequency.shortLabel, isSelected: draft.frequency == frequency) {
+                            withAnimation(AppMotion.settle) { draft.setFrequency(frequency) }
+                        }
+                    }
+                }
 
                 switch draft.frequency {
                 case .daily:
                     EmptyView()
                 case .weekly:
                     if draft.kind != .health {
-                        GlassCard {
+                        Panel {
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(draft.weeklyTarget)× per week")
-                                        .font(.subheadline.weight(.semibold))
-                                        .monospacedDigit()
-                                    Text("Any days you like")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                Text(draft.weeklyTarget == 1 ? "Once a week" : "\(draft.weeklyTarget) times a week")
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
                                 Spacer()
-                                Stepper("Times per week", value: $draft.weeklyTarget, in: 1...7)
+                                Stepper("Times a week", value: $draft.weeklyTarget, in: 1...7)
                                     .labelsHidden()
                             }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
                         }
                     }
                 case .interval:
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Every")
-                                .font(.subheadline.weight(.semibold))
+                    Panel {
+                        VStack(alignment: .leading, spacing: 8) {
                             FlowLayout(spacing: 8) {
                                 ForEach(Self.intervalOptions, id: \.self) { days in
                                     ChoiceChip(title: "\(days) days", isSelected: draft.intervalDays == days) {
@@ -326,10 +328,12 @@ struct HabitScheduleSection: View {
                                     }
                                 }
                             }
-                            Text("Slide to log any time. Logging restarts the countdown.")
+                            Text("Counts from your last log.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .padding(.horizontal, 2)
                         }
+                        .padding(12)
                     }
                 }
             }
@@ -349,23 +353,21 @@ struct HabitReminderSection: View {
 
     var body: some View {
         GlassSection("Reminder") {
-            GlassRowGroup(dividerInset: RowLayout.dividerInset) {
-                SettingsRow("Remind me", icon: "bell", caption: caption, isOn: $draft.reminderEnabled)
+            Panel {
+                SettingsRow("Remind me", icon: "bell", isOn: $draft.reminderEnabled)
                 if draft.reminderEnabled {
-                    if canLearn {
-                        SettingsRow("Learn my time", icon: "sparkles", caption: learnCaption, isOn: $draft.reminderLearnsTime)
-                    }
-                    if let learned = shownLearnedTime {
-                        SettingsRow("Time", icon: "clock") {
+                    SettingsRow("Time", icon: "clock") {
+                        if let learned = shownLearnedTime {
                             Text(learned.label)
                                 .font(.body.monospacedDigit())
                                 .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        SettingsRow(isLearning ? "Until then" : "Time", icon: "clock") {
+                        } else {
                             DatePicker("Reminder time", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
                                 .labelsHidden()
                         }
+                    }
+                    if canLearn {
+                        SettingsRow("Match my routine", icon: "sparkles", caption: learnCaption, isOn: $draft.reminderLearnsTime)
                     }
                 }
             }
@@ -385,23 +387,13 @@ struct HabitReminderSection: View {
     /// nothing about the person's routine.
     private var canLearn: Bool { draft.kind != .health }
 
-    private var isLearning: Bool { canLearn && draft.reminderLearnsTime }
-
     private var shownLearnedTime: ReminderTime? {
-        isLearning ? draft.learnedReminderTime : nil
-    }
-
-    private var caption: String {
-        guard draft.reminderEnabled else { return "Off" }
-        switch draft.frequency {
-        case .daily, .weekly: return "Every day"
-        case .interval: return "On each due date"
-        }
+        canLearn && draft.reminderLearnsTime ? draft.learnedReminderTime : nil
     }
 
     private var learnCaption: String {
         let lead = "\(ReminderTiming.leadMinutes) min before you usually log"
-        guard draft.reminderLearnsTime else { return "Always the time below" }
+        guard draft.reminderLearnsTime else { return "Always at this time" }
         if draft.learnedReminderTime != nil { return lead }
         return "After \(ReminderTiming.minimumLogs) logs, \(lead)"
     }

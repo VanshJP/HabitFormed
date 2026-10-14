@@ -53,8 +53,8 @@ enum AppColors {
     /// Uniform hairline stroke around flat panels.
     static let cardStroke = Color.white.opacity(0.07)
 
-    /// The one solid white: the primary `GlassButton`, a selected
-    /// `SectionPicker` or chip. Anything under 1.0 lets text scrolling behind a
+    /// The one solid white: the primary `GlassButton`, a selected chip.
+    /// Anything under 1.0 lets text scrolling behind a
     /// pinned control show through.
     static let solidWhite = Color.white
 

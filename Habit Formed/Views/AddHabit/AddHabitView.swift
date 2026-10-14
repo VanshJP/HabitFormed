@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// Add or edit a habit. A new habit can start from a template in one tap;
-/// every field lives in a `HabitDraft` that is written on Save.
+/// Add or edit a habit, as a few plain questions: the name (with its icon
+/// and color folded away), how you log it, how often, and a reminder. A new
+/// habit can start from an idea in one tap. Every field lives in a
+/// `HabitDraft` that is written on Save.
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +17,7 @@ struct AddHabitView: View {
     @State private var didLoad = false
     @State private var confirmDiscard = false
     @State private var isSaving = false
+    @State private var showLook = false
     @FocusState private var nameFocused: Bool
 
     private var isDirty: Bool { draft != original }
@@ -24,15 +27,13 @@ struct AddHabitView: View {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     if habit == nil {
-                        HabitTemplateRail { template in
-                            Haptics.selection()
+                        HabitIdeas(pickedTitle: draft.title) { template in
                             withAnimation(AppMotion.settle) { draft.apply(template) }
                             nameFocused = false
                         }
                     }
 
                     nameCard
-                    HabitAppearanceSection(draft: $draft)
                     HabitTrackSection(draft: $draft)
                     HabitScheduleSection(draft: $draft)
                     HabitReminderSection(draft: $draft)
@@ -58,8 +59,8 @@ struct AddHabitView: View {
                 }
             }
             .confirmationDialog("Discard your changes?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-                Button("Discard Changes", role: .destructive) { dismiss() }
-                Button("Keep Editing", role: .cancel) {}
+                Button("Discard changes", role: .destructive) { dismiss() }
+                Button("Keep editing", role: .cancel) {}
             }
             .interactiveDismissDisabled(isDirty)
             .onAppear(perform: load)
@@ -68,31 +69,60 @@ struct AddHabitView: View {
 
     // MARK: - Name
 
+    /// The name beside its glyph, and under it the icon and color, folded
+    /// away until asked for (the glyph opens them too).
     private var nameCard: some View {
-        GlassCard(tint: AppColors.identityTint(Color(hex: draft.colorHex))) {
+        Panel {
             HStack(spacing: 14) {
-                IconChip(icon: draft.symbol, tint: Color(hex: draft.colorHex), size: 44)
-                    .motion(AppMotion.snap, value: draft.symbol)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField(
-                        "",
-                        text: $draft.title,
-                        prompt: Text("Habit name").foregroundStyle(.white.opacity(0.4))
-                    )
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .focused($nameFocused)
-                    .submitLabel(.done)
-                    .inputWell(isFocused: nameFocused)
-
-                    Text(draft.summary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.opacity)
+                Button(action: toggleLook) {
+                    IconChip(icon: draft.symbol, tint: Color(hex: draft.colorHex), size: 36)
+                        .motion(AppMotion.snap, value: draft.symbol)
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Icon and color")
+
+                TextField(
+                    "",
+                    text: $draft.title,
+                    prompt: Text("What's the habit?").foregroundStyle(.white.opacity(0.4))
+                )
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+                .focused($nameFocused)
+                .submitLabel(.done)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+
+            Button(action: toggleLook) {
+                HStack {
+                    Text("Icon and color")
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(showLook ? 180 : 0))
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .frame(minHeight: AppLayout.minHitTarget)
+                .contentShape(.rect)
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityLabel(showLook ? "Hide icon and color" : "Show icon and color")
+
+            if showLook {
+                HabitLookPicker(draft: $draft)
             }
         }
+    }
+
+    private func toggleLook() {
+        Haptics.light()
+        withAnimation(AppMotion.settle) { showLook.toggle() }
     }
 
     // MARK: - Actions

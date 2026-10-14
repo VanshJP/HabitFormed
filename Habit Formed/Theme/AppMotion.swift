@@ -10,7 +10,7 @@ enum AppMotion {
     /// Content arriving or rearranging: cards, sheet contents, list inserts.
     static let settle = Animation.spring(response: 0.4, dampingFraction: 0.85)
 
-    /// Matched-geometry travel, e.g. the selected pill in `SectionPicker`.
+    /// Matched-geometry travel, e.g. a selected pill sliding to its place.
     static let slide = Animation.spring(response: 0.38, dampingFraction: 0.82)
 
     /// A value drawing itself in: a progress ring, a count.

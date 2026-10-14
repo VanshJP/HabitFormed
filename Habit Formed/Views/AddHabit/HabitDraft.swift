@@ -149,30 +149,6 @@ struct HabitDraft: Equatable {
             sortOrder: sortOrder
         )
     }
-
-    // MARK: - Summary
-
-    /// One line under the name: "Daily · Manual", "25 min · 3× / week".
-    var summary: String {
-        switch kind {
-        case .manual:
-            switch frequency {
-            case .daily:    return "Daily · Manual"
-            case .weekly:   return "\(weeklyTarget)× / week · Manual"
-            case .interval: return "Every \(intervalDays) days · Manual"
-            }
-        case .timer:
-            let minutes = "\(timerDurationSeconds / 60) min"
-            switch frequency {
-            case .daily:    return "\(minutes) · Daily"
-            case .weekly:   return "\(minutes) · \(weeklyTarget)× / week"
-            case .interval: return "Every \(intervalDays) days · \(minutes)"
-            }
-        case .health:
-            let cadence = frequency == .weekly ? " / week" : " / day"
-            return "\(source.label) · \(source.compactValue(targetValue))\(cadence)"
-        }
-    }
 }
 
 // MARK: - Templates
