@@ -76,7 +76,7 @@ struct SettingsView: View {
 
     private var siriPhrases: String {
         let habit = habits.first(where: { $0.trackKind != .health })?.title ?? "Read"
-        return "Say \"Log \(habit) in Habit Formed\" or \"What's left in Habit Formed\""
+        return "Say “Log \(habit) in Habit Formed” or “What’s left in Habit Formed”"
     }
 
     // MARK: - Reports

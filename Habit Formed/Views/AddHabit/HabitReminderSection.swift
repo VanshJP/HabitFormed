@@ -74,12 +74,20 @@ struct HabitReminderSection: View {
         draft.reminderMinute = time.minute
     }
 
-    /// "9:30 PM, evenings suit reading", while the suggestion sets the time
-    /// (or would, once on). The model's wording when it has one for this name.
-    private var explanation: String? {
+    /// Why the suggested time, while the suggestion sets it (or would, once
+    /// on). The model's wording when it has one for this name.
+    private var reason: String? {
         guard let suggestion, !(draft.reminderEnabled && pickedTime) else { return nil }
         if let phrased, phrased.title == draft.trimmedTitle { return phrased.text }
-        return "\(suggestion.time.label), \(suggestion.reason.prefix(1).lowercased())\(suggestion.reason.dropFirst())"
+        return suggestion.reason
+    }
+
+    /// "9:30 PM, evenings suit reading" while off; the Time row shows the
+    /// time once on, so the caption then gives only the reason.
+    private var explanation: String? {
+        guard let reason, let suggestion else { return nil }
+        if draft.reminderEnabled { return reason }
+        return "\(suggestion.time.label), \(reason.prefix(1).lowercased())\(reason.dropFirst())"
     }
 
     private var learnCaption: String {
@@ -89,26 +97,25 @@ struct HabitReminderSection: View {
         } else if let usual = draft.usualLogMinute {
             rule = "You usually log around \(ReminderTime(minuteOfDay: usual).label)"
         } else {
-            rule = "After \(ReminderTiming.minimumLogs) logs, \(ReminderTiming.leadMinutes) min before you usually log"
+            rule = "After \(ReminderTiming.minimumLogs) logs it moves to \(ReminderTiming.leadMinutes) min before you usually log"
         }
         return explanation.map { "\($0). \(rule)" } ?? rule
     }
 
-    /// Words the suggestion with the on-device model once typing pauses, and
-    /// keeps the reply only if it still names the suggested time.
+    /// Rewords the reason with the on-device model once typing pauses. The
+    /// app owns the time, so a reply that names one, or runs long, is dropped.
+    /// A reason anchored to another habit is already specific and stays as is.
     private func phrase() async {
         let title = draft.trimmedTitle
-        guard let suggestion, (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
-        // Times format with a narrow space before AM or PM; the model types a plain one.
-        let time = suggestion.time.label.replacingOccurrences(of: "\u{202F}", with: " ")
+        guard let suggestion, !suggestion.reason.contains(where: \.isNumber),
+              (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
         let reply = await OnDeviceModel.phrase(
-            "Habit: \(title). Reminder: \(time). Why: \(suggestion.reason).",
-            instructions: "Say why a habit's reminder is at its time, in one plain sentence under 50 characters. Keep the time exactly as given. No em dashes."
+            "Habit: \(title). Reason for its reminder time: \(suggestion.reason).",
+            instructions: "Reword the reason as one short, warm phrase in sentence case, under 40 characters. Do not mention a time or add facts that are not given. No em dashes, no final period."
         )
         guard !Task.isCancelled,
               let text = reply?.trimmingCharacters(in: CharacterSet(charactersIn: ".")),
-              text.count <= 60,
-              text.replacingOccurrences(of: "\u{202F}", with: " ").contains(time)
+              text.count <= 45, !text.contains(where: \.isNumber)
         else { return }
         phrased = (title, text)
     }
