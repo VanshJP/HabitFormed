@@ -20,9 +20,9 @@ struct ContentView: View {
     var onShareReport: (Date) -> Void = { _ in }
 
     @State private var sheet: HabitSheet?
+    @State private var openHabit: Habit?
     @State private var pendingDelete: Habit?
     @State private var pendingStop: Habit?
-    @Namespace private var zoom
     @State private var selectedDate: Date = .now
     /// The last day the week strip shows; nil keeps it on today. Only the
     /// calendar and "Today" move it, so tapping a strip day never slides the
@@ -97,8 +97,7 @@ struct ContentView: View {
                             layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
                             selectedDate: selectedDate,
                             isPastDay: !isViewingToday,
-                            actions: actions(for:),
-                            zoom: zoom
+                            actions: actions(for:)
                         )
                     } accessory: {
                         HStack(spacing: 14) {
@@ -166,7 +165,7 @@ struct ContentView: View {
 
     private func actions(for habit: Habit) -> HabitActions {
         HabitActions(
-            open: { sheet = .detail(habit) },
+            open: { openHabit = habit },
             log: { logToday(habit) },
             undoToday: { undoToday(habit) },
             togglePastDay: { togglePastDay(habit) },
@@ -203,12 +202,12 @@ struct ContentView: View {
 
     private func presentations<V: View>(_ content: V) -> some View {
         content
+            .navigationDestination(item: $openHabit) { habit in
+                HabitDetailView(habit: habit)
+            }
             .sheet(item: $sheet) { item in
                 switch item {
                 case .edit(let habit): AddHabitView(habit: habit)
-                case .detail(let habit):
-                    HabitDetailView(habit: habit)
-                        .navigationTransition(.zoom(sourceID: habit.id.uuidString, in: zoom))
                 case .timer(let habit): TimerView(habit: habit)
                 }
             }
@@ -503,13 +502,11 @@ struct UndoLog: Equatable {
 
 enum HabitSheet: Identifiable {
     case edit(Habit)
-    case detail(Habit)
     case timer(Habit)
 
     var id: String {
         switch self {
         case .edit(let h):   return "edit-\(h.id.uuidString)"
-        case .detail(let h): return "detail-\(h.id.uuidString)"
         case .timer(let h):  return "timer-\(h.id.uuidString)"
         }
     }

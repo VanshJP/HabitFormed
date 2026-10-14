@@ -45,7 +45,7 @@ struct HistoryView: View {
             .pageContentInsets()
         }
         .confirmsLogRemoval($pendingRemoval, remove: delete)
-        .sheet(item: $detailHabit) { habit in
+        .navigationDestination(item: $detailHabit) { habit in
             HabitDetailView(habit: habit)
         }
     }

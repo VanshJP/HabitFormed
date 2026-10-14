@@ -7,7 +7,7 @@ import SwiftUI
 /// - HealthKit: today's reading against the target, with a meter
 /// - Timer: the week's dots and a play capsule
 ///
-/// Gestures: tap opens the detail sheet, the slide logs today, a long press
+/// Gestures: tap opens the habit's page, the slide logs today, a long press
 /// opens the context menu. On a past day the bottom row is a pill that
 /// toggles that day's log, so a forgotten day is one tap to fix.
 struct HabitTileView: View {
@@ -17,8 +17,6 @@ struct HabitTileView: View {
     /// True when the grid is showing a day before today.
     var isPastDay: Bool = false
     let actions: HabitActions
-    /// Where the habit's page zooms out from, when the host presents one.
-    var zoom: Namespace.ID?
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
@@ -60,7 +58,6 @@ struct HabitTileView: View {
                 tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
             )
             .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
-            .zoomSource(habit.id.uuidString, in: zoom)
             .onTapGesture { Haptics.light(); actions.open() }
             .contextMenu {
                 if !isSliding {

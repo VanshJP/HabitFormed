@@ -12,8 +12,6 @@ struct HabitRowView: View {
     /// True when the list is showing a day before today.
     var isPastDay: Bool = false
     let actions: HabitActions
-    /// Where the habit's page zooms out from, when the host presents one.
-    var zoom: Namespace.ID?
 
     @Environment(HealthKitService.self) private var health
     @Environment(TimerCenter.self) private var timerCenter
@@ -65,7 +63,6 @@ struct HabitRowView: View {
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
         )
         .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
-        .zoomSource(habit.id.uuidString, in: zoom)
         .onTapGesture { Haptics.light(); actions.open() }
         .contextMenu {
             if !isSliding {

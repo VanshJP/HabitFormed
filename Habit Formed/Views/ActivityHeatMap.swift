@@ -5,7 +5,7 @@ import SwiftUI
 /// current week are blank so the grid stays rectangular.
 ///
 /// With `onToggleDay` set, every past cell is a button that adds or removes
-/// that day's log, which is how the detail sheet fixes history.
+/// that day's log, which is how the habit's page fixes history.
 struct ActivityHeatMap: View {
     let completionDates: [Date]
     let accent: Color

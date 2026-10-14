@@ -9,8 +9,6 @@ struct TodayHabitList: View {
     let selectedDate: Date
     let isPastDay: Bool
     let actions: (Habit) -> HabitActions
-    /// Where each habit's page zooms out from.
-    var zoom: Namespace.ID?
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -22,13 +20,13 @@ struct TodayHabitList: View {
         case .tiles:
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(habits) { habit in
-                    HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit), zoom: zoom)
+                    HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
                 }
             }
         case .rows:
             LazyVStack(spacing: 8) {
                 ForEach(habits) { habit in
-                    HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit), zoom: zoom)
+                    HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
                 }
             }
         }

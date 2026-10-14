@@ -30,55 +30,50 @@ struct HabitDetailView: View {
         // Re-render at midnight so the log button flips back to "Log today".
         let _ = dayTracker.today
 
-        return NavigationStack {
-            PageScrollView {
-                VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    hero
-                    calendarSection
-                    todaySection
-                    recentSection
+        return PageScrollView {
+            VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+                hero
+                calendarSection
+                todaySection
+                recentSection
+            }
+            .padding(.horizontal, AppLayout.pageHorizontal)
+            .padding(.bottom, AppLayout.pageBottom)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background { AppBackground(style: .subtle) }
+        .navigationTitle(habit.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Edit", systemImage: "pencil") { Haptics.light(); showingEdit = true }
+                    Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); confirmDelete = true }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
-                .padding(.horizontal, AppLayout.pageHorizontal)
-                .padding(.bottom, AppLayout.pageBottom)
+                .accessibilityLabel("More")
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background { AppBackground(style: .subtle) }
-            .navigationTitle(habit.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(role: .close) { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Edit", systemImage: "pencil") { Haptics.light(); showingEdit = true }
-                        Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); confirmDelete = true }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                    }
-                    .accessibilityLabel("More")
-                }
+        }
+        .onDisappear {
+            guard deleteOnClose else { return }
+            HabitLifecycle.delete(habit, in: modelContext, timer: timerCenter, notifications: notifications)
+        }
+        .sheet(isPresented: $showingTimer) {
+            TimerView(habit: habit)
+        }
+        .sheet(isPresented: $showingEdit) {
+            AddHabitView(habit: habit)
+        }
+        .confirmsLogRemoval($pendingRemoval, remove: delete)
+        .alert("Delete this habit?", isPresented: $confirmDelete) {
+            Button("Delete", role: .destructive) {
+                deleteOnClose = true
+                dismiss()
             }
-            .onDisappear {
-                guard deleteOnClose else { return }
-                HabitLifecycle.delete(habit, in: modelContext, timer: timerCenter, notifications: notifications)
-            }
-            .sheet(isPresented: $showingTimer) {
-                TimerView(habit: habit)
-            }
-            .sheet(isPresented: $showingEdit) {
-                AddHabitView(habit: habit)
-            }
-            .confirmsLogRemoval($pendingRemoval, remove: delete)
-            .alert("Delete this habit?", isPresented: $confirmDelete) {
-                Button("Delete", role: .destructive) {
-                    deleteOnClose = true
-                    dismiss()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This permanently deletes \(habit.title) and its history.")
-            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes \(habit.title) and its history.")
         }
     }
 

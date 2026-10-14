@@ -131,7 +131,7 @@ the header):
   lines `HabitInsights` found in the last eight weeks, plus an Apple
   Intelligence tip when the model is there; hidden until two weeks of days
   exist and something holds). Then the 12-week map with its
-  legend, per-habit streak rows (tap opens the detail sheet), and the days:
+  legend, per-habit streak rows (tap opens the habit's page), and the days:
   each a `DayRow` (name, logged glyphs, "2 of 3") that opens in place to
   list its logs (long-press one to remove it) and a "Share report" row.
 - **Settings**: pushed from the gear. Today (layout as two small pictures,
@@ -179,7 +179,7 @@ confetti. Taking back your own log is `Haptics.undo`, not a warning.
 
 When the grid shows a **past day**, the bottom row of every tile becomes a
 pill that toggles that day's log (fixing a forgotten day is one tap). The
-detail sheet's calendar does the same per day.
+habit page's calendar does the same per day.
 
 All log writes go through `Habit.log(on:in:)` and `Habit.removeLog(on:in:)`
 so a day never holds two completions. Logs made with no window open (Siri,
@@ -368,9 +368,10 @@ The design system is SpeakUp's; when in doubt, match
   close with `Button(role: .close)` top leading (no haptic), and a Done
   that commits is `Button(role: .confirm)`; deletes confirm with an
   `.alert("Delete this X?")` (a log: "Remove this log?", `confirmsLogRemoval`), and stopping a running timer always asks
-  "Stop the timer for X?". A habit's page zooms out of its tile or row
-  (`zoomSource` + `.navigationTransition(.zoom)`), the timer out of the
-  mini banner.
+  "Stop the timer for X?". A habit's page is pushed on the tab's stack
+  (`navigationDestination(item:)`), so it opens fast and swipes back from
+  the edge; the timer zooms out of the mini banner (`zoomSource` +
+  `.navigationTransition(.zoom)`).
 - **Motion:** `AppMotion` tokens and `.motion(_:value:)`, or
   `withMotion(_:_:)` for a change made in an action; both go still under
   Reduce Motion (never call `withAnimation` directly). Numbers that change
