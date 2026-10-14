@@ -20,8 +20,13 @@ struct HabitDraft: Equatable {
     var reminderMinute = 0
     /// New reminders follow the habit's usual log time by default.
     var reminderLearnsTime = true
-    /// What the habit's logs have taught so far, read once when editing.
-    private(set) var learnedReminderTime: ReminderTime?
+    /// When the habit is usually logged, read once when editing.
+    private(set) var usualLogMinute: Int?
+
+    /// What the habit's logs have taught so far.
+    var learnedReminderTime: ReminderTime? {
+        usualLogMinute.map { ReminderTiming.reminder(beforeTypical: $0) }
+    }
 
     init() {}
 
@@ -42,7 +47,7 @@ struct HabitDraft: Equatable {
         // A habit without a reminder yet gets the learning default; one that
         // has a reminder keeps the choice already made.
         reminderLearnsTime = habit.reminderEnabled ? habit.reminderLearnsTime : true
-        learnedReminderTime = habit.learnedReminderTime
+        usualLogMinute = habit.usualLogMinute
     }
 
     /// The palette color the fewest habits wear, so each new habit starts

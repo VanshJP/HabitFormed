@@ -107,10 +107,11 @@ struct HabitDetailView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            if let usual = habit.usualLogMinute {
-                Text("Usually logged around \(ReminderTime(minuteOfDay: usual).label)")
+            if let routine = routineLine {
+                Text(routine)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
 
             if healthLooksBlocked {
@@ -146,6 +147,23 @@ struct HabitDetailView: View {
             ? "\(habit.completionsThisWeek) of \(habit.weeklyTarget) this week"
             : "\(habit.completionsThisWeek) this week"
         return [habit.scheduleLabel, logs, week].joined(separator: " · ")
+    }
+
+    /// The usual log time and the reminder, said once: a learned reminder
+    /// names the time it learned. The usual time is read once per render,
+    /// since this page redraws every second while a timer runs.
+    private var routineLine: String? {
+        let usual = habit.usualLogMinute
+        let usualLabel = usual.map { ReminderTime(minuteOfDay: $0).label }
+        guard habit.reminderEnabled else { return usualLabel.map { "Usually logged around \($0)" } }
+        let setTime = ReminderTime(hour: habit.reminderHour, minute: habit.reminderMinute).label
+        guard habit.reminderLearnsTime, habit.trackKind != .health else {
+            return usualLabel.map { "Reminds you at \(setTime). Usually logged around \($0)" } ?? "Reminds you at \(setTime)"
+        }
+        guard let usual, let usualLabel else {
+            return "Reminds you at \(setTime). Learns your routine after \(ReminderTiming.minimumLogs) logs"
+        }
+        return "Reminds you at \(ReminderTiming.reminder(beforeTypical: usual).label), before your usual \(usualLabel)"
     }
 
     /// Copy for the interval next-due line; urgent means due or overdue.

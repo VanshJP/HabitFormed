@@ -19,6 +19,8 @@ struct AddHabitView: View {
     @State private var confirmDiscard = false
     @State private var isSaving = false
     @State private var showLook = false
+    /// Other habits' usual log times, for a new habit's suggested reminder.
+    @State private var routine: [(title: String, minute: Int)]?
     @FocusState private var nameFocused: Bool
 
     private var isDirty: Bool { draft != original }
@@ -36,7 +38,7 @@ struct AddHabitView: View {
                     }
                     HabitTrackSection(draft: $draft)
                     HabitScheduleSection(draft: $draft)
-                    HabitReminderSection(draft: $draft)
+                    HabitReminderSection(draft: $draft, routine: routine)
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, AppLayout.pageBottom)
@@ -140,6 +142,7 @@ struct AddHabitView: View {
         } else {
             let existing = (try? modelContext.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
             draft.colorHex = HabitDraft.freshColor(after: existing.map(\.colorHex))
+            routine = existing.compactMap { other in other.usualLogMinute.map { (other.title, $0) } }
             // The name is the one thing a new habit needs; the ideas sit
             // right under it, above the keyboard.
             Task {
