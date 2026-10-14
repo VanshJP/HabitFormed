@@ -108,9 +108,10 @@ the header):
   (gear, pushed). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
-  day). The selected day sits on a soft fill, never solid white. Strip taps
-  only change the selected day; the strip itself moves only when the
-  calendar picks an older day (`stripAnchor`). Then the grid's section,
+  day). The selected day sits on a soft circle of glass, never solid
+  white. Strip taps only change the selected day; the strip itself moves
+  only when the calendar picks an older day (`stripAnchor`). Then the
+  grid's section,
   titled "Habits" for today or the browsed day's name, with the day's count
   beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
   while browsing another day). Progress is said once, in that header.
@@ -276,7 +277,9 @@ The design system is SpeakUp's; when in doubt, match
   Settings, the report and add sheets) sit on a `Panel`, one pane of glass
   with hairlines. Chips use `controlChrome`, so a row of them on the canvas
   is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
-  panel they are plates. The material is glass; nothing draws its own
+  panel they are plates. Alignment: text outside a card (page titles,
+  section headers, the History hero) sits on the card's edge, and
+  everything inside a card or tile sits `AppLayout.tilePadding` (14) in. The material is glass; nothing draws its own
   bevel, gradient or glow. Names: the daily card is the "report", the
   weekly one the "recap".
 - **Colour:** only `AppColors`. Identity tints stay at 0.06 on a tile
@@ -288,7 +291,7 @@ The design system is SpeakUp's; when in doubt, match
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);
   words-only buttons use `.buttonStyle(.textLink)`. Selected chips and
   segments are solid white with `AppColors.inkOnLight` text. The week
-  strip is the exception: its selected day is a soft 0.16 white fill.
+  strip is the exception: its selected day is a soft circle of glass.
 - **Type:** text styles that scale (`.subheadline.weight(.semibold)` etc.);
   numerals use `.displayNumeral`, `.ringNumeral`, `.metricValue`,
   `.statValue`. Small caps labels use `.eyebrowStyle()`; never hand-roll

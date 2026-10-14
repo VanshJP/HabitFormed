@@ -47,6 +47,9 @@ private struct GlassBackgroundModifier: ViewModifier {
 /// Branches on an environment value, never on animated state.
 private struct ControlChrome<S: InsettableShape>: ViewModifier {
     let shape: S
+    /// Colors the glass on the canvas (an idea's habit color); a plate on a
+    /// card stays neutral.
+    var tint: Color?
 
     @Environment(\.isOnGlass) private var isOnGlass
     @Environment(\.glassAppearance) private var glassAppearance
@@ -57,7 +60,7 @@ private struct ControlChrome<S: InsettableShape>: ViewModifier {
             content.plateChrome(in: shape)
         } else {
             content.glassEffect(
-                .regular.tint(glassAppearance.glassTint).interactive(),
+                .regular.tint(tint ?? glassAppearance.glassTint).interactive(),
                 in: shape
             )
         }
@@ -94,8 +97,8 @@ extension View {
 
     /// A small control's face wherever it sits: glass on the canvas, the plate
     /// on a card.
-    func controlChrome<S: InsettableShape>(in shape: S) -> some View {
-        modifier(ControlChrome(shape: shape))
+    func controlChrome<S: InsettableShape>(in shape: S, tint: Color? = nil) -> some View {
+        modifier(ControlChrome(shape: shape, tint: tint))
     }
 
     /// A text field's well inside a card: the plate at the well radius, its
@@ -115,7 +118,9 @@ extension View {
 
 /// A page chapter's name. Text only, headline weight, with an optional
 /// detail right after it ("2 of 6 done") and an optional trailing fact
-/// (`HeaderMeta`) or door (`HeaderLinkLabel`).
+/// (`HeaderMeta`) or door (`HeaderLinkLabel`). Flush with the cards under
+/// it: text outside a card sits on the card's edge, text inside sits
+/// `AppLayout.tilePadding` in.
 struct GlassSectionHeader<Accessory: View>: View {
     let title: String
     var detail: String?
@@ -148,7 +153,6 @@ struct GlassSectionHeader<Accessory: View>: View {
             Spacer()
             accessory
         }
-        .padding(.horizontal, 4)
     }
 }
 

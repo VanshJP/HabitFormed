@@ -2,14 +2,16 @@ import SwiftUI
 
 /// Seven days as the Today page's date control, in one row. Each day is its
 /// weekday and date inside a ring that fills as the day's habits are logged
-/// and closes green on a perfect day. The selected day sits on a soft fill
-/// rather than solid white, so the strip stays quieter than the tiles under
-/// it; its count lives in the grid's header. Drawn straight on the canvas, so
-/// it reads as navigation rather than another card.
+/// and closes green on a perfect day. The selected day sits on a soft circle
+/// of glass rather than solid white, so the strip stays quieter than the
+/// tiles under it; its count lives in the grid's header. Drawn straight on
+/// the canvas, so it reads as navigation rather than another card.
 struct WeekStrip: View {
     /// Seven summaries, oldest first.
     let summaries: [DaySummary]
     @Binding var selectedDate: Date
+
+    @Environment(\.glassAppearance) private var glassAppearance
 
     private let ringSize: CGFloat = 44
     private let lineWidth: CGFloat = 3
@@ -38,10 +40,12 @@ struct WeekStrip: View {
                 ring(for: day)
 
                 // Selection is a hard cut, never an animated fill.
-                Circle()
-                    .fill(Color.white.opacity(isSelected ? 0.16 : 0))
-                    .padding(lineWidth + 2)
-                    .transaction { $0.animation = nil }
+                if isSelected {
+                    Color.clear
+                        .glassEffect(.regular.tint(glassAppearance.glassTint), in: .circle)
+                        .padding(lineWidth + 2)
+                        .transaction { $0.animation = nil }
+                }
 
                 VStack(spacing: 0) {
                     Text(day.date.formatted(.dateTime.weekday(.narrow)))

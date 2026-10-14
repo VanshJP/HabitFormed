@@ -37,7 +37,7 @@ enum AppLayout {
     static let cardPadding: CGFloat = 16
 
     /// Inset inside a grid tile, stat tile or half-width card.
-    static let tilePadding: CGFloat = 12
+    static let tilePadding: CGFloat = 14
 
     // MARK: - Corner radii
     //

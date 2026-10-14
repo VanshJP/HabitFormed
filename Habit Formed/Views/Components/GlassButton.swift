@@ -120,6 +120,8 @@ struct GlassButton: View {
     var fullWidth: Bool = false
     let action: () -> Void
 
+    @Environment(\.isEnabled) private var isEnabled
+
     enum IconPosition {
         case left, right
     }
@@ -181,6 +183,7 @@ struct GlassButton: View {
             )
         }
         .buttonStyle(GlassPressStyle())
+        .opacity(isEnabled ? 1 : 0.4)
         .accessibilityLabel(title)
     }
 }

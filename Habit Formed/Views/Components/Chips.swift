@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// A one-of-many chip: a timer length, an interval, a layout, an idea for
-/// a habit. `tint` colors the glyph, chosen or not.
+/// a habit. `tint` colors the glyph and, on the canvas, the glass, so an
+/// idea reads as a suggestion rather than a setting.
 struct ChoiceChip: View {
     let title: String
     var icon: String? = nil
@@ -15,7 +16,7 @@ struct ChoiceChip: View {
             Haptics.selection()
             action()
         } label: {
-            ChipFace(title: title, icon: icon, tint: tint, isOn: isSelected, keepsTint: true)
+            ChipFace(title: title, icon: icon, tint: tint, isOn: isSelected, isChoice: true)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -45,14 +46,16 @@ struct ToggleChip: View {
 /// Both chips' face: solid white with ink when on, `controlChrome` when off
 /// (interactive glass on the canvas, a plate inside a glass panel). The
 /// glass stays put and the white sits on it, so choosing never rebuilds
-/// the glass. An off toggle dims its glyph too, unless `keepsTint`. Put a
-/// row of chips on the canvas in a `GlassEffectContainer`.
+/// the glass. Off text is hierarchical so it adapts to the glass under it:
+/// primary for a choice, secondary (and a dimmer glyph) for a toggle that
+/// leaves something out. Put a row of chips on the canvas in a
+/// `GlassEffectContainer`.
 private struct ChipFace: View {
     let title: String
     let icon: String?
     var tint: Color? = nil
     let isOn: Bool
-    var keepsTint = false
+    var isChoice = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -66,19 +69,19 @@ private struct ChipFace: View {
                 .monospacedDigit()
                 .lineLimit(1)
         }
-        .foregroundStyle(isOn ? AppColors.inkOnLight : Color.white.opacity(0.7))
+        .foregroundStyle(isOn ? AnyShapeStyle(AppColors.inkOnLight) : isChoice ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .padding(.horizontal, 14)
         .frame(minHeight: 34)
         .background(Capsule().fill(isOn ? AppColors.solidWhite : .clear))
-        .controlChrome(in: Capsule())
+        .controlChrome(in: Capsule(), tint: tint.map { $0.opacity(0.3) })
         .frame(minHeight: AppLayout.minHitTarget)
         .contentShape(.rect)
         .motion(AppMotion.snap, value: isOn)
     }
 
-    private var glyphColor: Color {
-        if isOn { return tint ?? AppColors.inkOnLight }
-        if keepsTint, let tint { return tint.glyphTone }
-        return Color.white.opacity(0.45)
+    private var glyphColor: AnyShapeStyle {
+        if isOn { return AnyShapeStyle(tint ?? AppColors.inkOnLight) }
+        if isChoice { return tint.map { AnyShapeStyle($0.glyphTone) } ?? AnyShapeStyle(.secondary) }
+        return AnyShapeStyle(.tertiary)
     }
 }

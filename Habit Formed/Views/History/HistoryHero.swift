@@ -10,7 +10,7 @@ struct HistoryHero: View {
     let onShareRecap: () -> Void
 
     var body: some View {
-        HStack(alignment: .lastTextBaseline) {
+        HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(streak)")
                     .font(.displayNumeral)
@@ -32,15 +32,13 @@ struct HistoryHero: View {
                 Label("Recap", systemImage: "square.and.arrow.up")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 36)
-                    .controlChrome(in: Capsule())
+                    .padding(.horizontal, 16)
                     .frame(minHeight: AppLayout.minHitTarget)
-                    .contentShape(.rect)
+                    .controlChrome(in: Capsule())
+                    .contentShape(Capsule())
             }
             .buttonStyle(GlassPressStyle())
             .accessibilityLabel("Share the week's recap")
         }
-        .padding(.horizontal, 4)
     }
 }

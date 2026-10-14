@@ -103,7 +103,7 @@ struct HabitLookPicker: View {
             }
             .buttonStyle(.textLink)
         }
-        .padding(14)
+        .padding(AppLayout.tilePadding)
     }
 
     /// The first row, plus the chosen icon if it lives further down.
@@ -212,7 +212,7 @@ struct HabitTrackSection: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(AppLayout.tilePadding)
         }
     }
 
@@ -223,7 +223,7 @@ struct HabitTrackSection: View {
                     metricButton(source)
                 }
             }
-            .padding(12)
+            .padding(AppLayout.tilePadding)
 
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -250,7 +250,7 @@ struct HabitTrackSection: View {
                 }
                 .inputWell(isFocused: targetFocused)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, AppLayout.tilePadding)
             .padding(.vertical, 12)
         }
     }
@@ -322,7 +322,7 @@ struct HabitScheduleSection: View {
                                 Stepper("Times a week", value: $draft.weeklyTarget, in: 1...7)
                                     .labelsHidden()
                             }
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, AppLayout.tilePadding)
                             .padding(.vertical, 10)
                         }
                     }
@@ -339,9 +339,8 @@ struct HabitScheduleSection: View {
                             Text("Counts from your last log.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .padding(.horizontal, 2)
                         }
-                        .padding(12)
+                        .padding(AppLayout.tilePadding)
                     }
                 }
             }
@@ -360,33 +359,31 @@ struct HabitReminderSection: View {
     @Environment(NotificationService.self) private var notifications
 
     var body: some View {
-        GlassSection("Reminder") {
-            Panel {
-                SettingsRow("Remind me", icon: "bell", isOn: $draft.reminderEnabled)
-                if draft.reminderEnabled {
-                    SettingsRow("Time", icon: "clock") {
-                        if let learned = shownLearnedTime {
-                            Text(learned.label)
-                                .font(.body.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        } else {
-                            DatePicker("Reminder time", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
-                                .labelsHidden()
-                        }
+        Panel {
+            SettingsRow("Remind me", icon: "bell", isOn: $draft.reminderEnabled)
+            if draft.reminderEnabled {
+                SettingsRow("Time", icon: "clock") {
+                    if let learned = shownLearnedTime {
+                        Text(learned.label)
+                            .font(.body.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    } else {
+                        DatePicker("Reminder time", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
                     }
-                    if canLearn {
-                        SettingsRow("Match my routine", icon: "sparkles", caption: learnCaption, isOn: $draft.reminderLearnsTime)
-                    }
+                }
+                if canLearn {
+                    SettingsRow("Match my routine", icon: "sparkles", caption: learnCaption, isOn: $draft.reminderLearnsTime)
                 }
             }
-            .motion(AppMotion.settle, value: draft.reminderEnabled)
-            .motion(AppMotion.settle, value: draft.reminderLearnsTime)
-            .onChange(of: draft.reminderEnabled) { _, isOn in
-                // iOS silently denies repeat prompts after a refusal, so ask
-                // at the moment of intent.
-                if isOn && !notifications.isAuthorized {
-                    Task { await notifications.requestAuthorization() }
-                }
+        }
+        .motion(AppMotion.settle, value: draft.reminderEnabled)
+        .motion(AppMotion.settle, value: draft.reminderLearnsTime)
+        .onChange(of: draft.reminderEnabled) { _, isOn in
+            // iOS silently denies repeat prompts after a refusal, so ask at
+            // the moment of intent.
+            if isOn && !notifications.isAuthorized {
+                Task { await notifications.requestAuthorization() }
             }
         }
     }

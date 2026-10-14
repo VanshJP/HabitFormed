@@ -71,7 +71,7 @@ struct HistoryView: View {
                         ConsistencyHeatMap(summaries: byDay, weeks: Self.mapWeeks)
                         ConsistencyLegend()
                     }
-                    .padding(14)
+                    .padding(AppLayout.tilePadding)
                 }
             }
         }
