@@ -135,8 +135,8 @@ the header):
 - **Settings**: pushed from the gear. Today (layout, arrange, log sound,
   the Siri phrases with one of your habits),
   Reports (name on cards, daily reminder with its time, Sunday recap) and
-  Look (canvas rail, glass). No captions; few-way choices are chips in
-  their row.
+  Look (canvas rail, glass). No captions except where the words are the
+  content (the Siri phrases); few-way choices are chips in their row.
 
 The rule across screens: say each fact once, keep captions for what is not
 obvious, paint only the selected choice in a grid, and prefer one line of

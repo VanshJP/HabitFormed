@@ -19,6 +19,8 @@ struct AddHabitView: View {
     @State private var confirmDiscard = false
     @State private var isSaving = false
     @State private var showLook = false
+    /// The idea last tapped, so its chip stays lit while the name is its own.
+    @State private var pickedIdea: String?
     /// Other habits' usual log times, for a new habit's suggested reminder.
     @State private var routine: [(title: String, minute: Int)]?
     @FocusState private var nameFocused: Bool
@@ -31,7 +33,10 @@ struct AddHabitView: View {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                     nameCard
                     if habit == nil {
-                        HabitIdeas(pickedTitle: draft.title) { template in
+                        // Lit only once tapped: a typed name that matches an
+                        // idea has not taken its settings.
+                        HabitIdeas(pickedTitle: draft.title == pickedIdea ? draft.title : "") { template in
+                            pickedIdea = template.title
                             withAnimation(AppMotion.settle) { draft.apply(template) }
                             nameFocused = false
                         }
