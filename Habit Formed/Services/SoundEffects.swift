@@ -28,16 +28,7 @@ enum SoundEffects {
     static func warm() {
         guard AppPreferences.isLogSoundOn else { return }
         configure()
-        // Activation can block for a while, so on iOS 27 it runs async and
-        // the engine starts once it lands. iOS 26 has only the blocking call.
-        if #available(iOS 27.0, *) {
-            Task {
-                guard (try? await AVAudioSession.sharedInstance().activate(options: [])) == true else { return }
-                startEngine()
-            }
-        } else {
-            startEngine()
-        }
+        startEngine()
         stopWhenIdle(after: 4)
     }
 
@@ -75,7 +66,6 @@ enum SoundEffects {
 
     private static func startEngine() {
         guard !engine.isRunning else { return }
-        try? AVAudioSession.sharedInstance().setActive(true)
         try? engine.start()
     }
 
@@ -108,6 +98,10 @@ enum SoundEffects {
         // be heard. mixWithOthers keeps any music or podcast playing through.
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, options: [.mixWithOthers])
+        // Activation can block for a while, so it runs once, off the main
+        // thread. Nothing deactivates it, and a start that beats it lands
+        // fine: the engine activates the session itself when it has to.
+        Task.detached { try? AVAudioSession.sharedInstance().setActive(true) }
 
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
             return

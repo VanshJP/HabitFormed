@@ -109,27 +109,28 @@ Settings are pushed from Today's top row:
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄", which opens the calendar) and a capsule holding the
-  perfect-day `StreakChip` (only once a streak exists), add (+), History
-  (clock, pushed) and Settings (gear, pushed). Right under it the `WeekStrip` is the date control: one
+  perfect-day `StreakChip` (only once a streak exists), add (+), Share report
+  (the day shown), History (clock, pushed) and Settings (gear, pushed). The
+  calendar is a full-height sheet (a shorter one floats off the screen's
+  edges on iOS 26). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
   day). The selected day sits on a soft circle of glass, never solid
-  white, that slides to the day tapped (`matchedGeometryEffect`; a glass
-  container would draw it over the letters). Strip taps only change the selected day; the strip itself moves
-  only when the calendar picks an older day (`stripAnchor`). Then the
-  grid's section,
-  titled "Habits" for today or the browsed day's name, with the day's count
-  beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
-  while browsing another day). Progress is said once, in that header.
-  Once today is perfect the link steps aside for a solid "Send today's
-  report" under the grid, the screen's one primary button.
-  The section lists every habit, as tiles or rows (`TodayLayout`, picked
+  white: one circle under the row that glides to the day tapped
+  (`AppMotion.slide`; a glass container would draw it over the letters),
+  while the grid lands on the new day at once. Strip taps only change the selected day; the strip itself moves
+  only when the calendar picks an older day (`stripAnchor`). The habits
+  follow with no title or count over them: the strip's ring is the day's
+  progress, said once. Under the grid sits a "Today" link while browsing
+  another day, and once today is perfect a solid "Share today's report",
+  the screen's one primary button.
+  Every habit shows, as tiles or rows (`TodayLayout`, picked
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
   of filled squares and needs no other line to say so. Done means logged on
   the day shown, the ledger's `.done`, and one `isDone` drives the fill,
   the white glyph, the featured tint and the spoken state, so a tile always
-  agrees with the header's count, the week strip and its own pill; a weekly
+  agrees with the week strip's ring and its own pill; a weekly
   habit's week is its status line's to say ("2 of 3 this week").
 - **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last

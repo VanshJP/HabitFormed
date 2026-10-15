@@ -17,6 +17,12 @@ struct HabitTileView: View {
     var selectedDate: Date = .now
     /// True when the grid is showing a day before today.
     var isPastDay: Bool = false
+    /// Logged on the day shown, the ledger's `.done`, handed down from the
+    /// page's tracks so a tile never scans its logs: the fill, the white
+    /// glyph, the featured tint and the spoken state all follow it, so a
+    /// tile agrees with the week strip's ring and its own pill.
+    /// A weekly habit's week is the status line's to say.
+    let isDone: Bool
     let actions: HabitActions
 
     @Environment(HealthKitService.self) private var health
@@ -32,12 +38,6 @@ struct HabitTileView: View {
     @State private var showStopConfirm = false
 
     private let padding = AppLayout.tilePadding
-
-    /// Logged on the day shown, the ledger's `.done`: the fill, the white
-    /// glyph, the featured tint and the spoken state all follow it, so a
-    /// tile agrees with the header's count, the week strip and its own pill.
-    /// A weekly habit's week is the status line's to say.
-    private var isDone: Bool { habit.isCompleted(on: selectedDate) }
 
     var body: some View {
         // Re-render at midnight so today-driven state updates.
@@ -152,7 +152,7 @@ struct HabitTileView: View {
     /// A past day's log as a toggle: tap to add a forgotten log or remove a
     /// wrong one. The toast on Today offers the way back.
     private var pastDayPill: some View {
-        let logged = habit.isCompleted(on: selectedDate)
+        let logged = isDone
         return Button(action: actions.togglePastDay) {
             HStack(spacing: 6) {
                 Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")

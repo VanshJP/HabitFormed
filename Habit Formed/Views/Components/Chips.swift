@@ -1,5 +1,11 @@
 import SwiftUI
 
+extension FlowLayout {
+    /// Rows of chips. A chip's hit frame already sits 5pt clear of its
+    /// capsule, so lines stack frame to frame and the capsules land 10 apart.
+    static let chips = FlowLayout(spacing: 8, lineSpacing: 0)
+}
+
 /// A one-of-many chip: a timer length, an interval, a layout, an idea for
 /// a habit. `tint` colors the glyph and, on the canvas, the glass, so an
 /// idea reads as a suggestion rather than a setting.

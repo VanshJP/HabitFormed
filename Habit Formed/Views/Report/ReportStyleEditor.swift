@@ -1,9 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// What goes on the report card and how it looks: the habits and details,
-/// the Apple Health numbers, then the layout as pictures, the background, the
-/// accent and the type. What is on the card leads, since it changes from day
+/// What goes on the report card and how it looks: the habits, details and
+/// Apple Health numbers as one set of chips, then the layout as pictures, the
+/// background, the accent and the type. What is on the card leads, since it changes from day
 /// to day while the look is set once. It reads and writes the stored choices
 /// itself, so Settings → Report card and the sheet's Edit are one editor, and
 /// the card above it redraws as each one changes.
@@ -31,7 +31,6 @@ struct ReportStyleEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
             contentsSection
-            healthSection
             GlassSection("Layout") {
                 Panel {
                     SketchPicker(
@@ -49,7 +48,7 @@ struct ReportStyleEditor: View {
             }
             GlassSection("Type") {
                 GlassEffectContainer(spacing: 8) {
-                    FlowLayout(spacing: 8) {
+                    FlowLayout.chips {
                         ForEach(ReportFont.allCases) { font in
                             ChoiceChip(title: font.title, isSelected: fontRaw == font.rawValue) {
                                 fontRaw = font.rawValue
@@ -113,36 +112,30 @@ struct ReportStyleEditor: View {
 
     // MARK: - On the card
 
-    /// The habits first, then what each one carries. Notes and the week's
+    /// The habits, then what each one carries, then one chip per Apple Health
+    /// number, so what is picked is exactly what the card adds. A wider gap
+    /// sets the groups apart instead of a header each. Notes and the week's
     /// dots live in a row, so they are offered only in the list layout.
     private var contentsSection: some View {
         GlassSection("On the card") {
             GlassEffectContainer(spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    FlowLayout(spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    FlowLayout.chips {
                         ForEach(habits) { habit in
                             ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
                         }
                     }
-                    FlowLayout(spacing: 8) {
+                    FlowLayout.chips {
                         ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
                         if layout.showsRowDetail {
                             ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
                             ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
                         }
                     }
-                }
-            }
-        }
-    }
-
-    /// One chip per number, so what is picked is exactly what the card adds.
-    private var healthSection: some View {
-        GlassSection("Apple Health") {
-            GlassEffectContainer(spacing: 8) {
-                FlowLayout(spacing: 8) {
-                    ForEach(ReportMetric.allCases) { metric in
-                        ToggleChip(title: metric.title, icon: metric.icon, isOn: shows(metric))
+                    FlowLayout.chips {
+                        ForEach(ReportMetric.allCases) { metric in
+                            ToggleChip(title: metric.title, icon: metric.icon, isOn: shows(metric))
+                        }
                     }
                 }
             }

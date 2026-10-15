@@ -15,7 +15,7 @@ struct HabitIdeas: View {
         GlassSection("Ideas") {
             if showAll {
                 GlassEffectContainer(spacing: 8) {
-                    FlowLayout(spacing: 8) { chips }
+                    FlowLayout.chips { chips }
                 }
             } else {
                 ScrollView(.horizontal) {
@@ -182,7 +182,7 @@ struct HabitTrackSection: View {
         GlassSection("How do you log it?") {
             VStack(alignment: .leading, spacing: 10) {
                 GlassEffectContainer(spacing: 8) {
-                    FlowLayout(spacing: 8) {
+                    FlowLayout.chips {
                         ForEach(HabitTrackKind.allCases) { kind in
                             ChoiceChip(title: kind.label, icon: kind.symbol, isSelected: draft.kind == kind) {
                                 withMotion(AppMotion.settle) { draft.setKind(kind) }
@@ -205,7 +205,7 @@ struct HabitTrackSection: View {
 
     private var timerPanel: some View {
         Panel {
-            FlowLayout(spacing: 8) {
+            FlowLayout.chips {
                 ForEach(Self.timerOptions, id: \.self) { minutes in
                     ChoiceChip(title: "\(minutes) min", isSelected: draft.timerDurationSeconds == minutes * 60) {
                         draft.timerDurationSeconds = minutes * 60
@@ -299,7 +299,7 @@ struct HabitScheduleSection: View {
         GlassSection("How often?") {
             VStack(alignment: .leading, spacing: 10) {
                 GlassEffectContainer(spacing: 8) {
-                    FlowLayout(spacing: 8) {
+                    FlowLayout.chips {
                         ForEach(options) { frequency in
                             ChoiceChip(title: frequency.shortLabel, isSelected: draft.frequency == frequency) {
                                 withMotion(AppMotion.settle) { draft.setFrequency(frequency) }
@@ -329,7 +329,7 @@ struct HabitScheduleSection: View {
                 case .interval:
                     Panel {
                         VStack(alignment: .leading, spacing: 8) {
-                            FlowLayout(spacing: 8) {
+                            FlowLayout.chips {
                                 ForEach(Self.intervalOptions, id: \.self) { days in
                                     ChoiceChip(title: "\(days) days", isSelected: draft.intervalDays == days) {
                                         draft.intervalDays = days

@@ -12,6 +12,9 @@ struct HabitRowView: View {
     var selectedDate: Date = .now
     /// True when the list is showing a day before today.
     var isPastDay: Bool = false
+    /// Logged on the day shown, the same fact a tile fills for (see
+    /// `HabitTileView.isDone`).
+    let isDone: Bool
     let actions: HabitActions
 
     @Environment(HealthKitService.self) private var health
@@ -27,10 +30,6 @@ struct HabitRowView: View {
     /// While the knob is held the long-press menu stays empty, so pausing
     /// mid-slide never opens it.
     @State private var isSliding = false
-
-    /// Logged on the day shown, the same fact a tile fills for (see
-    /// `HabitTileView.isDone`).
-    private var isDone: Bool { habit.isCompleted(on: selectedDate) }
 
     var body: some View {
         // Re-render at midnight so today-driven state updates.
@@ -115,7 +114,7 @@ struct HabitRowView: View {
     }
 
     private var pastDayToggle: some View {
-        let logged = habit.isCompleted(on: selectedDate)
+        let logged = isDone
         return Button(action: actions.togglePastDay) {
             Label(logged ? "Logged" : "Log", systemImage: logged ? "checkmark.circle.fill" : "plus.circle")
                 .font(.caption.weight(.semibold))
