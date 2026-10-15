@@ -4,8 +4,10 @@ import SwiftData
 /// Add or edit a habit, as a few plain questions: the name (with its icon
 /// and color folded away), how you log it, how often, and a reminder. A new
 /// habit opens on its name, with ideas under it that fill everything in one
-/// tap. Close is the X; the one solid button, pinned at the bottom, adds or
-/// saves. Every field lives in a `HabitDraft` that is written on save.
+/// tap, and fills itself in from what is typed ("Read 20 min" picks the book
+/// and a 20 minute timer). Close is the X; the one solid button, pinned at
+/// the bottom, adds or saves. Every field lives in a `HabitDraft` that is
+/// written on save.
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -23,6 +25,8 @@ struct AddHabitView: View {
     @State private var pickedIdea: String?
     /// Other habits' usual log times, for a new habit's suggested reminder.
     @State private var routine: [(title: String, minute: Int)]?
+    /// The glyph and plan as the typed name last set them (`HabitDraft.follow`).
+    @State private var named = HabitDraft()
     @FocusState private var nameFocused: Bool
 
     private var isDirty: Bool { draft != original }
@@ -70,6 +74,7 @@ struct AddHabitView: View {
             }
             .interactiveDismissDisabled(isDirty)
             .onAppear(perform: load)
+            .onChange(of: draft.title) { followName() }
         }
     }
 
@@ -134,6 +139,16 @@ struct AddHabitView: View {
         withMotion(AppMotion.settle) { showLook.toggle() }
     }
 
+    /// A new habit's glyph and plan follow its name while typed, until the
+    /// person picks their own. Editing never moves them.
+    private func followName() {
+        guard habit == nil, didLoad else { return }
+        var next = draft
+        next.follow(HabitGuess.read(draft.title), named: &named, base: original)
+        guard next != draft else { return }
+        withMotion(AppMotion.settle) { draft = next }
+    }
+
     // MARK: - Actions
 
     private func load() {
@@ -145,6 +160,7 @@ struct AddHabitView: View {
             let existing = (try? modelContext.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
             draft.colorHex = HabitDraft.freshColor(after: existing.map(\.colorHex))
             routine = existing.compactMap { other in other.usualLogMinute.map { (other.title, $0) } }
+            named = draft
             // The name is the one thing a new habit needs; the ideas sit
             // right under it, above the keyboard.
             Task {

@@ -106,9 +106,10 @@ struct HabitLookPicker: View {
         .padding(AppLayout.tilePadding)
     }
 
-    /// The first row, plus the chosen icon if it lives further down.
+    /// The first row, plus the chosen icon if it lives further down or is
+    /// one the name picked from outside the grid.
     private var visibleSymbols: [String] {
-        if showAllIcons { return Self.symbols }
+        if showAllIcons { return Self.symbols.contains(draft.symbol) ? Self.symbols : Self.symbols + [draft.symbol] }
         var row = Array(Self.symbols.prefix(12))
         if !row.contains(draft.symbol) {
             row[row.count - 1] = draft.symbol
@@ -206,7 +207,7 @@ struct HabitTrackSection: View {
     private var timerPanel: some View {
         Panel {
             FlowLayout.chips {
-                ForEach(Self.timerOptions, id: \.self) { minutes in
+                ForEach(Self.timerOptions.including(draft.timerDurationSeconds / 60), id: \.self) { minutes in
                     ChoiceChip(title: "\(minutes) min", isSelected: draft.timerDurationSeconds == minutes * 60) {
                         draft.timerDurationSeconds = minutes * 60
                     }
@@ -330,7 +331,7 @@ struct HabitScheduleSection: View {
                     Panel {
                         VStack(alignment: .leading, spacing: 8) {
                             FlowLayout.chips {
-                                ForEach(Self.intervalOptions, id: \.self) { days in
+                                ForEach(Self.intervalOptions.including(draft.intervalDays), id: \.self) { days in
                                     ChoiceChip(title: "\(days) days", isSelected: draft.intervalDays == days) {
                                         draft.intervalDays = days
                                     }
@@ -345,5 +346,13 @@ struct HabitScheduleSection: View {
                 }
             }
         }
+    }
+}
+
+private extension Array where Element == Int {
+    /// These choices with `value` in its place among them, so a length or a
+    /// count the name set (40 min, every 8 days) shows as the lit chip.
+    func including(_ value: Element) -> [Element] {
+        contains(value) ? self : (self + [value]).sorted()
     }
 }

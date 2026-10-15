@@ -60,10 +60,11 @@ Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today, the root page: month control, week strip, the habits, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
-│                             #   ReportOptions (+ ReportTheme)
+│                             #   HabitGuess, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
 │                             #   renderer, share, Messages, HabitInsights, OnDeviceModel
-├── Intents/                  # Siri: HabitEntity, LogHabitTodayIntent, TodayStatusIntent, HabitShortcuts
+├── Intents/                  # Siri: HabitEntity, LogHabitTodayIntent, AddHabitIntent, TodayStatusIntent,
+│                             #   HabitShortcuts
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
 │                             #   GlassStyles, AppBackground, AppCanvas, CanvasLook, AppearanceEnvironment
 ├── Extensions/               # Haptics, Date helpers (streak math, trailing days)
@@ -236,6 +237,18 @@ rings, the perfect-day streak and the report's counts. Per habit and day a
 and missed count toward the total. A perfect day logged everything expected;
 days that expected nothing are skipped by the streak.
 
+### Adding a habit
+
+A new habit fills itself in from its name as it is typed
+(`HabitGuess`, words and patterns, no model): a glyph for the activity
+("Walk the dog" a paw, "Water the plants" a leaf), a timer for a length
+("Read 20 min"), Apple Health for a metric ("10k steps", "Sleep 8 hours",
+"Run 5k"), and the schedule ("3x a week", "every 3 days"). The glyph and
+the plan (`HabitDraft.Plan`: how and how often) each follow the name only
+while they still hold what it last set (`HabitDraft.follow`), so a chip the
+person taps, or an idea, makes that part theirs; editing never moves them.
+A length or count outside the chips joins them as the lit one.
+
 ### Reminders
 
 A reminder learns by default (`Habit.reminderLearnsTime`): once a habit has
@@ -351,8 +364,10 @@ things out. No templates, layouts or placeholder tokens.
 
 `Intents/` holds the app's App Intents: `LogHabitTodayIntent` ("Log Read in
 Habit Formed") logs today without opening the app and replies with the
-day's count, and `TodayStatusIntent` ("What's left in Habit Formed") lists
-what is open. `HabitEntity` matches a spoken name loosely. Siri learns habit
+day's count, `AddHabitIntent` ("Add a habit in Habit Formed") asks for a
+name and makes the habit from it with `HabitGuess`, as the add sheet does
+("Gym 3 times a week" is Gym, 3 a week), and `TodayStatusIntent` ("What's
+left in Habit Formed") lists what is open. `HabitEntity` matches a spoken name loosely. Siri learns habit
 names only from `HabitShortcuts.updateAppShortcutParameters()`, which Today
 calls when the titles change. Intents reach the store through
 `Habit_FormedApp.sharedModelContainer`. The widget's `LogHabitIntent` is
@@ -490,8 +505,9 @@ The design system is SpeakUp's; when in doubt, match
    `DayLedger`; it compares them with brute-force versions across time
    zones, including one where clocks change at midnight. Likewise run
    `Scripts/check-reminder-suggestion.sh` after touching
-   `ReminderSuggestion`, and `Scripts/check-insights.sh` after touching
-   `HabitInsights`.
+   `ReminderSuggestion`, `Scripts/check-insights.sh` after touching
+   `HabitInsights`, and `Scripts/check-habit-guess.sh` after touching
+   `HabitGuess`.
 7. **Performance:** round a date to its day (`startOfDay`) as little as
    possible; each call is about a microsecond. Check many dates against
    one day with `dayRange`, step days with `previousDayStart` /

@@ -103,6 +103,71 @@ struct HabitDraft: Equatable {
         }
     }
 
+    // MARK: - Following the name
+
+    /// How and how often the habit is logged: what a typed name can fill in
+    /// besides the glyph.
+    struct Plan: Equatable {
+        var kind: HabitTrackKind
+        var source: HealthKitSource
+        var targetValue: Double
+        var timerDurationSeconds: Int
+        var frequency: HabitFrequency
+        var weeklyTarget: Int
+        var intervalDays: Int
+    }
+
+    var plan: Plan {
+        get {
+            Plan(kind: kind, source: source, targetValue: targetValue, timerDurationSeconds: timerDurationSeconds,
+                 frequency: frequency, weeklyTarget: weeklyTarget, intervalDays: intervalDays)
+        }
+        set {
+            kind = newValue.kind
+            source = newValue.source
+            targetValue = newValue.targetValue
+            timerDurationSeconds = newValue.timerDurationSeconds
+            frequency = newValue.frequency
+            weeklyTarget = newValue.weeklyTarget
+            intervalDays = newValue.intervalDays
+        }
+    }
+
+    /// Fills in what the name says (`HabitGuess`): the glyph, and the plan.
+    /// Each changes only while it still holds what the name last put there
+    /// (`named`, kept up here), so one the person set stays theirs; where the
+    /// name stops saying something, it goes back to `base`.
+    mutating func follow(_ guess: HabitGuess, named: inout HabitDraft, base: HabitDraft) {
+        if symbol == named.symbol {
+            symbol = guess.symbol ?? base.symbol
+            named.symbol = symbol
+        }
+        if plan == named.plan {
+            var fresh = base
+            fresh.apply(guess)
+            plan = fresh.plan
+            named.plan = plan
+        }
+    }
+
+    /// The plan a guess gives: Health for a metric, a timer for a length,
+    /// and its schedule.
+    mutating func apply(_ guess: HabitGuess) {
+        if let source = guess.source {
+            kind = .health
+            self.source = source
+        } else if let minutes = guess.minutes {
+            kind = .timer
+            timerDurationSeconds = minutes * 60
+        }
+        if let frequency = guess.frequency { self.frequency = frequency }
+        if let count = guess.weeklyTarget { weeklyTarget = count }
+        if let days = guess.intervalDays { intervalDays = days }
+        if kind == .health {
+            targetValue = guess.target ?? (frequency == .weekly ? source.weeklyDefaultTarget : source.defaultTarget)
+        }
+    }
+
     mutating func apply(_ template: HabitTemplate) {
         title = template.title
         symbol = template.symbol

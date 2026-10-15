@@ -20,6 +20,18 @@ struct HabitShortcuts: AppShortcutsProvider {
             systemImageName: "checkmark.circle"
         )
         AppShortcut(
+            intent: AddHabitIntent(),
+            phrases: [
+                "Add a habit in \(.applicationName)",
+                "Add a habit to \(.applicationName)",
+                "New habit in \(.applicationName)",
+                "Create a habit in \(.applicationName)",
+                "Start a habit in \(.applicationName)",
+            ],
+            shortTitle: "Add a habit",
+            systemImageName: "plus.circle"
+        )
+        AppShortcut(
             intent: TodayStatusIntent(),
             phrases: [
                 "What's left in \(.applicationName)",
