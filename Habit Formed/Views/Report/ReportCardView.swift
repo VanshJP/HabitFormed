@@ -7,12 +7,20 @@ import SwiftUI
 /// with `ImageRenderer`, so it uses painted fills only (no glass).
 ///
 /// Fixed at `width` points with Dynamic Type pinned, so the card looks the
-/// same on every phone it is forwarded to.
+/// same on every phone it is forwarded to. The receipt is the exception: it
+/// is the slip alone at `receiptWidth`, with nothing behind it, so the image
+/// sent is just the receipt.
 struct ReportCardView: View {
     let report: DailyReport
     let options: ReportOptions
 
     static let width: CGFloat = 390
+    static let receiptWidth: CGFloat = 340
+
+    /// The drawn width for a layout, for the renderer and the preview.
+    static func width(for layout: ReportLayout) -> CGFloat {
+        layout == .receipt ? receiptWidth : width
+    }
     /// Rows listed before "+N more", so a long list keeps the card a sensible
     /// height in a chat.
     static let maxItems = 12
@@ -20,18 +28,24 @@ struct ReportCardView: View {
     private var palette: ReportPalette { ReportPalette(look: options.look, accentHex: options.accentHex) }
 
     var body: some View {
+        Group {
+            if options.layout == .receipt {
+                // The slip is the whole image: its own header, Health lines,
+                // note and mark, and no card or canvas behind it.
+                ReportReceipt(report: report, options: options)
+                    .frame(width: Self.receiptWidth)
+            } else {
+                card
+            }
+        }
+        .environment(\.dynamicTypeSize, .large)
+        .environment(\.colorScheme, palette.isLight ? .light : .dark)
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
-            switch options.layout {
-            case .list:
-                hero
-                habitList
-            case .grid:
-                hero
-                ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
-            case .focus:
-                ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
-            }
+            habits
             ReportHealthSection(health: report.health, options: options, palette: palette)
             note
             HabitFormedMark(tint: palette.accent, ink: palette.faint)
@@ -43,8 +57,6 @@ struct ReportCardView: View {
         .frame(width: Self.width, alignment: .leading)
         .background { background }
         .fontDesign(options.font.design)
-        .environment(\.dynamicTypeSize, .large)
-        .environment(\.colorScheme, palette.isLight ? .light : .dark)
     }
 
     @ViewBuilder
@@ -56,37 +68,75 @@ struct ReportCardView: View {
         }
     }
 
-    // MARK: - Header and hero
-
-    /// Centred over Focus's ring, so that card reads as one poster.
-    private var header: some View {
-        let centred = options.layout == .focus
-        return VStack(alignment: centred ? .center : .leading, spacing: 2) {
-            Text(report.name.isEmpty ? "Daily report" : report.name)
-                .font(.title3.bold())
-                .foregroundStyle(palette.ink)
-            Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                .font(.subheadline)
-                .foregroundStyle(palette.secondary)
+    /// The layout's habits, under the hero ring where the layout has one.
+    @ViewBuilder
+    private var habits: some View {
+        switch options.layout {
+        case .list:
+            hero
+            habitList
+        case .grid:
+            hero
+            ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
+        case .focus:
+            ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
+        case .week:
+            hero
+            ReportWeekBoard(report: report, palette: palette, showStreaks: options.showStreaks)
+        case .bubbles:
+            hero
+            ReportBubbles(items: report.items, palette: palette, showStreaks: options.showStreaks)
+        case .receipt:
+            EmptyView()
         }
-        .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
     }
 
+    // MARK: - Header and hero
+
+    /// Centred over Focus's ring, so that card reads as one poster. With the
+    /// ring set to the corner, it sits small at the header's trailing edge.
+    private var header: some View {
+        let centred = options.layout == .focus
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: centred ? .center : .leading, spacing: 2) {
+                Text(report.name.isEmpty ? "Daily report" : report.name)
+                    .font(.title3.bold())
+                    .foregroundStyle(palette.ink)
+                Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.subheadline)
+                    .foregroundStyle(palette.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
+            if options.layout.showsRing, options.ring == .corner {
+                ring(size: 54, lineWidth: 6, numeral: 15)
+            }
+        }
+    }
+
+    /// The day's count in a ring, green once it closes.
+    private func ring(size: CGFloat, lineWidth: CGFloat, numeral: CGFloat) -> some View {
+        ProgressRing(
+            fraction: report.fraction,
+            lineWidth: lineWidth,
+            color: report.isPerfect ? AppColors.success : palette.accent
+        ) {
+            Text("\(report.done)/\(report.expected)")
+                .font(.system(size: numeral, weight: .bold, design: options.font.numerals).monospacedDigit())
+                .foregroundStyle(palette.ink)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .padding(.horizontal, lineWidth + 2)
+        }
+        .frame(width: size, height: size)
+    }
+
+    /// The verdict, the day's share and the perfect-day streak, beside the
+    /// big ring when it is on.
     private var hero: some View {
         HStack(alignment: .center, spacing: 18) {
-            ProgressRing(
-                fraction: report.fraction,
-                lineWidth: 10,
-                color: report.isPerfect ? AppColors.success : palette.accent
-            ) {
-                Text("\(report.done)/\(report.expected)")
-                    .font(.system(size: 26, weight: .bold, design: options.font.numerals).monospacedDigit())
-                    .foregroundStyle(palette.ink)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
+            if options.ring == .big {
+                ring(size: 100, lineWidth: 10, numeral: 26)
             }
-            .frame(width: 100, height: 100)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(report.verdict)

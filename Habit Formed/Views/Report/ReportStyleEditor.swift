@@ -1,18 +1,21 @@
 import SwiftData
 import SwiftUI
 
-/// What goes on the report card and how it looks: the habits, details and
-/// Apple Health numbers as one set of chips, then the layout as pictures, the
-/// background, the accent and the type. What is on the card leads, since it changes from day
-/// to day while the look is set once. It reads and writes the stored choices
-/// itself, so Settings → Report card and the sheet's Edit are one editor, and
-/// the card above it redraws as each one changes.
+/// Everything about the report card in one place: your name and what goes
+/// on the card, then the layout as pictures, the background, the accent and
+/// the type. What is on the card leads, since it changes from day to day
+/// while the look is set once. It reads and writes the stored choices
+/// itself, so Settings → Report style and the sheet's Edit are one editor,
+/// every card and recap after carries them, and the card above it redraws
+/// as each one changes.
 struct ReportStyleEditor: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
+    @AppStorage(AppPreferences.reporterName) private var reporterName = ""
     @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.app.rawValue
     @AppStorage(AppPreferences.reportLayout) private var layoutRaw = ReportLayout.list.rawValue
+    @AppStorage(AppPreferences.reportRing) private var ringRaw = ReportRing.big.rawValue
     @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
     @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
     @AppStorage(AppPreferences.reportHiddenHabits) private var hiddenRaw = ""
@@ -38,6 +41,15 @@ struct ReportStyleEditor: View {
                         selection: Binding(get: { layout }, set: { layoutRaw = $0.rawValue }),
                         name: \.title
                     ) { ReportLayoutSketch(layout: $0, accent: palette.accent) }
+                    if layout.showsRing {
+                        SettingsRow("Ring", icon: "circle.dashed") {
+                            ForEach(ReportRing.allCases) { ring in
+                                ChoiceChip(title: ring.title, isSelected: ringRaw == ring.rawValue) {
+                                    ringRaw = ring.rawValue
+                                }
+                            }
+                        }
+                    }
                 }
             }
             GlassSection("Background") {
@@ -112,34 +124,52 @@ struct ReportStyleEditor: View {
 
     // MARK: - On the card
 
-    /// The habits, then what each one carries, then one chip per Apple Health
-    /// number, so what is picked is exactly what the card adds. A wider gap
-    /// sets the groups apart instead of a header each. Notes and the week's
-    /// dots live in a row, so they are offered only in the list layout.
+    /// One panel of what the card carries: your name, kept for every card
+    /// and recap, then a band each for the habits, what each one carries,
+    /// and one chip per Apple Health number, so what is picked is exactly
+    /// what the card adds. Notes and the week's dots live in a row, so they
+    /// are offered only in the list layout.
     private var contentsSection: some View {
         GlassSection("On the card") {
-            GlassEffectContainer(spacing: 8) {
-                VStack(alignment: .leading, spacing: 8) {
-                    FlowLayout.chips {
+            Panel(dividerInset: AppLayout.tilePadding) {
+                SettingsRow("Name", icon: "person") {
+                    TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
+                        .textContentType(.givenName)
+                        .submitLabel(.done)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 160)
+                }
+                if !habits.isEmpty {
+                    chipBand {
                         ForEach(habits) { habit in
                             ToggleChip(title: habit.title, icon: habit.symbol, tint: habit.color, isOn: includes(habit))
                         }
                     }
-                    FlowLayout.chips {
-                        ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
-                        if layout.showsRowDetail {
-                            ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
-                            ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
-                        }
+                }
+                chipBand {
+                    ToggleChip(title: "Streaks", icon: "flame", isOn: $showStreaks)
+                    if layout.showsRowDetail {
+                        ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
+                        ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
                     }
-                    FlowLayout.chips {
-                        ForEach(ReportMetric.allCases) { metric in
-                            ToggleChip(title: metric.title, icon: metric.icon, isOn: shows(metric))
-                        }
+                }
+                chipBand {
+                    ForEach(ReportMetric.allCases) { metric in
+                        ToggleChip(title: metric.title, icon: metric.icon, isOn: shows(metric))
                     }
                 }
             }
         }
+    }
+
+    /// A band of chips on the panel. Their hit frames sit 5pt clear of the
+    /// capsules, so the capsules land a tile's padding from the hairlines,
+    /// as they do from the panel's edges.
+    private func chipBand<Chips: View>(@ViewBuilder _ chips: () -> Chips) -> some View {
+        FlowLayout.chips { chips() }
+            .padding(.horizontal, AppLayout.tilePadding)
+            .padding(.vertical, AppLayout.tilePadding - 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func shows(_ metric: ReportMetric) -> Binding<Bool> {
@@ -165,8 +195,9 @@ struct ReportStyleEditor: View {
     }
 }
 
-/// A report layout in miniature: rows under a ring, squares under a ring, or
-/// one big ring over a strip of dots.
+/// A report layout in miniature: rows under a ring, squares under a ring,
+/// one big ring over a strip of dots, a board of days, a honeycomb, or a
+/// slip of paper.
 private struct ReportLayoutSketch: View {
     let layout: ReportLayout
     let accent: Color
@@ -195,7 +226,42 @@ private struct ReportLayoutSketch: View {
                     }
                 }
             }
+        case .week:
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: 3) {
+                        Capsule().fill(faint).frame(width: 12, height: 5)
+                        ForEach(0..<5, id: \.self) { day in
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill((row + day * 2) % 3 == 0 ? faint : accent)
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                }
+            }
+        case .bubbles:
+            VStack(spacing: -2) {
+                HStack(spacing: 3) { bubble(true); bubble(false); bubble(true) }
+                HStack(spacing: 3) { bubble(false); bubble(true) }
+            }
+        case .receipt:
+            VStack(alignment: .leading, spacing: 3.5) {
+                ForEach([1, 0.6, 0.8, 0.5], id: \.self) { share in
+                    Capsule().fill(Color.black.opacity(0.4)).frame(width: 24 * share, height: 2.5)
+                }
+                Capsule().fill(accent).frame(width: 24, height: 3)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 8)
+            .background(Color(white: 0.94), in: ReceiptSlip(tooth: 5, depth: 2.5))
+            .rotationEffect(.degrees(-4))
         }
+    }
+
+    private func bubble(_ done: Bool) -> some View {
+        Circle()
+            .fill(done ? accent : faint)
+            .frame(width: 15, height: 15)
     }
 
     private func ring(_ size: CGFloat) -> some View {

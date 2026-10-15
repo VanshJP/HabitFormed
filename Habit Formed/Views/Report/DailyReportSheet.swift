@@ -19,6 +19,7 @@ struct DailyReportSheet: View {
     @AppStorage(AppPreferences.reportTheme) private var themeRaw = ReportTheme.app.rawValue
     @Environment(\.appCanvas) private var canvas
     @AppStorage(AppPreferences.reportLayout) private var layoutRaw = ReportLayout.list.rawValue
+    @AppStorage(AppPreferences.reportRing) private var ringRaw = ReportRing.big.rawValue
     @AppStorage(AppPreferences.reportAccent) private var accentHex = ""
     @AppStorage(AppPreferences.reportFont) private var fontRaw = ReportFont.standard.rawValue
     @AppStorage(AppPreferences.reportHiddenHabits) private var hiddenRaw = ""
@@ -39,11 +40,9 @@ struct DailyReportSheet: View {
     @State private var fatText = ""
     @State private var metrics: DayHealthMetrics = .empty
     @State private var askedHealth = false
-    /// Decided once on open, so the field does not vanish after one letter.
-    @State private var askForName = false
     @FocusState private var focusedField: Field?
 
-    private enum Field { case name, note, eaten }
+    private enum Field { case note, eaten }
 
     init(day: Date, isPreset: Bool = false) {
         self.day = day.startOfDay
@@ -57,6 +56,7 @@ struct DailyReportSheet: View {
             theme: ReportTheme(rawValue: themeRaw) ?? .app,
             appLook: canvas.look,
             layout: ReportLayout(rawValue: layoutRaw) ?? .list,
+            ring: ReportRing(rawValue: ringRaw) ?? .big,
             accentHex: accentHex,
             font: ReportFont(rawValue: fontRaw) ?? .standard,
             hiddenHabitIDs: ReportOptions.hiddenIDs(from: hiddenRaw),
@@ -114,7 +114,7 @@ struct DailyReportSheet: View {
         return NavigationStack {
             PageScrollView {
                 VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    ReportPreview(width: ReportCardView.width) {
+                    ReportPreview(width: ReportCardView.width(for: options.layout), framed: options.layout != .receipt) {
                         ReportCardView(report: report, options: options)
                     }
                     // A new look or switch eases in; the note is left out so
@@ -160,27 +160,14 @@ struct DailyReportSheet: View {
         }
         .presentationDetents([.large])
         .presentationBackground { AppBackground(style: .subtle) }
-        .task {
-            askForName = reporterName.trimmingCharacters(in: .whitespaces).isEmpty
-        }
         .task(id: options.needsHealth) { await loadHealth(needsHealth: options.needsHealth) }
     }
 
-    /// What you type onto the card, in one panel: your name (asked once,
-    /// the first time there is none), calories eaten and the macros while
-    /// they are on, and this card's note.
+    /// What you type onto this card, in one panel: calories eaten and the
+    /// macros while they are on, and the note. Your name is the editor's,
+    /// kept for every card.
     private var fields: some View {
         Panel {
-            if askForName {
-                SettingsRow("Name on reports", icon: "person") {
-                    TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
-                        .textContentType(.givenName)
-                        .submitLabel(.done)
-                        .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .name)
-                        .frame(maxWidth: 140)
-                }
-            }
             if picked.contains(.calories) {
                 SettingsRow("Calories eaten", icon: ReportMetric.calories.icon) {
                     TextField(

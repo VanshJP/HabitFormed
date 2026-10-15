@@ -11,7 +11,6 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.glassAppearance) private var glassRaw = GlassAppearance.light.rawValue
     @AppStorage(AppPreferences.logSound) private var logSound = true
     @AppStorage(AppPreferences.todayLayout) private var layoutRaw = TodayLayout.tiles.rawValue
-    @AppStorage(AppPreferences.reporterName) private var reporterName = ""
     @AppStorage(AppPreferences.reportReminderEnabled) private var reminderOn = false
     @AppStorage(AppPreferences.reportReminderHour) private var reminderHour = 21
     @AppStorage(AppPreferences.reportReminderMinute) private var reminderMinute = 0
@@ -22,7 +21,6 @@ struct SettingsView: View {
 
     @State private var showArrange = false
     @State private var showReportCard = false
-    @FocusState private var nameFocused: Bool
 
     var body: some View {
         PageScrollView {
@@ -90,14 +88,6 @@ struct SettingsView: View {
     private var reportSection: some View {
         GlassSection("Reports") {
             Panel {
-                SettingsRow("Name on reports", icon: "person") {
-                    TextField("", text: $reporterName, prompt: Text("Add").foregroundStyle(.white.opacity(0.4)))
-                        .textContentType(.givenName)
-                        .submitLabel(.done)
-                        .multilineTextAlignment(.trailing)
-                        .focused($nameFocused)
-                        .frame(maxWidth: 140)
-                }
                 Button {
                     Haptics.light()
                     showReportCard = true

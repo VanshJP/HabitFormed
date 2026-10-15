@@ -1,9 +1,10 @@
 import SwiftUI
 
 extension FlowLayout {
-    /// Rows of chips. A chip's hit frame already sits 5pt clear of its
-    /// capsule, so lines stack frame to frame and the capsules land 10 apart.
-    static let chips = FlowLayout(spacing: 8, lineSpacing: 0)
+    /// Rows of chips, their capsules 10 apart either way. A chip's hit frame
+    /// already sits 5pt clear of its capsule, so lines stack frame to frame
+    /// and the gap across matches the gap down.
+    static let chips = FlowLayout(spacing: 10, lineSpacing: 0)
 }
 
 /// A one-of-many chip: a timer length, an interval, a layout, an idea for

@@ -74,7 +74,8 @@ Habit Formed/
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
-    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportHealthSection),
+    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportWeekBoard,
+    │                         #   ReportBubbles, ReportReceipt, ReportHealthSection),
     │                         #   ReportStyleEditor, MacroFieldsRow,
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
@@ -157,7 +158,8 @@ Settings are pushed from Today's top row:
   list its logs (long-press one to remove it) and a "Share report" row.
 - **Settings**: pushed from the gear. Today (layout as two small pictures,
   arrange, log sound, the Siri phrase with one of your habits), Reports
-  (name on reports, Report style, daily reminder with its time, weekly recap)
+  (Report style, which holds your name too, daily reminder with its time,
+  weekly recap)
   and Look (canvas rail, plain ones first after Classic, and glass). No captions except where the words are the
   content (the Siri phrases); few-way choices are chips in their row.
 
@@ -284,7 +286,13 @@ things out. No templates, layouts or placeholder tokens.
 - `ReportOptions` is the whole configuration: a `ReportTheme` (App look by
   default, which paints whatever `AppCanvas` the app wears via
   `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
-  or Focus: one big ring and a strip of glyphs), an accent (empty follows
+  Focus: one big ring and a strip of glyphs, Week: a board of the last seven
+  days, Bubbles: a honeycomb of circles that fill when done, or Receipt: a
+  torn paper slip in monospaced capitals, habits on dotted leaders, totals
+  and Health numbers as line items, a barcode; the image sent is the slip
+  alone, 340pt, clear around its torn edges, with no card or canvas), a
+  `ReportRing` for the layouts with a ring beside the verdict (Big, Corner:
+  small at the header's trailing edge, or Off), an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
   (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
   notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
@@ -294,7 +302,11 @@ things out. No templates, layouts or placeholder tokens.
   `report.metrics`, defaulting to what the old Calories and Activity
   switches had on); the note is for one card only. `ReportStyleEditor`
   edits them and is the one editor for Settings → Report style and the
-  sheet's Edit; what is on the card leads it, the look follows.
+  sheet's Edit, so every customization lives there: "On the card" leads (one
+  panel: your name, kept for every card and recap, then a band of chips
+  each for habits, details and Health numbers, 10pt apart either way), the
+  look follows (layout as a 3-wide `SketchPicker` with the Ring chips under
+  it, background, accent, type).
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
@@ -305,9 +317,9 @@ things out. No templates, layouts or placeholder tokens.
   Report style opens `DailyReportSheet(isPreset: true)` (live preview, theme
   layout as `SketchPicker` pictures, background rail, accent dots, type
   chips, "On the card" as `ToggleChip`s; nothing to send).
-- `DailyReportSheet` to send: live preview, one panel of fields (name the
-  first time, calories eaten while Calories is on, protein, carbs and fat
-  while Macros is on, this card's note), then
+- `DailyReportSheet` to send: live preview, one panel of fields (calories
+  eaten while Calories is on, protein, carbs and fat while Macros is on,
+  this card's note), then
   Text it (`MessageComposer`, Messages with the image attached) and Share
   (`SharePresenter`; Save and Copy live in the share sheet), right under
   the note. Edit (`ReportEditButton`, top trailing) opens

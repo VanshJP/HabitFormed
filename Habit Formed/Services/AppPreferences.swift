@@ -17,6 +17,8 @@ nonisolated enum AppPreferences {
     /// Daily report choices, kept so the next report starts the same way.
     static let reportTheme = "report.theme"
     static let reportLayout = "report.layout"
+    /// Where the card's progress ring sits (`ReportRing`).
+    static let reportRing = "report.ring"
     /// A palette hex, or empty to follow the theme.
     static let reportAccent = "report.accent"
     static let reportFont = "report.font"
