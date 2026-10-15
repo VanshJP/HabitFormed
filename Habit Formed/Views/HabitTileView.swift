@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// One habit on the Today grid: its glyph, name and one status line, over a
-/// bottom row that depends on how it is tracked. Done is the tile filled with
-/// the habit's color; a slide fills it from the knob as it moves.
+/// bottom row that depends on how it is tracked. Done (logged on the day
+/// shown) is the tile filled with the habit's color, its glyph and marks
+/// turning white; a slide fills it from the knob as it moves.
 /// - Manual: the slide-to-log track
 /// - HealthKit: today's reading against the target, with a meter
 /// - Timer: the week's dots and a play capsule
@@ -22,26 +23,21 @@ struct HabitTileView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
 
-    /// The slide knob's place, 0...1. Manual habits on today fill from it.
-    @State private var slide: CGFloat = 0
+    /// How full the tile is, 0...1. The knob drives it while it slides; a
+    /// log or an undo made anywhere else plays it to 1 or 0.
+    @State private var fill: CGFloat = 0
     /// While the knob is held the long-press menu stays empty, so pausing
     /// mid-slide never opens it.
     @State private var isSliding = false
-    /// The fill for everything without a slide: health, timers, past days.
-    @State private var doneFill: CGFloat = 0
     @State private var showStopConfirm = false
 
     private let padding = AppLayout.tilePadding
 
-    /// Completion for the day being shown; a weekly habit counts the whole
-    /// week once logged. Fills follow it, except a manual habit on today,
-    /// which fills from its slide (logged today or not).
-    private var effectiveCompleted: Bool {
-        if habit.frequency == .weekly {
-            return !habit.completionsInWeek(of: selectedDate).isEmpty
-        }
-        return habit.isCompleted(on: selectedDate)
-    }
+    /// Logged on the day shown, the ledger's `.done`: the fill, the white
+    /// glyph, the featured tint and the spoken state all follow it, so a
+    /// tile agrees with the header's count, the week strip and its own pill.
+    /// A weekly habit's week is the status line's to say.
+    private var isDone: Bool { habit.isCompleted(on: selectedDate) }
 
     var body: some View {
         // Re-render at midnight so today-driven state updates.
@@ -52,10 +48,10 @@ struct HabitTileView: View {
             // today" yet stays discoverable.
             .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
             .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
-            .completionFill(habit.color, amount: fillsFromSlide ? $slide : $doneFill)
+            .completionFill(habit.color, amount: $fill)
             .glassCard(
                 cornerRadius: AppLayout.tileRadius,
-                tint: effectiveCompleted ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
+                tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
             )
             .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
             .onTapGesture { Haptics.light(); actions.open() }
@@ -99,7 +95,7 @@ struct HabitTileView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
-            HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay)
+            HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone)
                 .padding(.top, 3)
             Spacer(minLength: 12)
             bottomSection
@@ -109,31 +105,19 @@ struct HabitTileView: View {
 
     // MARK: - Fill
 
-    /// True when the slide is the bottom row, so the fill follows the knob.
-    private var fillsFromSlide: Bool {
-        !isPastDay && habit.trackKind == .manual && intervalRestingDays == nil
-    }
-
-    private var isFilled: Bool {
-        fillsFromSlide ? habit.isCompletedToday : effectiveCompleted
-    }
-
     private var fillState: CompletionFill.Key {
-        CompletionFill.Key(day: selectedDate.startOfDay, done: effectiveCompleted, doneToday: habit.isCompletedToday)
+        CompletionFill.Key(day: selectedDate.startOfDay, done: isDone)
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withMotion(animation) {
-            slide = state.doneToday ? 1 : 0
-            doneFill = state.done ? 1 : 0
-        }
+        withMotion(animation) { fill = state.done ? 1 : 0 }
     }
 
     // MARK: - Header
 
     private var topRow: some View {
         HStack(alignment: .top) {
-            IconChip(icon: habit.symbol, tint: isFilled ? .white : habit.color, size: 30)
+            IconChip(icon: habit.symbol, tint: isDone ? .white : habit.color, size: 30)
             Spacer()
             statusBadge
         }
@@ -143,7 +127,7 @@ struct HabitTileView: View {
     /// reads as progress, not completion.
     @ViewBuilder
     private var statusBadge: some View {
-        if effectiveCompleted && habit.trackKind == .health && !isPastDay {
+        if isDone && habit.trackKind == .health && !isPastDay {
             Image(systemName: "checkmark.circle.fill")
                 .font(.body)
                 .foregroundStyle(.white)
@@ -213,7 +197,7 @@ struct HabitTileView: View {
                         .eyebrowStyle()
                 }
             }
-            MeterBar(fraction: progress, color: habit.color.glyphTone, height: 6)
+            MeterBar(fraction: progress, color: isDone ? .white : habit.color.glyphTone, height: 6)
                 .motion(AppMotion.settle, value: progress)
         }
         .frame(minHeight: SlideToLogTrack.trackHeight, alignment: .bottom)
@@ -222,7 +206,7 @@ struct HabitTileView: View {
     /// The week's dots on the leading side, the play capsule on the trailing.
     private var timerRow: some View {
         HStack(spacing: 0) {
-            WeekDotsView(completionDates: habit.completionDates, accent: habit.color)
+            WeekDotsView(completionDates: habit.completionDates, accent: isDone ? .white : habit.color)
             Spacer(minLength: 6)
             Button {
                 Haptics.medium()
@@ -240,7 +224,7 @@ struct HabitTileView: View {
                 .padding(.horizontal, 12)
                 .frame(minHeight: 32)
                 .background(
-                    Capsule().fill(habit.isCompletedToday ? habit.color.opacity(0.3) : habit.color.opacity(0.85))
+                    Capsule().fill(habit.isCompletedToday ? Color.white.opacity(0.18) : habit.color.opacity(0.85))
                 )
                 .frame(minHeight: SlideToLogTrack.trackHeight)
                 .contentShape(.rect)
@@ -282,7 +266,7 @@ struct HabitTileView: View {
         if let remaining = intervalRestingDays {
             intervalRestingPill(days: remaining)
         } else {
-            SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide, isSliding: $isSliding) {
+            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding) {
                 actions.log()
             }
         }
@@ -307,7 +291,7 @@ struct HabitTileView: View {
     // MARK: - Accessibility
 
     private var accessibilityLabel: String {
-        let state = effectiveCompleted ? "done" : "not done"
+        let state = isDone ? "done" : "not done"
         return "\(habit.title), \(state), \(habit.displayStreak) \(habit.streakUnitLabel) streak"
     }
 }

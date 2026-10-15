@@ -3,8 +3,9 @@ import SwiftUI
 /// One habit as a compact row for Today's Rows layout: glyph, name and status
 /// line, with the way to log at the trailing end (the slide, a timer, a
 /// health reading, or a past day's toggle). Same gestures as a tile: tap
-/// opens the habit, slide logs, long press opens the shared menu. Done fills
-/// the row with the habit's color, from the knob when it is slid.
+/// opens the habit, slide logs, long press opens the shared menu. Done (logged
+/// on the day shown) fills the row with the habit's color, from the knob when
+/// it is slid, and turns its glyph and marks white.
 struct HabitRowView: View {
     let habit: Habit
     /// The day the list is showing. Equals today in normal use.
@@ -20,33 +21,29 @@ struct HabitRowView: View {
     /// Wide enough for "Slide to log" beside the knob.
     private let trailingWidth: CGFloat = 136
 
-    /// The slide knob's place, 0...1. Manual habits on today fill from it.
-    @State private var slide: CGFloat = 0
+    /// How full the row is, 0...1. The knob drives it while it slides; a
+    /// log or an undo made anywhere else plays it to 1 or 0.
+    @State private var fill: CGFloat = 0
     /// While the knob is held the long-press menu stays empty, so pausing
     /// mid-slide never opens it.
     @State private var isSliding = false
-    /// The fill for everything without a slide: health, timers, past days.
-    @State private var doneFill: CGFloat = 0
 
-    private var isDone: Bool {
-        if habit.frequency == .weekly {
-            return !habit.completionsInWeek(of: selectedDate).isEmpty
-        }
-        return habit.isCompleted(on: selectedDate)
-    }
+    /// Logged on the day shown, the same fact a tile fills for (see
+    /// `HabitTileView.isDone`).
+    private var isDone: Bool { habit.isCompleted(on: selectedDate) }
 
     var body: some View {
         // Re-render at midnight so today-driven state updates.
         let _ = dayTracker.today
 
         return HStack(spacing: 12) {
-            IconChip(icon: habit.symbol, tint: isFilled ? .white : habit.color, size: 26)
+            IconChip(icon: habit.symbol, tint: isDone ? .white : habit.color, size: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text(habit.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay)
+                HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -57,7 +54,7 @@ struct HabitRowView: View {
         .padding(.trailing, 10)
         .padding(.vertical, 10)
         .opacity(habit.restingDaysLeft == nil || isPastDay ? 1 : 0.6)
-        .completionFill(habit.color, amount: fillsFromSlide ? $slide : $doneFill)
+        .completionFill(habit.color, amount: $fill)
         .glassCard(
             cornerRadius: AppLayout.tileRadius,
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
@@ -81,24 +78,12 @@ struct HabitRowView: View {
 
     // MARK: - Fill
 
-    /// True when the slide is the trailing control, so the fill follows the knob.
-    private var fillsFromSlide: Bool {
-        !isPastDay && habit.trackKind == .manual && habit.restingDaysLeft == nil
-    }
-
-    private var isFilled: Bool {
-        fillsFromSlide ? habit.isCompletedToday : isDone
-    }
-
     private var fillState: CompletionFill.Key {
-        CompletionFill.Key(day: selectedDate.startOfDay, done: isDone, doneToday: habit.isCompletedToday)
+        CompletionFill.Key(day: selectedDate.startOfDay, done: isDone)
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withMotion(animation) {
-            slide = state.doneToday ? 1 : 0
-            doneFill = state.done ? 1 : 0
-        }
+        withMotion(animation) { fill = state.done ? 1 : 0 }
     }
 
     // MARK: - Trailing
@@ -121,7 +106,7 @@ struct HabitRowView: View {
                         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                         .background(Capsule().fill(Color.white.opacity(0.06)))
                 } else {
-                    SlideToLogTrack(accent: habit.color, isLogged: habit.isCompletedToday, progress: $slide, isSliding: $isSliding) {
+                    SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding) {
                         actions.log()
                     }
                 }
@@ -163,7 +148,7 @@ struct HabitRowView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            MeterBar(fraction: progress, color: habit.color.glyphTone, height: 4)
+            MeterBar(fraction: progress, color: isDone ? .white : habit.color.glyphTone, height: 4)
                 .motion(AppMotion.settle, value: progress)
         }
         .frame(minHeight: SlideToLogTrack.trackHeight)

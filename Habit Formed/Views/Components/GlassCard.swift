@@ -67,10 +67,7 @@ struct GlassCard<Content: View>: View {
     }
 
     private var resolvedGlass: Glass {
-        if let tint {
-            return .regular.tint(tint)
-        }
-        return .regular.tint(glassAppearance.glassTint)
+        .regular.tint(AppColors.glassTint(tint, on: glassAppearance))
     }
 }
 

@@ -159,6 +159,7 @@ struct RootView: View {
 /// to open the full timer.
 private struct MiniTimerBanner: View {
     @Environment(TimerCenter.self) private var center
+    @Environment(\.glassAppearance) private var glassAppearance
     let onTap: () -> Void
 
     var body: some View {
@@ -210,7 +211,10 @@ private struct MiniTimerBanner: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, minHeight: AppLayout.minHitTarget)
-                .glassEffect(.regular.tint(AppColors.featuredTint(center.habitColor)).interactive(), in: .capsule)
+                .glassEffect(
+                    .regular.tint(AppColors.glassTint(AppColors.featuredTint(center.habitColor), on: glassAppearance)).interactive(),
+                    in: .capsule
+                )
                 .shadow(color: .black.opacity(0.25), radius: 10, y: 5)
             }
         }

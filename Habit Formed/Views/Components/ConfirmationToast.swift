@@ -5,6 +5,8 @@ import SwiftUI
 /// the way back sits where the thumb already is.
 struct UndoToast: View {
     let message: String
+    /// A check for a log, the way back for one taken away.
+    var icon = "checkmark.circle.fill"
     var tint: Color = AppColors.success
     let onUndo: () -> Void
 
@@ -12,7 +14,7 @@ struct UndoToast: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: icon)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(tint.glyphTone)
                 // Lands again when the toast turns into "Perfect day".

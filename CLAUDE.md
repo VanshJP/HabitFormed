@@ -125,7 +125,11 @@ Settings are pushed from Today's top row:
   The section lists every habit, as tiles or rows (`TodayLayout`, picked
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
-  of filled squares and needs no other line to say so.
+  of filled squares and needs no other line to say so. Done means logged on
+  the day shown, the ledger's `.done`, and one `isDone` drives the fill,
+  the white glyph, the featured tint and the spoken state, so a tile always
+  agrees with the header's count, the week strip and its own pill; a weekly
+  habit's week is its status line's to say ("2 of 3 this week").
 - **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
   seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
@@ -347,9 +351,12 @@ The design system is SpeakUp's; when in doubt, match
 - **Colour:** only `AppColors`, plus the app look's accent
   (`CanvasLook.accent`, read from `\.appCanvas`) for switches, the week
   strip's rings and the calendar, so Ember runs copper and Forest sage. Identity tints stay at 0.06 on a tile
-  (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
-  one solid use of a habit's color is Today's done fill, with the glyph
-  turning white on it. A habit's glyph otherwise uses `color.glyphTone`
+  (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`), laid
+  over Settings → Look → Glass's white lift (`AppColors.glassTint`), so a
+  habit's glass follows Light and Dark like every untinted pane. Every
+  `glassEffect` takes its tint from that setting; none is plain `.regular`. The
+  one solid use of a habit's color is Today's done fill, with the glyph and
+  its marks (status highlight, week dots, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
   (lifted toward white). Habit colors come from `AppColors.tilePalette`;
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).

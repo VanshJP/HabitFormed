@@ -7,6 +7,9 @@ struct HabitStatusLine: View {
     let habit: Habit
     let selectedDate: Date
     let isPastDay: Bool
+    /// True on a surface filled with the habit's color, where a highlight
+    /// turns white like the glyph instead of vanishing into the fill.
+    var isOnFill = false
 
     var body: some View {
         let streak = habit.displayStreak
@@ -24,7 +27,7 @@ struct HabitStatusLine: View {
             }
             if let cadence {
                 Text(cadence.text)
-                    .foregroundStyle(cadence.highlighted ? AnyShapeStyle(habit.color.glyphTone) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(cadence.highlighted ? AnyShapeStyle(isOnFill ? .white : habit.color.glyphTone) : AnyShapeStyle(.secondary))
             }
         }
         .font(.caption.weight(.medium).monospacedDigit())

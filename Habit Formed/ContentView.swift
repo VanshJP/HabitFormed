@@ -184,6 +184,7 @@ struct ContentView: View {
         if let undo {
             UndoToast(
                 message: undo.message,
+                icon: undo.icon,
                 tint: undo.tint,
                 onUndo: { revert(undo) }
             )
@@ -493,7 +494,7 @@ struct UndoLog: Equatable {
     let id = UUID()
     let habitID: UUID
     let title: String
-    let tint: Color
+    let color: Color
     let day: Date
     /// True when the change added a log; false when it removed one.
     let wasLogged: Bool
@@ -503,10 +504,19 @@ struct UndoLog: Equatable {
     init(habit: Habit, day: Date, wasLogged: Bool) {
         self.habitID = habit.id
         self.title = habit.title
-        self.tint = habit.color
+        self.color = habit.color
         self.day = day.startOfDay
         self.wasLogged = wasLogged
     }
+
+    /// A check for a log, the way back for one taken away.
+    var icon: String {
+        wasLogged ? "checkmark.circle.fill" : "arrow.uturn.backward.circle.fill"
+    }
+
+    /// The habit's color, or green once the day is perfect, as the week
+    /// strip's ring closes.
+    var tint: Color { completesDay ? AppColors.success : color }
 
     var message: String {
         if completesDay { return "Perfect day" }

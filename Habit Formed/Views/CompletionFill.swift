@@ -25,13 +25,12 @@ struct CompletionFill: View {
 }
 
 extension CompletionFill {
-    /// What a tile or row syncs its fill to: the day shown, whether the habit
-    /// is done for it, and whether it is logged today, where the slide lives.
-    /// Keyed by day so a log can animate while a day change just lands.
+    /// What a tile or row syncs its fill to: the day shown and whether the
+    /// habit is logged on it. Keyed by day so a log can animate while a day
+    /// change just lands.
     struct Key: Equatable {
         let day: Date
         let done: Bool
-        let doneToday: Bool
     }
 }
 
