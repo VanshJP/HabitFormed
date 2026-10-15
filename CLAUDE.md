@@ -85,7 +85,8 @@ Habit Formed/
     ├── HabitRowView.swift    # One capsule row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
     ├── HabitStatusLine.swift # Streak and schedule line, shared by tiles and rows
-    ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
+    ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs;
+    │                         #   Edit and Delete in its top bar's More menu
     ├── HistoryView.swift     # One page: hero, patterns, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
@@ -106,7 +107,13 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 
 `RootView` hosts one `NavigationStack` and no tab bar, so nothing sits over
 the habits. Today is its root page, with no navigation bar; History and
-Settings are pushed from Today's top row:
+Settings are pushed from Today's top row. No page shows the system bar:
+pushed from a bar-less Today it animated in on its own track, its back
+button and title trailing the page. Every pushed page wears
+`pageTopBar(_:)` instead (`PageHeader.swift`): a back button in header
+glass, the title, an optional trailing control, drawn as part of the page
+so it moves with it, and a hook that keeps the edge swipe back working with
+the bar hidden.
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
@@ -198,7 +205,8 @@ the grid shows an `UndoToast` for four seconds; the log that finishes a
 perfect day turns it into "Perfect day" for six, and the report button
 under the grid takes it from there. A swipe up or to either side sends the
 toast off at once, like a notification banner, and dragging it holds its
-time.
+time. It sits over the whole page, not the scroll view, so taps on it
+never fall through to the header.
 
 Logs from Today chime through `ContentView.logToday`, a pentatonic step
 higher as the day fills (`SoundEffects.logChime(progress:)`), so callers

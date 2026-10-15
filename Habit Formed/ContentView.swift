@@ -53,7 +53,10 @@ struct ContentView: View {
         // Re-render when the calendar day rolls over so today's state
         // (header counter, tile state) reflects reality at midnight.
         let _ = dayTracker.today
+        // The toast sits over the whole page, not on the scroll view: on
+        // the scroll view, taps on it fell through to the header under it.
         return lifecycle(presentations(page))
+            .overlay(alignment: .top) { undoToast }
     }
 
     // MARK: - Page
@@ -124,7 +127,6 @@ struct ContentView: View {
             .pageContentInsets()
         }
         .refreshable { await refreshHealth() }
-        .overlay(alignment: .top) { undoToast }
         .overlay {
             if celebration > 0 {
                 ConfettiView(origin: UnitPoint(x: 0.5, y: 0.2))

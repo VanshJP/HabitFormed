@@ -42,19 +42,7 @@ struct HabitDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background { AppBackground(style: .subtle) }
-        .navigationTitle(habit.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Edit", systemImage: "pencil") { Haptics.light(); showingEdit = true }
-                    Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); confirmDelete = true }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .accessibilityLabel("More")
-            }
-        }
+        .pageTopBar(habit.title) { moreMenu }
         .onDisappear {
             guard deleteOnClose else { return }
             HabitLifecycle.delete(habit, in: modelContext, timer: timerCenter, notifications: notifications)
@@ -303,6 +291,25 @@ struct HabitDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - More
+
+    /// Edit and Delete, at the top bar's trailing end in the back button's
+    /// glass.
+    private var moreMenu: some View {
+        Menu {
+            Button("Edit", systemImage: "pencil") { Haptics.light(); showingEdit = true }
+            Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); confirmDelete = true }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                .headerGlass()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("More")
     }
 
     // MARK: - Data

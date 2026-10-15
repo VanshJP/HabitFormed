@@ -35,9 +35,7 @@ struct SettingsView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background { AppBackground() }
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresNavigationBar()
+        .pageTopBar("Settings")
         .sheet(isPresented: $showArrange) { ArrangeHabitsSheet() }
         .sheet(isPresented: $showReportCard) { DailyReportSheet(day: Date(), isPreset: true) }
         .onChange(of: reminderOn) { _, isOn in
