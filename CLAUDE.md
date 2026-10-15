@@ -74,7 +74,8 @@ Habit Formed/
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
-    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts), ReportStyleEditor,
+    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportHealthSection),
+    │                         #   ReportStyleEditor, MacroFieldsRow,
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
@@ -174,7 +175,9 @@ stays distinct on the fill. Done, the channel and
 the knob melt into the fill and only the white check stays. Every log from
 the grid shows an `UndoToast` for four seconds; the log that finishes a
 perfect day turns it into "Perfect day" for six, and the report button
-under the grid takes it from there.
+under the grid takes it from there. A swipe up or to either side sends the
+toast off at once, like a notification banner, and dragging it holds its
+time.
 
 Logs from Today chime through `ContentView.logToday`, a pentatonic step
 higher as the day fills (`SoundEffects.logChime(progress:)`), so callers
@@ -268,11 +271,15 @@ things out. No templates, layouts or placeholder tokens.
   `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
   or Focus: one big ring and a strip of glyphs), an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
-  (Default, Rounded, Serif, Mono), hidden habits, and switches for streaks,
-  notes, last 7 days, calories in vs out, and activity. Notes and the week's
-  dots exist only in List. All in `@AppStorage`; the note is for one card
-  only. `ReportStyleEditor` edits them and is the one editor for Settings →
-  Report style and the sheet's Edit.
+  (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
+  notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
+  exercise, sleep, mindful, calories in vs out, macros), one chip each so
+  what is picked is exactly what shows. Notes and the week's dots exist only
+  in List. All in `@AppStorage` (metrics as one comma-joined
+  `report.metrics`, defaulting to what the old Calories and Activity
+  switches had on); the note is for one card only. `ReportStyleEditor`
+  edits them and is the one editor for Settings → Report style and the
+  sheet's Edit; what is on the card leads it, the look follows.
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
@@ -284,7 +291,8 @@ things out. No templates, layouts or placeholder tokens.
   layout as `SketchPicker` pictures, background rail, accent dots, type
   chips, "On the card" as `ToggleChip`s; nothing to send).
 - `DailyReportSheet` to send: live preview, one panel of fields (name the
-  first time, calories eaten while Calories is on, this card's note), then
+  first time, calories eaten while Calories is on, protein, carbs and fat
+  while Macros is on, this card's note), then
   Text it (`MessageComposer`, Messages with the image attached) and Share
   (`SharePresenter`; Save and Copy live in the share sheet), right under
   the note. Edit (`ReportEditButton`, top trailing) opens
@@ -292,8 +300,8 @@ things out. No templates, layouts or placeholder tokens.
   preset too. The recap takes the theme, accent and type; its Edit opens
   the theme. Both send the card alone, with no text typed under it. The card prints the reporter's name
   (`AppPreferences.reporterName`) so a forwarded card still says whose day
-  it was. Calories eaten come from Apple Health and can be typed over before
-  sending.
+  it was. Calories eaten and macros come from Apple Health and can be typed
+  over before sending.
 - An optional daily reminder (`report-reminder`) opens today's report.
   Turning it on sets it 30 minutes after the day's usual last log
   (`ReminderTiming.reminder(afterTypical:)`), with that reason as the
@@ -405,7 +413,9 @@ The design system is SpeakUp's; when in doubt, match
   facts in one line join with a comma. Tiles and rows say the same thing
   the same way ("Log", "Next log in 3 days", "10 min").
 - **Numbers:** convert user-typed or HealthKit doubles with
-  `Double.safeRounded`, never `Int(x)`, which traps on huge values.
+  `Double.safeRounded`, never `Int(x)`, which traps on huge values. Time
+  reads as hours and minutes ("7h 40m", `Double.minutesAsDuration`), never
+  as decimal hours ("7.7h").
 - **HealthKit:** new HealthKit-backed habit types should extend
   `HealthKitSource` (label, defaultTarget, unitSuffix, symbol,
   compactValue) and add a matching branch in

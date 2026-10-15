@@ -147,6 +147,8 @@ struct HabitRowView: View {
                 Text("of \(habit.source.compactValue(habit.targetValue))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             MeterBar(fraction: progress, color: isDone ? .white : habit.color.glyphTone, height: 4)
                 .motion(AppMotion.settle, value: progress)

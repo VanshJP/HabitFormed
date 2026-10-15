@@ -25,8 +25,7 @@ struct DailyReportSheet: View {
     @AppStorage(AppPreferences.reportShowStreaks) private var showStreaks = true
     @AppStorage(AppPreferences.reportShowNotes) private var showNotes = true
     @AppStorage(AppPreferences.reportShowWeek) private var showWeek = true
-    @AppStorage(AppPreferences.reportShowCalories) private var showCalories = false
-    @AppStorage(AppPreferences.reportShowActivity) private var showActivity = false
+    @AppStorage(AppPreferences.reportMetrics) private var metricsRaw = ReportOptions.legacyMetricsRaw
 
     let day: Date
     /// Opened from Settings to set the look: always editing, nothing to send.
@@ -35,6 +34,9 @@ struct DailyReportSheet: View {
     @State private var isEditing = false
     @State private var note = ""
     @State private var eatenText = ""
+    @State private var proteinText = ""
+    @State private var carbsText = ""
+    @State private var fatText = ""
     @State private var metrics: DayHealthMetrics = .empty
     @State private var askedHealth = false
     /// Decided once on open, so the field does not vanish after one letter.
@@ -61,20 +63,27 @@ struct DailyReportSheet: View {
             showStreaks: showStreaks,
             showNotes: showNotes,
             showWeek: showWeek,
-            showCalories: showCalories,
-            showActivity: showActivity,
+            metrics: picked,
             note: note
         )
     }
 
-    /// Apple Health's numbers with a typed calorie total laid over them.
+    private var picked: Set<ReportMetric> { ReportOptions.metrics(from: metricsRaw) }
+
+    /// Apple Health's numbers with whatever was typed laid over them.
     private var effectiveMetrics: DayHealthMetrics {
         var merged = metrics
-        let digits = eatenText.filter { "0123456789.".contains($0) }
-        if let typed = Double(digits) {
-            merged.eatenKcal = min(typed, 99_999)
-        }
+        if let typed = Self.typedAmount(eatenText, cap: 99_999) { merged.eatenKcal = typed }
+        if let typed = Self.typedAmount(proteinText, cap: 9_999) { merged.protein = typed }
+        if let typed = Self.typedAmount(carbsText, cap: 9_999) { merged.carbs = typed }
+        if let typed = Self.typedAmount(fatText, cap: 9_999) { merged.fat = typed }
         return merged
+    }
+
+    /// A typed amount, digits only, capped so the card's columns hold it.
+    private static func typedAmount(_ text: String, cap: Double) -> Double? {
+        let digits = text.filter { "0123456789.".contains($0) }
+        return Double(digits).map { min($0, cap) }
     }
 
     private func makeReport(_ options: ReportOptions) -> DailyReport {
@@ -158,8 +167,8 @@ struct DailyReportSheet: View {
     }
 
     /// What you type onto the card, in one panel: your name (asked once,
-    /// the first time there is none), calories eaten while they are on, and
-    /// this card's note.
+    /// the first time there is none), calories eaten and the macros while
+    /// they are on, and this card's note.
     private var fields: some View {
         Panel {
             if askForName {
@@ -172,8 +181,8 @@ struct DailyReportSheet: View {
                         .frame(maxWidth: 140)
                 }
             }
-            if showCalories {
-                SettingsRow("Calories eaten", icon: "fork.knife") {
+            if picked.contains(.calories) {
+                SettingsRow("Calories eaten", icon: ReportMetric.calories.icon) {
                     TextField(
                         "",
                         text: $eatenText,
@@ -186,6 +195,9 @@ struct DailyReportSheet: View {
                     .focused($focusedField, equals: .eaten)
                     .frame(maxWidth: 90)
                 }
+            }
+            if picked.contains(.macros) {
+                MacroFieldsRow(protein: $proteinText, carbs: $carbsText, fat: $fatText, health: metrics)
             }
             HStack(spacing: RowLayout.spacing) {
                 RowGlyph(icon: "square.and.pencil", tint: .secondary)
@@ -203,7 +215,7 @@ struct DailyReportSheet: View {
             .padding(.vertical, RowLayout.verticalPadding)
             .frame(minHeight: AppLayout.minHitTarget)
         }
-        .motion(AppMotion.settle, value: showCalories)
+        .motion(AppMotion.settle, value: metricsRaw)
     }
 
     // MARK: - Health

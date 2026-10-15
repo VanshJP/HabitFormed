@@ -33,6 +33,17 @@ nonisolated struct DayHealthMetrics: Sendable, Hashable {
     }
 
     var hasMacros: Bool { protein != nil || carbs != nil || fat != nil }
+
+    /// Each macro's share of the energy the three carry (4, 4 and 9 kcal a
+    /// gram), summing to 1, or nil while none has any.
+    var macroShares: (protein: Double, carbs: Double, fat: Double)? {
+        let p = max(protein ?? 0, 0) * 4
+        let c = max(carbs ?? 0, 0) * 4
+        let f = max(fat ?? 0, 0) * 9
+        let total = p + c + f
+        guard total > 0, total.isFinite else { return nil }
+        return (p / total, c / total, f / total)
+    }
 }
 
 enum HealthKitError: LocalizedError {

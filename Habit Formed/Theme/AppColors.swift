@@ -115,6 +115,14 @@ enum AppColors {
         Color(red: 0.298, green: 0.388, blue: 0.494),    // slate
     ]
 
+    // MARK: - Macros
+
+    /// The report card's protein, carbs and fat: the palette's rose, amber
+    /// and steel blue, three hues apart so the split bar reads at a glance.
+    static let macroProtein = Color(red: 0.800, green: 0.420, blue: 0.520)
+    static let macroCarbs = Color(red: 0.749, green: 0.576, blue: 0.318)
+    static let macroFat = info
+
     // MARK: - Glass tints
 
     /// Identity tint for a whole card or tile (rule 12: 0.06).

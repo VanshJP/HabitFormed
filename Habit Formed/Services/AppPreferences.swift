@@ -24,6 +24,9 @@ nonisolated enum AppPreferences {
     static let reportShowStreaks = "report.showStreaks"
     static let reportShowNotes = "report.showNotes"
     static let reportShowWeek = "report.showWeek"
+    /// `ReportMetric` raw values, comma-joined: the Health numbers on the card.
+    static let reportMetrics = "report.metrics"
+    /// The switches `reportMetrics` replaced, read only for its default.
     static let reportShowCalories = "report.showCalories"
     static let reportShowActivity = "report.showActivity"
     /// Evening nudge to send the day's report.

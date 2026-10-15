@@ -1,10 +1,12 @@
 import SwiftData
 import SwiftUI
 
-/// How the report card looks and what goes on it: the layout as pictures, the
-/// background, the accent, the type, and the switches. It reads and writes
-/// the stored choices itself, so Settings → Report card and the sheet's Edit
-/// are one editor, and the card above it redraws as each one changes.
+/// What goes on the report card and how it looks: the habits and details,
+/// the Apple Health numbers, then the layout as pictures, the background, the
+/// accent and the type. What is on the card leads, since it changes from day
+/// to day while the look is set once. It reads and writes the stored choices
+/// itself, so Settings → Report card and the sheet's Edit are one editor, and
+/// the card above it redraws as each one changes.
 struct ReportStyleEditor: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
@@ -17,8 +19,7 @@ struct ReportStyleEditor: View {
     @AppStorage(AppPreferences.reportShowStreaks) private var showStreaks = true
     @AppStorage(AppPreferences.reportShowNotes) private var showNotes = true
     @AppStorage(AppPreferences.reportShowWeek) private var showWeek = true
-    @AppStorage(AppPreferences.reportShowCalories) private var showCalories = false
-    @AppStorage(AppPreferences.reportShowActivity) private var showActivity = false
+    @AppStorage(AppPreferences.reportMetrics) private var metricsRaw = ReportOptions.legacyMetricsRaw
 
     @Environment(\.appCanvas) private var canvas
 
@@ -29,6 +30,8 @@ struct ReportStyleEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+            contentsSection
+            healthSection
             GlassSection("Layout") {
                 Panel {
                     SketchPicker(
@@ -56,7 +59,6 @@ struct ReportStyleEditor: View {
                     }
                 }
             }
-            contentsSection
         }
         .motion(AppMotion.settle, value: layoutRaw)
     }
@@ -111,8 +113,8 @@ struct ReportStyleEditor: View {
 
     // MARK: - On the card
 
-    /// The habits first, then the extras. Notes and the week's dots live in a
-    /// row, so they are offered only in the list layout.
+    /// The habits first, then what each one carries. Notes and the week's
+    /// dots live in a row, so they are offered only in the list layout.
     private var contentsSection: some View {
         GlassSection("On the card") {
             GlassEffectContainer(spacing: 8) {
@@ -128,12 +130,34 @@ struct ReportStyleEditor: View {
                             ToggleChip(title: "Habit notes", icon: "text.quote", isOn: $showNotes)
                             ToggleChip(title: "Last 7 days", icon: "circle.grid.3x3", isOn: $showWeek)
                         }
-                        ToggleChip(title: "Calories", icon: "fork.knife", isOn: $showCalories)
-                        ToggleChip(title: "Activity", icon: "figure.walk", isOn: $showActivity)
                     }
                 }
             }
         }
+    }
+
+    /// One chip per number, so what is picked is exactly what the card adds.
+    private var healthSection: some View {
+        GlassSection("Apple Health") {
+            GlassEffectContainer(spacing: 8) {
+                FlowLayout(spacing: 8) {
+                    ForEach(ReportMetric.allCases) { metric in
+                        ToggleChip(title: metric.title, icon: metric.icon, isOn: shows(metric))
+                    }
+                }
+            }
+        }
+    }
+
+    private func shows(_ metric: ReportMetric) -> Binding<Bool> {
+        Binding(
+            get: { ReportOptions.metrics(from: metricsRaw).contains(metric) },
+            set: { isOn in
+                var metrics = ReportOptions.metrics(from: metricsRaw)
+                if isOn { metrics.insert(metric) } else { metrics.remove(metric) }
+                metricsRaw = ReportOptions.raw(from: metrics)
+            }
+        )
     }
 
     private func includes(_ habit: Habit) -> Binding<Bool> {

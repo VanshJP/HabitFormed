@@ -75,13 +75,14 @@ nonisolated enum ReportFormat {
             : value.safeRounded.formatted()
     }
 
-    static func hours(_ value: Double?) -> String {
+    /// "7h 40m", "45m".
+    static func duration(minutes value: Double?) -> String {
         guard let value else { return "n/a" }
-        return String(format: "%.1fh", value)
+        return value.minutesAsDuration
     }
 
-    static func minutes(_ value: Double?) -> String {
+    static func grams(_ value: Double?) -> String {
         guard let value else { return "n/a" }
-        return "\(value.safeRounded) min"
+        return "\(value.safeRounded) g"
     }
 }

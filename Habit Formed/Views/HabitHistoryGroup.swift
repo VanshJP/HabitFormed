@@ -61,7 +61,12 @@ private struct HabitHistoryRow: View {
         }
         if completion.value != 1 {
             let v = completion.value
-            parts.append(v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v))
+            let source = completion.habit?.source ?? .none
+            if source != .none {
+                parts.append(source.compactValue(v))
+            } else {
+                parts.append(v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v))
+            }
         }
         return parts.joined(separator: " · ")
     }

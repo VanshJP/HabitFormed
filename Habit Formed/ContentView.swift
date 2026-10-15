@@ -186,18 +186,15 @@ struct ContentView: View {
                 message: undo.message,
                 icon: undo.icon,
                 tint: undo.tint,
-                onUndo: { revert(undo) }
+                // "Perfect day" stays a little longer.
+                lifetime: .seconds(undo.completesDay ? 6 : 4),
+                onUndo: { revert(undo) },
+                onDismiss: { if self.undo?.id == undo.id { self.undo = nil } }
             )
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.top, 4)
                 .readableColumn()
                 .transition(.move(edge: .top).combined(with: .opacity))
-                .task(id: "\(undo.id)-\(undo.completesDay)") {
-                    // Cancelled means the toast just became "Perfect day";
-                    // the task that replaced this one closes it.
-                    guard (try? await Task.sleep(for: .seconds(undo.completesDay ? 6 : 4))) != nil else { return }
-                    if self.undo?.id == undo.id { self.undo = nil }
-                }
         }
     }
 
@@ -445,6 +442,8 @@ struct ContentView: View {
 
     private func undoToday(_ habit: Habit) {
         Haptics.undo()
+        // The toast for this log would offer to take back what is gone.
+        if let last = undo, last.habitID == habit.id, last.wasLogged, last.day.isToday { undo = nil }
         withMotion(AppMotion.snap) { habit.removeLog(on: Date(), in: modelContext) }
     }
 
@@ -488,8 +487,8 @@ struct ContentView: View {
 
 // MARK: - Undo
 
-/// The last change made from the grid, kept for four seconds so the toast can
-/// take it back.
+/// The last change made from the grid, kept while its toast shows (four
+/// seconds, or until swiped away) so the toast can take it back.
 struct UndoLog: Equatable {
     let id = UUID()
     let habitID: UUID
