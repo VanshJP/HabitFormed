@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// One habit as a compact row for Today's Rows layout: glyph, name and status
-/// line, with the way to log at the trailing end (the slide, a timer, a
-/// health reading, or a past day's toggle). Same gestures as a tile: tap
-/// opens the habit, slide logs, long press opens the shared menu. Done (logged
-/// on the day shown) fills the row with the habit's color, from the knob when
-/// it is slid, and turns its glyph and marks white.
+/// One habit as a compact row for Today's Rows layout: glyph, name and
+/// status line (streak and schedule), with
+/// the way to log at the trailing end (a short slide, a timer, a health
+/// reading, or a past day's toggle). The row's corners follow the slide's
+/// pill, so at default text sizes it is a capsule. Same gestures as a tile:
+/// tap opens the habit, slide logs, long press opens the shared menu. Done
+/// (logged on the day shown) fills the row with the habit's color, from the
+/// knob when it is slid, and turns its glyph and marks white.
 struct HabitRowView: View {
     let habit: Habit
     /// The day the list is showing. Equals today in normal use.
@@ -21,8 +23,16 @@ struct HabitRowView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
 
-    /// Wide enough for "Slide to log" beside the knob.
-    private let trailingWidth: CGFloat = 136
+    /// How far the trailing control sits inside the row, top, bottom and
+    /// trailing. The row's corners are the pill's plus this, so the two
+    /// curves run parallel at any height.
+    private let inset: CGFloat = 10
+    private var cornerRadius: CGFloat { SlideToLogTrack.trackHeight / 2 + inset }
+    /// Room for the knob to travel, with no words beside it.
+    private let slideWidth: CGFloat = 96
+    /// Wide enough for "Next log in 3 days" and a timer's capsule.
+    private let trailingWidth: CGFloat = 120
+    private let glyphSize: CGFloat = 28
 
     /// How full the row is, 0...1. The knob drives it while it slides; a
     /// log or an undo made anywhere else plays it to 1 or 0.
@@ -36,10 +46,10 @@ struct HabitRowView: View {
         let _ = dayTracker.today
 
         return HStack(spacing: 12) {
-            IconChip(icon: habit.symbol, tint: isDone ? .white : habit.color, size: 26)
+            IconChip(icon: habit.symbol, tint: isDone ? .white : habit.color, size: glyphSize)
             VStack(alignment: .leading, spacing: 2) {
                 Text(habit.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.headline)
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone)
@@ -47,18 +57,18 @@ struct HabitRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             trailing
-                .frame(width: trailingWidth)
+                .frame(width: usesSlide ? slideWidth : trailingWidth)
         }
-        .padding(.leading, AppLayout.tilePadding)
-        .padding(.trailing, 10)
-        .padding(.vertical, 10)
+        // The glyph centres in the capsule's round end.
+        .padding(.leading, cornerRadius - glyphSize / 2)
+        .padding([.trailing, .vertical], inset)
         .opacity(habit.restingDaysLeft == nil || isPastDay ? 1 : 0.6)
-        .completionFill(habit.color, amount: $fill)
+        .completionFill(habit.color, amount: $fill, cornerRadius: cornerRadius)
         .glassCard(
-            cornerRadius: AppLayout.tileRadius,
+            cornerRadius: cornerRadius,
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
         )
-        .contentShape(.rect(cornerRadius: AppLayout.tileRadius))
+        .contentShape(.rect(cornerRadius: cornerRadius))
         .onTapGesture { Haptics.light(); actions.open() }
         .contextMenu {
             if !isSliding {
@@ -66,7 +76,7 @@ struct HabitRowView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(habit.title), \(isDone ? "done" : "not done")")
+        .accessibilityLabel("\(habit.title), \(isDone ? "done" : "not done"), \(habit.displayStreak) \(habit.streakUnitLabel) streak")
         .accessibilityHint("Opens history. Long press for options.")
         .onAppear { syncFill(fillState, animation: nil) }
         .onChange(of: fillState) { old, new in
@@ -87,6 +97,11 @@ struct HabitRowView: View {
 
     // MARK: - Trailing
 
+    /// The short slide, rather than one of the wider controls.
+    private var usesSlide: Bool {
+        !isPastDay && habit.trackKind == .manual && habit.restingDaysLeft == nil
+    }
+
     @ViewBuilder
     private var trailing: some View {
         if isPastDay {
@@ -105,7 +120,7 @@ struct HabitRowView: View {
                         .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
                         .background(Capsule().fill(Color.white.opacity(0.06)))
                 } else {
-                    SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding) {
+                    SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding, showsLabel: false) {
                         actions.log()
                     }
                 }

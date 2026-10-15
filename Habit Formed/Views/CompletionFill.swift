@@ -37,10 +37,10 @@ extension CompletionFill {
 extension View {
     /// Fills this surface with `color` by `amount`, pouring out of the slide
     /// knob inside it when there is one.
-    func completionFill(_ color: Color, amount: Binding<CGFloat>) -> some View {
+    func completionFill(_ color: Color, amount: Binding<CGFloat>, cornerRadius: CGFloat = AppLayout.tileRadius) -> some View {
         backgroundPreferenceValue(SlideToLogTrack.BoundsKey.self) { anchor in
             GeometryReader { proxy in
-                CompletionFill(color: color, amount: amount, track: anchor.map { proxy[$0] })
+                CompletionFill(color: color, amount: amount, track: anchor.map { proxy[$0] }, cornerRadius: cornerRadius)
             }
         }
     }

@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(NotificationService.self) private var notifications
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
+    @Environment(\.appCanvas) private var canvas
 
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
@@ -293,15 +294,19 @@ struct ContentView: View {
                 Haptics.light()
                 showDatePicker = true
             } label: {
+                // As big as fits beside four doors and the streak chip:
+                // `.largeTitle` squeezes "September" past the scale floor.
                 HStack(spacing: 6) {
                     Text(monthTitle)
-                        .font(.title2.bold())
+                        .font(.title.bold())
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
+                    // The capsule's icon weight, in the accent the calendar
+                    // it opens wears.
                     Image(systemName: "chevron.down")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(canvas.look.accent)
                 }
                 .frame(minHeight: AppLayout.minHitTarget)
                 .contentShape(.rect)

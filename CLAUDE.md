@@ -81,9 +81,9 @@ Habit Formed/
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
     ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
-    ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
+    ├── HabitRowView.swift    # One capsule row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
-    ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
+    ├── HabitStatusLine.swift # Streak and schedule line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
     ├── HistoryView.swift     # One page: hero, patterns, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
@@ -108,7 +108,8 @@ the habits. Today is its root page, with no navigation bar; History and
 Settings are pushed from Today's top row:
 
 - **Today**: `ContentView`. No page title: the top row is the month
-  ("October ⌄", which opens the calendar) and a capsule holding the
+  ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
+  chevron in the look's accent; it opens the calendar) and a capsule holding the
   perfect-day `StreakChip` (only once a streak exists), add (+), Share report
   (the day shown), History (clock, pushed) and Settings (gear, pushed). The
   calendar is a full-height sheet (a shorter one floats off the screen's
@@ -132,6 +133,19 @@ Settings are pushed from Today's top row:
   the white glyph, the featured tint and the spoken state, so a tile always
   agrees with the week strip's ring and its own pill; a weekly
   habit's week is its status line's to say ("2 of 3 this week").
+  A tile is SpeakUp's tool tile: its glyph drawn large and quiet in the
+  top trailing corner (the habit's own color at 55%, behind the words),
+  then at the bottom the name, the `HabitStatusLine` and the way to log,
+  every kind of it a 44pt pill (the slide, a timer's play pill, a health
+  meter, a past day's toggle). The status line leads with the streak's
+  number ("3 days · 1 of 5 this week"), rounded, medium weight and a step
+  under the name, and is one numeral tall even without one, so tiles in a
+  row stay level. The name leads and the line sits back: the number in
+  soft white, the unit softer, the schedule gray unless it asks for
+  attention (then the habit's `glyphTone`). A row keeps
+  the same line at caption size and is a capsule: its corners are the
+  slide's pill plus the row's 10pt inset, so the two curves nest, and its
+  short slide has no words (a tile's says "Slide to log").
 - **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
   seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
@@ -348,7 +362,7 @@ The design system is SpeakUp's; when in doubt, match
   (Liquid Glass). Never stack glass on glass: inside a card use
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
-  (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles and rows the tile radius. Groups of rows (History,
+  (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles the tile radius and its rows the slide's pill plus their inset (a capsule). Groups of rows (History,
   Settings, the report and add sheets) sit on a `Panel`, one pane of glass
   with hairlines. Chips use `controlChrome`, so a row of them on the canvas
   is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
@@ -365,8 +379,9 @@ The design system is SpeakUp's; when in doubt, match
   habit's glass follows Light and Dark like every untinted pane. Every
   `glassEffect` takes its tint from that setting; none is plain `.regular`. The
   one solid use of a habit's color is Today's done fill, with the glyph and
-  its marks (status highlight, week dots, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
-  (lifted toward white). Habit colors come from `AppColors.tilePalette`;
+  its marks (status line, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
+  (lifted toward white), except as a tile's art, which is the raw color
+  at 55%, like SpeakUp's `ToolArt`. Habit colors come from `AppColors.tilePalette`;
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);

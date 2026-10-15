@@ -20,6 +20,9 @@ struct SlideToLogTrack: View {
     /// True while a thumb is on the knob, so the surface can hold back its
     /// long-press menu: a pause mid-slide is not a long press.
     @Binding var isSliding: Bool
+    /// "Slide to log" in the pill. A row's short track leaves it out: the
+    /// knob's chevron already says which way.
+    var showsLabel = true
     let onComplete: () -> Void
 
     @State private var isArmed = false
@@ -46,12 +49,14 @@ struct SlideToLogTrack: View {
                     .fill(Color.white.opacity(isLogged ? 0 : 0.08))
                     .padding(.leading, p * maxX)
 
-                Text("Slide to log")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
-                    .padding(.leading, Self.knobSize * 0.6)
-                    .frame(maxWidth: .infinity)
-                    .allowsHitTesting(false)
+                if showsLabel {
+                    Text("Slide to log")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
+                        .padding(.leading, Self.knobSize * 0.6)
+                        .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
+                }
 
                 knob(progress: p)
                     .offset(x: Self.inset + p * maxX)
