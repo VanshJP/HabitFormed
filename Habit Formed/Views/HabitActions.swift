@@ -34,7 +34,9 @@ struct HabitContextMenu: View {
             }
         } else if habit.isCompletedToday {
             Button("Undo today's log", systemImage: "arrow.uturn.backward") { actions.undoToday() }
-        } else {
+        } else if habit.trackKind != .health {
+            // Health checks today off; a log by hand would claim a goal the
+            // numbers have not reached. Past days stay fixable above.
             Button("Log today", systemImage: "checkmark.circle") {
                 Haptics.success()
                 actions.log()

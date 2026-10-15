@@ -88,6 +88,7 @@ Habit Formed/
     ├── HabitStatusLine.swift # Streak and schedule line, shared by tiles and rows
     ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs;
     │                         #   Edit and Delete in its top bar's More menu
+    ├── HabitHealthReading.swift # A health habit's reading on its page, where the log button would be
     ├── HistoryView.swift     # One page: hero, patterns, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
@@ -523,7 +524,10 @@ The design system is SpeakUp's; when in doubt, match
   total held over midnight never checks off the next day), and takes back
   a log sync wrote that a fresh total for its day falls short of; once a
   launch it checks the last 30 days the same way. A log by hand records
-  the goal itself and is never taken back.
+  the goal itself and is never taken back. Today is Health's to check
+  off: a health habit's page shows its reading where the log button would
+  be, its long-press menu has no "Log today", and Siri declines too. The
+  page's calendar stays the deliberate way to set any day by hand.
 - Notifications: reminders are cadence-aware and rebuilt by
   `NotificationService.syncReminders(for:)` (launch, foreground, habit
   changes). Interval habits get rolling one-shots on due dates; timer

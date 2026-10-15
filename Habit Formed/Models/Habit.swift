@@ -133,6 +133,17 @@ nonisolated enum HealthKitSource: String, Codable, CaseIterable, Identifiable, S
         }
     }
 
+    /// The unit a `compactValue` does not already carry: " steps" after
+    /// "8.2k", nothing after "7h 40m" or "4.8km".
+    var compactUnit: String {
+        switch self {
+        case .steps:          return " steps"
+        case .activeCalories: return " kcal"
+        case .flightsClimbed: return " floors"
+        default:              return ""
+        }
+    }
+
     var symbol: String {
         switch self {
         case .none:            return "hand.tap"

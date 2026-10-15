@@ -106,9 +106,8 @@ enum DailyReportBuilder {
             guard let value = live ?? loggedValue else {
                 return status == .done ? nil : "Under target"
             }
-            let suffix = healthSuffix(habit.source)
             let range = weekly ? " this week" : ""
-            return "\(habit.source.compactValue(value)) of \(habit.source.compactValue(habit.targetValue))\(suffix)\(range)"
+            return "\(habit.source.compactValue(value)) of \(habit.source.compactValue(habit.targetValue))\(habit.source.compactUnit)\(range)"
         }
 
         switch habit.frequency {
@@ -124,16 +123,6 @@ enum DailyReportBuilder {
             }
         case .daily:
             return habit.timerDurationSeconds > 0 ? "\(habit.timerDurationSeconds / 60) min" : nil
-        }
-    }
-
-    /// The unit word a compact health value does not already carry.
-    private static func healthSuffix(_ source: HealthKitSource) -> String {
-        switch source {
-        case .steps: return " steps"
-        case .activeCalories: return " kcal"
-        case .flightsClimbed: return " floors"
-        default: return ""
         }
     }
 }

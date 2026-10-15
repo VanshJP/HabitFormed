@@ -10,7 +10,6 @@ struct HabitDetailView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(NotificationService.self) private var notifications
     @Environment(DayTracker.self) private var dayTracker
-    @Environment(HealthKitService.self) private var health
 
     let habit: Habit
 
@@ -99,15 +98,6 @@ struct HabitDetailView: View {
                     .multilineTextAlignment(.center)
             }
 
-            if healthLooksBlocked {
-                // iOS never tells an app its Health access was declined, so a
-                // reading stuck at zero is the only sign.
-                Text("Stuck at 0? Check Settings › Privacy & Security › Health › Habit Formed.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
             if habit.frequency == .interval {
                 let status = nextDueStatus
                 Text(status.text)
@@ -117,12 +107,6 @@ struct HabitDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 4)
-    }
-
-    private var healthLooksBlocked: Bool {
-        guard habit.trackKind == .health, !habit.isCompletedToday else { return false }
-        let values = habit.frequency == .weekly ? health.liveWeeklyValues : health.liveValues
-        return (values[habit.source.rawValue] ?? 0) == 0
     }
 
     /// "Daily · 48 logs · 3 this week". Weekly habits count toward the target.
@@ -171,6 +155,8 @@ struct HabitDetailView: View {
         let section = VStack(spacing: 12) {
             if let entry = habit.todayCompletion {
                 loggedCard(entry)
+            } else if habit.trackKind == .health {
+                HabitHealthReading(habit: habit)
             } else {
                 GlassButton(title: "Log today", icon: "checkmark", style: .primary, size: .large, fullWidth: true) {
                     Haptics.success()
