@@ -177,62 +177,13 @@ final class HealthKitService {
         return metrics
     }
 
-    // MARK: - Today's value
+    // MARK: - Readings
 
-    func todayValue(for source: HealthKitSource) async -> Double? {
-        guard isAvailable, source != .none else { return nil }
-        let (start, end) = todayBounds()
-
-        switch source {
-        case .none:
-            return nil
-
-        case .steps:
-            guard let t = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return nil }
-            return await sumQuantity(type: t, unit: .count(), start: start, end: end)
-
-        case .activeCalories:
-            guard let t = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return nil }
-            return await sumQuantity(type: t, unit: .kilocalorie(), start: start, end: end)
-
-        case .exerciseMinutes:
-            guard let t = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) else { return nil }
-            return await sumQuantity(type: t, unit: .minute(), start: start, end: end)
-
-        case .walkingDistance:
-            guard let t = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return nil }
-            let meters = await sumQuantity(type: t, unit: .meter(), start: start, end: end)
-            return meters.map { $0 / 1000.0 }
-
-        case .flightsClimbed:
-            guard let t = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) else { return nil }
-            return await sumQuantity(type: t, unit: .count(), start: start, end: end)
-
-        case .mindfulMinutes:
-            guard let t = HKCategoryType.categoryType(forIdentifier: .mindfulSession) else { return nil }
-            let secs = await sumCategoryDuration(type: t, start: start, end: end)
-            return secs.map { $0 / 60.0 }
-
-        case .sleepHours:
-            guard let t = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return nil }
-            let from = end.addingTimeInterval(-24 * 60 * 60)
-            let secs = await sumSleepAsleep(type: t, start: from, end: end)
-            return secs.map { $0 / 3600.0 }
-
-        case .standHours:
-            guard let t = HKCategoryType.categoryType(forIdentifier: .appleStandHour) else { return nil }
-            return await countStoodHours(type: t, start: start, end: end)
-        }
-    }
-
-    // MARK: - Week-to-date value
-
-    /// Sum of `source` from the start of this calendar week through now.
-    /// Mirrors `todayValue(for:)` but spans the week instead of the day.
-    func weekValue(for source: HealthKitSource) async -> Double? {
-        guard isAvailable, source != .none else { return nil }
-        let (start, end) = weekBounds()
-
+    /// `source`'s total from `start` to `end`: one day for a daily habit, the
+    /// week so far for a weekly one. Nil when Health has no answer, as on a
+    /// locked phone (Health stays sealed until it is unlocked).
+    func reading(for source: HealthKitSource, from start: Date, to end: Date) async -> Double? {
+        guard isAvailable else { return nil }
         switch source {
         case .none:
             return nil
@@ -268,50 +219,109 @@ final class HealthKitService {
 
     // MARK: - Sync
 
+    /// The day `liveValues` were read for and the week `liveWeeklyValues`
+    /// were. A new one starts them empty, so a total read yesterday never
+    /// stands in for today's.
+    @ObservationIgnored private var liveDay: Date?
+    @ObservationIgnored private var liveWeek: Date?
+    /// Set once past logs have been checked this launch (`checkPastLogs`).
+    @ObservationIgnored private var checkedPastLogs = false
+
+    /// Reads each health habit's total for today (or the week so far), logs
+    /// the ones at goal, and takes back a log the reading contradicts.
     @MainActor
     func syncHealthKitHabits(in context: ModelContext) async {
         guard isAvailable else { return }
         let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.sourceRaw != "none" })
-        guard let habits = try? context.fetch(descriptor) else { return }
+        guard let tracked = try? context.fetch(descriptor) else { return }
 
-        var fetchedDailySources = Set<String>()
-        var fetchedWeeklySources = Set<String>()
-        var logged = false
-
-        for habit in habits {
-            let key = habit.source.rawValue
-            let isWeekly = habit.frequency == .weekly
-
-            if isWeekly {
-                if !fetchedWeeklySources.contains(key) {
-                    // Only a real change is written: every write redraws each
-                    // tile that reads these values.
-                    if let value = await weekValue(for: habit.source), liveWeeklyValues[key] != value {
-                        liveWeeklyValues[key] = value
-                    }
-                    fetchedWeeklySources.insert(key)
-                }
-                guard let value = liveWeeklyValues[key] else { continue }
-                guard value >= habit.targetValue else { continue }
-                guard !habit.isCompletedThisWeek else { continue }
-                context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
-                logged = true
-            } else {
-                if !fetchedDailySources.contains(key) {
-                    if let value = await todayValue(for: habit.source), liveValues[key] != value {
-                        liveValues[key] = value
-                    }
-                    fetchedDailySources.insert(key)
-                }
-                guard let value = liveValues[key] else { continue }
-                guard value >= habit.targetValue else { continue }
-                guard !habit.isCompletedToday else { continue }
-                context.insert(HabitCompletion(date: Date(), value: value, habit: habit))
-                logged = true
-            }
+        // One day for the whole pass: read for it, log on it.
+        let now = Date()
+        let day = now.startOfDay
+        let week = Date.startOfWeek(for: day)
+        if liveDay != day {
+            liveDay = day
+            liveValues = [:]
+        }
+        if liveWeek != week {
+            liveWeek = week
+            liveWeeklyValues = [:]
         }
 
-        if logged { try? context.save() }
+        var dayTotals: [String: Double] = [:]
+        var weekTotals: [String: Double] = [:]
+        for source in Set(tracked.filter { $0.frequency != .weekly }.map(\.source)) {
+            dayTotals[source.rawValue] = await reading(for: source, from: day, to: day.nextDayStart)
+        }
+        for source in Set(tracked.filter { $0.frequency == .weekly }.map(\.source)) {
+            weekTotals[source.rawValue] = await reading(for: source, from: week, to: now)
+        }
+        // A pass that crossed midnight while it read leaves the new day's
+        // values alone. Only a real change is written: every write redraws
+        // each tile that reads these values.
+        if liveDay == day {
+            for (key, total) in dayTotals where liveValues[key] != total { liveValues[key] = total }
+            for (key, total) in weekTotals where liveWeeklyValues[key] != total { liveWeeklyValues[key] = total }
+        }
+
+        // Fetched again, so a habit deleted while Health answered is not touched.
+        guard let habits = try? context.fetch(descriptor) else { return }
+        var changed = false
+        for habit in habits {
+            let weekly = habit.frequency == .weekly
+            guard let total = (weekly ? weekTotals : dayTotals)[habit.source.rawValue] else { continue }
+            let logs = weekly ? habit.completionsInWeek(of: day) : habit.completion(on: day).map { [$0] } ?? []
+            if total >= habit.targetValue {
+                guard logs.isEmpty else { continue }
+                context.insert(HabitCompletion(date: day, value: total, habit: habit))
+                changed = true
+            } else {
+                for log in logs where Self.contradicts(total, logged: log.value, goal: habit.targetValue) {
+                    context.delete(log)
+                    changed = true
+                }
+            }
+        }
+        if changed { try? context.save() }
+        await checkPastLogs(before: day, in: context)
+    }
+
+    /// True when `total`, read for a log's own day (or week), shows the log
+    /// was never read from it. Sync records the total it saw, at or over
+    /// goal; a log by hand records the goal itself and is left alone. Totals
+    /// only grow through a day, so one now under the logged total and under
+    /// goal means the log carried another day's total.
+    private static func contradicts(_ total: Double, logged: Double, goal: Double) -> Bool {
+        logged != goal && total < logged && total < goal
+    }
+
+    /// Once a launch, checks the last 30 days' logs of daily health habits
+    /// against their own day's total and takes back the ones it contradicts.
+    /// Tried again on the next sync while Health reads nothing (a locked phone).
+    private func checkPastLogs(before day: Date, in context: ModelContext) async {
+        guard !checkedPastLogs else { return }
+        checkedPastLogs = true
+        let start = day.adding(days: -30)
+        let descriptor = FetchDescriptor<Habit>(predicate: #Predicate { $0.sourceRaw != "none" && $0.frequencyRaw != "weekly" })
+        // As values, so a habit deleted while Health answers is never touched.
+        let candidates = ((try? context.fetch(descriptor)) ?? []).flatMap { habit in
+            (habit.completions ?? [])
+                .filter { $0.date >= start && $0.date < day && $0.value != habit.targetValue }
+                .map { (id: $0.id, day: $0.date, logged: $0.value, source: habit.source, goal: habit.targetValue) }
+        }
+        var answered = candidates.isEmpty
+        var stray: [UUID] = []
+        for log in candidates {
+            guard let total = await reading(for: log.source, from: log.day, to: log.day.nextDayStart) else { continue }
+            answered = true
+            if Self.contradicts(total, logged: log.logged, goal: log.goal) { stray.append(log.id) }
+        }
+        checkedPastLogs = answered
+        guard !stray.isEmpty else { return }
+        let ids = stray
+        let strayLogs = FetchDescriptor<HabitCompletion>(predicate: #Predicate { ids.contains($0.id) })
+        for log in (try? context.fetch(strayLogs)) ?? [] { context.delete(log) }
+        try? context.save()
     }
 
     // MARK: - Live observers
@@ -374,23 +384,6 @@ final class HealthKitService {
 
     // MARK: - Query helpers
 
-    private func todayBounds() -> (Date, Date) {
-        let cal = Calendar.current
-        let start = cal.startOfDay(for: Date())
-        let end = cal.date(byAdding: .day, value: 1, to: start) ?? Date()
-        return (start, end)
-    }
-
-    /// (start of the current calendar week, now). Honors the user's locale:
-    /// e.g. weeks start Sunday in en_US, Monday in most of Europe.
-    private func weekBounds() -> (Date, Date) {
-        let cal = Calendar.current
-        let now = Date()
-        let interval = cal.dateInterval(of: .weekOfYear, for: now)
-        let start = interval?.start ?? cal.startOfDay(for: now)
-        return (start, now)
-    }
-
     private func sumQuantity(type: HKQuantityType, unit: HKUnit, start: Date, end: Date) async -> Double? {
         await withCheckedContinuation { cont in
             let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
@@ -404,8 +397,9 @@ final class HealthKitService {
     private func sumCategoryDuration(type: HKCategoryType, start: Date, end: Date) async -> Double? {
         await withCheckedContinuation { cont in
             let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
-            let q = HKSampleQuery(sampleType: type, predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
-                let total = (samples ?? []).reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+            let q = HKSampleQuery(sampleType: type, predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard error == nil, let samples else { cont.resume(returning: nil); return }
+                let total = samples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
                 cont.resume(returning: total)
             }
             store.execute(q)
@@ -415,14 +409,15 @@ final class HealthKitService {
     private func sumSleepAsleep(type: HKCategoryType, start: Date, end: Date) async -> Double? {
         await withCheckedContinuation { cont in
             let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
-            let q = HKSampleQuery(sampleType: type, predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+            let q = HKSampleQuery(sampleType: type, predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard error == nil, let samples else { cont.resume(returning: nil); return }
                 let asleepValues: Set<Int> = [
                     HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
                     HKCategoryValueSleepAnalysis.asleepCore.rawValue,
                     HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
                     HKCategoryValueSleepAnalysis.asleepREM.rawValue,
                 ]
-                let total = (samples ?? [])
+                let total = samples
                     .compactMap { $0 as? HKCategorySample }
                     .filter { asleepValues.contains($0.value) }
                     .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }

@@ -459,7 +459,7 @@ The design system is SpeakUp's; when in doubt, match
 - **HealthKit:** new HealthKit-backed habit types should extend
   `HealthKitSource` (label, defaultTarget, unitSuffix, symbol,
   compactValue) and add a matching branch in
-  `HealthKitService.todayValue(for:)`. Report-only numbers live in
+  `HealthKitService.reading(for:from:to:)`. Report-only numbers live in
   `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`. Health is asked
   for per type with `requestAuthorization(for:)`: by the add sheet when a
   health habit is saved, and at launch only for types existing habits read.
@@ -502,7 +502,12 @@ The design system is SpeakUp's; when in doubt, match
 ## Known gaps / future work
 
 - HealthKit auto-sync only inserts a completion when today's value
-  meets the target; partial progress shows on the tile's meter.
+  meets the target; partial progress shows on the tile's meter. Each sync
+  reads for the day it runs on (`liveValues` start empty each day, so a
+  total held over midnight never checks off the next day), and takes back
+  a log sync wrote that a fresh total for its day falls short of; once a
+  launch it checks the last 30 days the same way. A log by hand records
+  the goal itself and is never taken back.
 - Notifications: reminders are cadence-aware and rebuilt by
   `NotificationService.syncReminders(for:)` (launch, foreground, habit
   changes). Interval habits get rolling one-shots on due dates; timer
