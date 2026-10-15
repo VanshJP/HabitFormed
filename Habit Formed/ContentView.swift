@@ -2,9 +2,10 @@ import AppIntents
 import SwiftUI
 import SwiftData
 
-/// The Today tab: a header with the perfect-day streak, a week strip to jump
-/// between recent days, the day's progress with the report button, and the
-/// habits as tiles or rows, each filled with its color once done.
+/// Today, the app's root page: a header with the perfect-day streak and the
+/// doors to History and Settings, a week strip to jump between recent days,
+/// the day's progress with the report button, and the habits as tiles or
+/// rows, each filled with its color once done.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -18,6 +19,7 @@ struct ContentView: View {
 
     var onAdd: () -> Void = {}
     var onShareReport: (Date) -> Void = { _ in }
+    var onShareWeek: () -> Void = {}
 
     @State private var sheet: HabitSheet?
     @State private var openHabit: Habit?
@@ -182,6 +184,7 @@ struct ContentView: View {
         if let undo {
             UndoToast(
                 message: undo.message,
+                icon: undo.icon,
                 tint: undo.tint,
                 onUndo: { revert(undo) }
             )
@@ -313,6 +316,8 @@ struct ContentView: View {
                     Text(monthTitle)
                         .font(.title2.bold())
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     Image(systemName: "chevron.down")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.secondary)
@@ -341,6 +346,19 @@ struct ContentView: View {
                 }
                 .buttonStyle(GlassPressStyle())
                 .accessibilityLabel("Add habit")
+
+                NavigationLink {
+                    HistoryView(onShareReport: onShareReport, onShareWeek: onShareWeek)
+                } label: {
+                    Image(systemName: "clock")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+                .accessibilityLabel("History")
 
                 NavigationLink {
                     SettingsView()
@@ -476,7 +494,7 @@ struct UndoLog: Equatable {
     let id = UUID()
     let habitID: UUID
     let title: String
-    let tint: Color
+    let color: Color
     let day: Date
     /// True when the change added a log; false when it removed one.
     let wasLogged: Bool
@@ -486,10 +504,19 @@ struct UndoLog: Equatable {
     init(habit: Habit, day: Date, wasLogged: Bool) {
         self.habitID = habit.id
         self.title = habit.title
-        self.tint = habit.color
+        self.color = habit.color
         self.day = day.startOfDay
         self.wasLogged = wasLogged
     }
+
+    /// A check for a log, the way back for one taken away.
+    var icon: String {
+        wasLogged ? "checkmark.circle.fill" : "arrow.uturn.backward.circle.fill"
+    }
+
+    /// The habit's color, or green once the day is perfect, as the week
+    /// strip's ring closes.
+    var tint: Color { completesDay ? AppColors.success : color }
 
     var message: String {
         if completesDay { return "Perfect day" }

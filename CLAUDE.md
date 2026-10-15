@@ -58,7 +58,7 @@ the one sanctioned `pbxproj` edit for files.
 ```
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
-├── ContentView.swift         # Today tab: month control, week strip, the habits, undo toast
+├── ContentView.swift         # Today, the root page: month control, week strip, the habits, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
 │                             #   ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
@@ -78,7 +78,7 @@ Habit Formed/
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
-    ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
+    ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
     ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
@@ -102,13 +102,14 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 
 ## Interaction model
 
-`RootView` hosts two tabs, each with no navigation bar (the page title is
-the header):
+`RootView` hosts one `NavigationStack` and no tab bar, so nothing sits over
+the habits. Today is its root page, with no navigation bar; History and
+Settings are pushed from Today's top row:
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄", which opens the calendar) and a capsule holding the
-  perfect-day `StreakChip` (only once a streak exists), add (+) and Settings
-  (gear, pushed). Right under it the `WeekStrip` is the date control: one
+  perfect-day `StreakChip` (only once a streak exists), add (+), History
+  (clock, pushed) and Settings (gear, pushed). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
   day). The selected day sits on a soft circle of glass, never solid
@@ -124,8 +125,12 @@ the header):
   The section lists every habit, as tiles or rows (`TodayLayout`, picked
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
-  of filled squares and needs no other line to say so.
-- **History**: `HistoryView`, one page with no picker. `HistoryHero` is
+  of filled squares and needs no other line to say so. Done means logged on
+  the day shown, the ledger's `.done`, and one `isDone` drives the fill,
+  the white glyph, the featured tint and the spoken state, so a tile always
+  agrees with the header's count, the week strip and its own pill; a weekly
+  habit's week is its status line's to say ("2 of 3 this week").
+- **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
   seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
   lines `HabitInsights` found in the last eight weeks, plus an Apple
@@ -346,9 +351,12 @@ The design system is SpeakUp's; when in doubt, match
 - **Colour:** only `AppColors`, plus the app look's accent
   (`CanvasLook.accent`, read from `\.appCanvas`) for switches, the week
   strip's rings and the calendar, so Ember runs copper and Forest sage. Identity tints stay at 0.06 on a tile
-  (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`); the
-  one solid use of a habit's color is Today's done fill, with the glyph
-  turning white on it. A habit's glyph otherwise uses `color.glyphTone`
+  (`AppColors.identityTint`) and 0.10 when featured (`featuredTint`), laid
+  over Settings → Look → Glass's white lift (`AppColors.glassTint`), so a
+  habit's glass follows Light and Dark like every untinted pane. Every
+  `glassEffect` takes its tint from that setting; none is plain `.regular`. The
+  one solid use of a habit's color is Today's done fill, with the glyph and
+  its marks (status highlight, week dots, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
   (lifted toward white). Habit colors come from `AppColors.tilePalette`;
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
@@ -364,11 +372,11 @@ The design system is SpeakUp's; when in doubt, match
   uppercase + tracking.
 - **Sections:** `GlassSection("Title", meta:)` with a sentence-case header;
   `detail:` puts one fact right after the title.
-- **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
+- **Pages:** `PageScrollView` + `.pageContentInsets()` on every page; sheets
   close with `Button(role: .close)` top leading (no haptic), and a Done
   that commits is `Button(role: .confirm)`; deletes confirm with an
   `.alert("Delete this X?")` (a log: "Remove this log?", `confirmsLogRemoval`), and stopping a running timer always asks
-  "Stop the timer for X?". A habit's page is pushed on the tab's stack
+  "Stop the timer for X?". A habit's page is pushed on the stack
   (`navigationDestination(item:)`), so it opens fast and swipes back from
   the edge; the timer zooms out of the mini banner (`zoomSource` +
   `.navigationTransition(.zoom)`).

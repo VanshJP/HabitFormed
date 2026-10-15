@@ -122,6 +122,22 @@ enum AppColors {
 
     /// Identity tint for a featured or completed surface (rule 12: 0.10).
     static func featuredTint(_ color: Color) -> Color { color.opacity(0.10) }
+
+    /// What a pane of glass is tinted with: Settings → Look → Glass's white
+    /// lift, with `tint` (a habit's identity tint) laid over it, so a habit's
+    /// tile brightens and deepens with the setting like every untinted pane
+    /// and only its color sets it apart. Nil is the lift alone.
+    static func glassTint(_ tint: Color?, on appearance: GlassAppearance) -> Color {
+        guard let tint else { return appearance.glassTint }
+        // "Over" is a weighted sum in linear light. Palette colors are plain
+        // RGB, so they resolve the same in any environment.
+        let top = tint.resolve(in: EnvironmentValues())
+        let lift = Float(appearance.tintLift) * (1 - top.opacity)
+        let opacity = top.opacity + lift
+        guard opacity > 0 else { return appearance.glassTint }
+        func over(_ channel: Float) -> Float { (channel * top.opacity + lift) / opacity }
+        return Color(Color.Resolved(red: over(top.red), green: over(top.green), blue: over(top.blue), opacity: opacity))
+    }
 }
 
 // MARK: - Identity glyph

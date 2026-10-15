@@ -1,9 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// The long view, on one page: the perfect-day streak with the week's recap,
-/// a 12-week map, every habit's streak, then the days. A day opens in place
-/// to list its logs (long-press one to remove it) and share its report.
+/// The long view, pushed from Today's clock: the perfect-day streak with the
+/// week's recap, a 12-week map, every habit's streak, then the days. A day
+/// opens in place to list its logs (long-press one to remove it) and share
+/// its report.
 struct HistoryView: View {
     var onShareReport: (Date) -> Void = { _ in }
     var onShareWeek: () -> Void = {}
@@ -44,6 +45,10 @@ struct HistoryView: View {
             }
             .pageContentInsets()
         }
+        .background { AppBackground() }
+        .navigationTitle("History")
+        .navigationBarTitleDisplayMode(.inline)
+        .restoresNavigationBar()
         .confirmsLogRemoval($pendingRemoval, remove: delete)
         .navigationDestination(item: $detailHabit) { habit in
             HabitDetailView(habit: habit)

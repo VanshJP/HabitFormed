@@ -25,7 +25,7 @@ struct RowTimerButton: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
-            .background(Capsule().fill(done ? habit.color.opacity(0.3) : habit.color.opacity(0.85)))
+            .background(Capsule().fill(done ? Color.white.opacity(0.18) : habit.color.opacity(0.85)))
             .contentShape(Capsule())
         }
         .buttonStyle(GlassPressStyle())

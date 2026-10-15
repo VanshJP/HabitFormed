@@ -2,9 +2,9 @@ import SwiftUI
 
 // MARK: - Glass Card Modifier
 
-/// iOS 26 Liquid Glass plate, tinted by Settings → App look unless a tint is
-/// given. Sets `isOnGlass` so controls inside paint a plate instead of a
-/// second pane of glass.
+/// iOS 26 Liquid Glass plate, lifted by Settings → Look → Glass, with a
+/// habit's tint over the lift when one is given. Sets `isOnGlass` so controls
+/// inside paint a plate instead of a second pane of glass.
 struct GlassCardModifier: ViewModifier {
     var cornerRadius: CGFloat = AppLayout.cardRadius
     var tint: Color? = nil
@@ -12,13 +12,9 @@ struct GlassCardModifier: ViewModifier {
     @Environment(\.glassAppearance) private var glassAppearance
 
     func body(content: Content) -> some View {
-        let glass: Glass = {
-            if let tint { return .regular.tint(tint) }
-            return .regular.tint(glassAppearance.glassTint)
-        }()
         content
             .environment(\.isOnGlass, true)
-            .glassEffect(glass, in: .rect(cornerRadius: cornerRadius))
+            .glassEffect(.regular.tint(AppColors.glassTint(tint, on: glassAppearance)), in: .rect(cornerRadius: cornerRadius))
             .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
     }
 }
@@ -37,6 +33,18 @@ private struct GlassBackgroundModifier: ViewModifier {
             .regular.tint(glassAppearance.glassTint),
             in: .rect(cornerRadius: cornerRadius)
         )
+    }
+}
+
+// MARK: - Glass Circle
+
+/// Round interactive glass behind an icon-only control, lifted by Settings →
+/// Look → Glass like every other pane.
+private struct GlassCircleModifier: ViewModifier {
+    @Environment(\.glassAppearance) private var glassAppearance
+
+    func body(content: Content) -> some View {
+        content.glassEffect(.regular.tint(glassAppearance.glassTint).interactive(), in: .circle)
     }
 }
 
@@ -60,7 +68,7 @@ private struct ControlChrome<S: InsettableShape>: ViewModifier {
             content.plateChrome(in: shape)
         } else {
             content.glassEffect(
-                .regular.tint(tint ?? glassAppearance.glassTint).interactive(),
+                .regular.tint(AppColors.glassTint(tint, on: glassAppearance)).interactive(),
                 in: shape
             )
         }
@@ -82,7 +90,7 @@ extension View {
     /// Round, interactive glass behind an icon-only control, such as the
     /// timer's close button.
     func glassCircle() -> some View {
-        self.glassEffect(.regular.interactive(), in: .circle)
+        modifier(GlassCircleModifier())
     }
 
     /// The painted face of a control on a glass plate: white 0.10 fill and a
