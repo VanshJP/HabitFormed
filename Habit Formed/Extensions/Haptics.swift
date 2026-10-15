@@ -7,6 +7,7 @@ enum Haptics {
     private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
     private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
     private static let rigidGenerator = UIImpactFeedbackGenerator(style: .rigid)
+    private static let softGenerator = UIImpactFeedbackGenerator(style: .soft)
     private static let notificationGenerator = UINotificationFeedbackGenerator()
     private static let selectionGenerator = UISelectionFeedbackGenerator()
 
@@ -28,11 +29,39 @@ enum Haptics {
         heavyGenerator.impactOccurred()
     }
 
-    /// Rigid tap: used during long-press progress ramp for a "tightening"
-    /// feel before the success notification fires.
-    static func tick() {
+    // MARK: - Slide to log
+    //
+    // The knob's whole travel is felt: a press as it is picked up, soft
+    // steps that firm up as it goes, a click where letting go logs, then
+    // `success` on the log itself.
+
+    /// The slide knob picked up: a soft press, so the thumb feels it take
+    /// hold. Readies the steps and the click that follow.
+    static func grab() {
+        softGenerator.prepare()
+        softGenerator.impactOccurred(intensity: 0.75)
+        softGenerator.prepare()
         rigidGenerator.prepare()
-        rigidGenerator.impactOccurred(intensity: 0.6)
+    }
+
+    /// The knob passing one of its steps, `progress` along its travel:
+    /// faint at the start, firmer as it nears the point that logs.
+    static func slideStep(_ progress: CGFloat) {
+        let along = min(max(progress, 0), 1)
+        softGenerator.impactOccurred(intensity: 0.3 + 0.5 * along)
+        softGenerator.prepare()
+    }
+
+    /// The knob reaching the point where letting go logs: a firm click.
+    static func arm() {
+        rigidGenerator.impactOccurred(intensity: 1)
+        rigidGenerator.prepare()
+    }
+
+    /// The knob pulled back out of that point: a lighter click back.
+    static func disarm() {
+        rigidGenerator.impactOccurred(intensity: 0.45)
+        rigidGenerator.prepare()
     }
 
     /// Success: habit logged, streak extended.

@@ -182,7 +182,11 @@ the tile's far corner as the knob arrives) and its chevron winds clockwise
 into clock hands showing the time right now (the knob's disc is the face),
 holds there, then folds into a check (`ClockGlyph`: one stroke, a corner
 and two legs moving between poses); at ~75% the check is whole and it
-arms (a tick and a small pop), and letting go logs. Holding the knob keeps
+arms (a click and a small pop), and letting go logs. The travel is felt:
+`Haptics.grab` as the knob is taken, `slideStep` every 14pt, firming up
+toward the arm point, `arm` there (`disarm` pulling back), `success` on the
+log. The knob takes a touch up to 10pt off its disc, so a thumb a little
+wide still catches it. Holding the knob keeps
 the long-press menu shut, so a pause mid-slide never opens it. Release earlier to cancel; a flick from halfway logs too. The
 surface owns the knob's `progress`, so an undo plays it all backwards. The
 track is 44pt tall with the 36pt knob inset in it; its gray pill is what
