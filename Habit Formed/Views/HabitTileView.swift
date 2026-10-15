@@ -191,6 +191,8 @@ struct HabitTileView: View {
                 Text("of \(habit.source.compactValue(habit.targetValue))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 if isWeekly {
                     Text("Week")

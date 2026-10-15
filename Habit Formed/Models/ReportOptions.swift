@@ -112,6 +112,46 @@ nonisolated enum ReportFont: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+// MARK: - Report Metric
+
+/// One Apple Health number the card can carry, each switched on by itself so
+/// what is picked is exactly what shows. Persisted by raw value in
+/// `AppPreferences.reportMetrics`; do not rename cases.
+nonisolated enum ReportMetric: String, CaseIterable, Identifiable, Sendable {
+    case steps
+    case exercise
+    case sleep
+    case mindful
+    /// Eaten, burned and the difference.
+    case calories
+    /// Protein, carbs and fat in grams.
+    case macros
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .steps: return "Steps"
+        case .exercise: return "Exercise"
+        case .sleep: return "Sleep"
+        case .mindful: return "Mindful"
+        case .calories: return "Calories"
+        case .macros: return "Macros"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .steps: return "figure.walk"
+        case .exercise: return "figure.run"
+        case .sleep: return "bed.double.fill"
+        case .mindful: return "brain.head.profile"
+        case .calories: return "fork.knife"
+        case .macros: return "chart.pie"
+        }
+    }
+}
+
 // MARK: - Report Options
 
 /// What the daily report shows and how it looks. One report, everything on
@@ -131,8 +171,8 @@ nonisolated struct ReportOptions: Sendable, Hashable {
     var showStreaks = true
     var showNotes = true
     var showWeek = true
-    var showCalories = false
-    var showActivity = false
+    /// The Apple Health numbers on the card. None until picked.
+    var metrics: Set<ReportMetric> = []
     /// A line for this card only ("Rest day tomorrow"). Not kept.
     var note = ""
 
@@ -140,7 +180,9 @@ nonisolated struct ReportOptions: Sendable, Hashable {
     var look: CanvasLook? { theme.look(appLook: appLook) }
 
     /// True when the card needs Apple Health numbers.
-    var needsHealth: Bool { showCalories || showActivity }
+    var needsHealth: Bool { !metrics.isEmpty }
+
+    func shows(_ metric: ReportMetric) -> Bool { metrics.contains(metric) }
 
     /// Hidden habit IDs as stored: comma-joined UUID strings.
     static func hiddenIDs(from raw: String) -> Set<UUID> {
@@ -149,5 +191,26 @@ nonisolated struct ReportOptions: Sendable, Hashable {
 
     static func raw(from ids: Set<UUID>) -> String {
         ids.map(\.uuidString).sorted().joined(separator: ",")
+    }
+
+    /// Metrics as stored: comma-joined raw values.
+    static func metrics(from raw: String) -> Set<ReportMetric> {
+        Set(raw.split(separator: ",").compactMap { ReportMetric(rawValue: String($0)) })
+    }
+
+    static func raw(from metrics: Set<ReportMetric>) -> String {
+        ReportMetric.allCases.filter { metrics.contains($0) }.map(\.rawValue).joined(separator: ",")
+    }
+
+    /// The stored metrics' default until one is picked: what the old
+    /// Calories and Activity switches had on, so an upgrade keeps the card.
+    static var legacyMetricsRaw: String {
+        let defaults = UserDefaults.standard
+        var metrics: Set<ReportMetric> = []
+        if defaults.bool(forKey: AppPreferences.reportShowCalories) { metrics.insert(.calories) }
+        if defaults.bool(forKey: AppPreferences.reportShowActivity) {
+            metrics.formUnion([.steps, .exercise, .sleep, .mindful])
+        }
+        return raw(from: metrics)
     }
 }

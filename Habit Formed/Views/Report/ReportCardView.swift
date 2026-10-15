@@ -32,12 +32,7 @@ struct ReportCardView: View {
             case .focus:
                 ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
             }
-            if options.showCalories {
-                calories
-            }
-            if options.showActivity {
-                activity
-            }
+            ReportHealthSection(health: report.health, options: options, palette: palette)
             note
             HabitFormedMark(tint: palette.accent, ink: palette.faint)
                 .frame(maxWidth: .infinity)
@@ -221,81 +216,7 @@ struct ReportCardView: View {
         .font(.system(size: 20, weight: .semibold))
     }
 
-    // MARK: - Extras
-
-    private var calories: some View {
-        let health = report.health
-        let net = health.netKcal
-
-        return HStack(spacing: 0) {
-            calorieColumn("Eaten", ReportFormat.kcal(health.eatenKcal), tint: palette.ink)
-            columnRule
-            calorieColumn("Burned", ReportFormat.kcal(health.burnedKcal), tint: palette.ink)
-            columnRule
-            calorieColumn(
-                net.map { $0 <= 0 ? "Deficit" : "Surplus" } ?? "Net",
-                ReportFormat.signedKcal(net),
-                tint: net.map { $0 <= 0 ? AppColors.success : AppColors.warning } ?? palette.ink
-            )
-        }
-        .padding(.vertical, 12)
-        .background(palette.well, in: .rect(cornerRadius: AppLayout.tileRadius, style: .continuous))
-    }
-
-    private var columnRule: some View {
-        Rectangle().fill(palette.rule).frame(width: 0.5, height: 30)
-    }
-
-    private func calorieColumn(_ label: String, _ value: String, tint: Color) -> some View {
-        VStack(spacing: 3) {
-            Text(value)
-                .font(.system(size: 15, weight: .bold, design: options.font.numerals).monospacedDigit())
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .eyebrowStyle(palette.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private struct ActivityChip: Identifiable {
-        let icon: String
-        let text: String
-        var id: String { icon }
-    }
-
-    private var activityChips: [ActivityChip] {
-        let health = report.health
-        var chips: [ActivityChip] = []
-        if let steps = health.steps { chips.append(ActivityChip(icon: "figure.walk", text: "\(ReportFormat.count(steps)) steps")) }
-        if let exercise = health.exerciseMinutes { chips.append(ActivityChip(icon: "figure.run", text: ReportFormat.minutes(exercise))) }
-        if let sleep = health.sleepHours { chips.append(ActivityChip(icon: "bed.double.fill", text: "\(ReportFormat.hours(sleep)) sleep")) }
-        if let mindful = health.mindfulMinutes { chips.append(ActivityChip(icon: "brain.head.profile", text: "\(ReportFormat.minutes(mindful)) mindful")) }
-        return chips
-    }
-
-    @ViewBuilder
-    private var activity: some View {
-        let chips = activityChips
-        if !chips.isEmpty {
-            FlowLayout(spacing: 6) {
-                ForEach(chips) { chip in
-                    HStack(spacing: 5) {
-                        Image(systemName: chip.icon)
-                            .font(.caption2.weight(.semibold))
-                        Text(chip.text)
-                            .font(.caption.weight(.semibold))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(palette.ink.opacity(0.85))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(palette.well, in: Capsule())
-                }
-            }
-        }
-    }
+    // MARK: - Note
 
     @ViewBuilder
     private var note: some View {
@@ -344,8 +265,12 @@ struct ReportPalette {
     /// A habit's colour, lifted on dark canvases and kept deep on paper so it
     /// clears contrast either way.
     func habitTint(_ hex: String) -> Color {
-        let color = Color(hex: hex)
-        return isLight ? color : color.glyphTone
+        dataTint(Color(hex: hex))
+    }
+
+    /// Any data colour (a macro, a habit) toned for the card's ground.
+    func dataTint(_ color: Color) -> Color {
+        isLight ? color : color.glyphTone
     }
 }
 
@@ -413,8 +338,8 @@ extension DailyReport {
             perfectStreak: 4,
             health: DayHealthMetrics(
                 steps: 11_240, activeKcal: 610, restingKcal: 1_790, eatenKcal: 1_850,
-                exerciseMinutes: 42, sleepHours: 7.4, mindfulMinutes: nil,
-                protein: nil, carbs: nil, fat: nil
+                exerciseMinutes: 42, sleepHours: 7 + 40.0 / 60, mindfulMinutes: nil,
+                protein: 142, carbs: 180, fat: 61
             )
         )
     }
@@ -426,7 +351,7 @@ extension DailyReport {
             ForEach(ReportTheme.allCases) { theme in
                 ReportCardView(
                     report: .sample,
-                    options: ReportOptions(theme: theme, showCalories: true, showActivity: true, note: "Rest day tomorrow.")
+                    options: ReportOptions(theme: theme, metrics: Set(ReportMetric.allCases), note: "Rest day tomorrow.")
                 )
             }
         }
