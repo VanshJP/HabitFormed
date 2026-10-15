@@ -4,9 +4,10 @@ import SwiftUI
 /// weekday and date inside a ring that fills as the day's habits are logged
 /// and closes green on a perfect day. The selected day sits on a soft circle
 /// of glass rather than solid white, so the strip stays quieter than the
-/// tiles under it, and the glass slides to the day tapped; its count lives in
-/// the grid's header. Drawn straight on
-/// the canvas, so it reads as navigation rather than another card.
+/// tiles under it, and the glass glides to the day tapped while the grid
+/// under it lands at once. The ring is the
+/// day's only count on Today (VoiceOver reads it as "2 of 3 done"). Drawn
+/// straight on the canvas, so it reads as navigation rather than another card.
 struct WeekStrip: View {
     /// Seven summaries, oldest first.
     let summaries: [DaySummary]
@@ -14,43 +15,59 @@ struct WeekStrip: View {
 
     @Environment(\.glassAppearance) private var glassAppearance
     @Environment(\.appCanvas) private var canvas
-    /// One circle of glass, carried from day to day.
-    @Namespace private var selection
 
     private let ringSize: CGFloat = 44
     private let lineWidth: CGFloat = 3
 
     var body: some View {
+        let selected = selectedDate.dayRange
+        let index = summaries.firstIndex { selected.contains($0.date) }
+
         HStack(spacing: 0) {
             ForEach(summaries) { day in
-                dayCell(day)
+                dayCell(day, isSelected: selected.contains(day.date))
             }
         }
+        .background { selectionGlass(at: index) }
         // Seven 44pt rings fill an iPhone row; larger text would push the
         // letters out of them.
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 
-    private func dayCell(_ day: DaySummary) -> some View {
-        let isSelected = day.date.isSameDay(as: selectedDate)
+    /// One circle of glass for the whole row, moved rather than rebuilt, so it
+    /// glides between days instead of fading out of one and into the next.
+    /// It sits inside the rings, so lying under them hides nothing, and under
+    /// the letters (a glass container would draw it over them). Hidden while
+    /// the calendar holds a day the strip does not show.
+    @ViewBuilder
+    private func selectionGlass(at index: Int?) -> some View {
+        if let index {
+            let size = ringSize - 2 * (lineWidth + 2)
+            GeometryReader { proxy in
+                Color.clear
+                    .glassEffect(.regular.tint(glassAppearance.glassTint), in: .circle)
+                    .frame(width: size, height: size)
+                    .position(
+                        x: proxy.size.width / CGFloat(summaries.count) * (CGFloat(index) + 0.5),
+                        y: proxy.size.height / 2
+                    )
+                    .motion(AppMotion.slide, value: index)
+            }
+        }
+    }
+
+    private func dayCell(_ day: DaySummary, isSelected: Bool) -> some View {
         let isToday = day.date.isToday
 
         return Button {
             guard !isSelected else { return }
             Haptics.selection()
-            withMotion(AppMotion.snap) { selectedDate = day.date }
+            // No page-wide animation: the grid shows the new day at once, as
+            // its fill does, and only the glass travels.
+            selectedDate = day.date
         } label: {
             ZStack {
                 ring(for: day)
-
-                if isSelected {
-                    Color.clear
-                        .glassEffect(.regular.tint(glassAppearance.glassTint), in: .circle)
-                        .padding(lineWidth + 2)
-                        // Moved, not morphed: a glass container would draw the
-                        // glass over the day's letters.
-                        .matchedGeometryEffect(id: "selected", in: selection)
-                }
 
                 VStack(spacing: 0) {
                     Text(day.date.formatted(.dateTime.weekday(.narrow)))

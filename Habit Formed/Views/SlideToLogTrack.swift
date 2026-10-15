@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Slide-to-log track, mirroring iOS's slide-to-answer. As the knob travels
 /// its chevron winds into clock hands showing the time right now, then
-/// folds into a check, landing at 75% where it arms (a tick and a small
-/// pop); let go to log, or pull back to disarm. A confident
+/// folds into a check, landing at 75% where it arms (a click and a small
+/// pop); let go to log, or pull back to disarm. The whole way is felt: a
+/// press as the knob is taken, soft steps that firm up toward the click. A confident
 /// flick from halfway logs too. Flat: the knob is a disc a step lighter
 /// than its color, the pill a soft white tint, no shadows.
 /// Once logged the channel goes and the knob melts into the filled square,
@@ -20,9 +21,17 @@ struct SlideToLogTrack: View {
     /// True while a thumb is on the knob, so the surface can hold back its
     /// long-press menu: a pause mid-slide is not a long press.
     @Binding var isSliding: Bool
+    /// "Slide to log" in the pill. A row's short track leaves it out: the
+    /// knob's chevron already says which way.
+    var showsLabel = true
+    /// Said at the leading end once logged ("Logged 9:41 AM"), with the
+    /// check where the knob came to rest.
+    var loggedLabel: String? = nil
     let onComplete: () -> Void
 
     @State private var isArmed = false
+    /// The last step the knob passed, so each is felt once.
+    @State private var step = 0
     @GestureState private var isHeld = false
 
     nonisolated static let trackHeight: CGFloat = 44
@@ -33,6 +42,12 @@ struct SlideToLogTrack: View {
     /// does not tick on and off.
     private let disarmRatio: CGFloat = 0.68
     private let flickMinRatio: CGFloat = 0.4
+    /// A soft step every this many points up to the arm point, then its
+    /// click: by distance, so a row's short track ticks as evenly as a
+    /// tile's long one instead of buzzing.
+    private let stepLength: CGFloat = 14
+    /// How far past the disc a touch still takes the knob.
+    private static let grabSlop: CGFloat = 10
 
     var body: some View {
         GeometryReader { proxy in
@@ -46,16 +61,36 @@ struct SlideToLogTrack: View {
                     .fill(Color.white.opacity(isLogged ? 0 : 0.08))
                     .padding(.leading, p * maxX)
 
-                Text("Slide to log")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
-                    .padding(.leading, Self.knobSize * 0.6)
-                    .frame(maxWidth: .infinity)
-                    .allowsHitTesting(false)
+                if showsLabel {
+                    Text("Slide to log")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
+                        .padding(.leading, Self.knobSize * 0.6)
+                        .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
+                }
+
+                if isLogged, let loggedLabel {
+                    Text(loggedLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.leading, 2)
+                        .padding(.trailing, Self.knobSize)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
 
                 knob(progress: p)
-                    .offset(x: Self.inset + p * maxX)
+                    // A thumb-wide grab around the disc: a touch a little
+                    // off it still takes hold, with no change to how it
+                    // looks or where it sits.
+                    .padding(Self.grabSlop)
+                    .contentShape(.rect)
                     .gesture(drag(maxX: maxX), isEnabled: !isLogged)
+                    .padding(-Self.grabSlop)
+                    .offset(x: Self.inset + p * maxX)
             }
             .frame(height: Self.trackHeight)
             .motion(AppMotion.settle, value: isLogged)
@@ -74,7 +109,10 @@ struct SlideToLogTrack: View {
         .onChange(of: isLogged) { isArmed = false }
         // From the gesture state, which resets itself even when the gesture
         // is cancelled rather than ended.
-        .onChange(of: isHeld) { _, held in isSliding = held }
+        .onChange(of: isHeld) { _, held in
+            isSliding = held
+            if held { Haptics.grab() }
+        }
     }
 
     /// A flat disc a step lighter than the fill it slides over, so it stays
@@ -108,8 +146,11 @@ struct SlideToLogTrack: View {
         return t * t * (3 - 2 * t)
     }
 
+    /// Measured on the screen: the gesture sits inside the knob's offset,
+    /// so in its own space every step the knob took would come off the
+    /// drag, and the knob would trail the thumb and fall short.
     private func drag(maxX: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 1)
+        DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .updating($isHeld) { _, held, _ in
                 // The first touch warms the sound, so a log's chime lands
                 // with its haptic.
@@ -119,11 +160,17 @@ struct SlideToLogTrack: View {
             .onChanged { value in
                 let x = max(0, min(maxX, value.translation.width))
                 progress = x / maxX
+                let reached = Int(x / stepLength)
+                if reached != step {
+                    step = reached
+                    if progress < armRatio { Haptics.slideStep(progress) }
+                }
                 if !isArmed, x >= maxX * armRatio {
                     isArmed = true
-                    Haptics.tick()
+                    Haptics.arm()
                 } else if isArmed, x < maxX * disarmRatio {
                     isArmed = false
+                    Haptics.disarm()
                 }
             }
             .onEnded { value in
@@ -140,6 +187,7 @@ struct SlideToLogTrack: View {
                     withAnimation(AppMotion.snap) { progress = 0 }
                 }
                 isArmed = false
+                step = 0
             }
     }
 }

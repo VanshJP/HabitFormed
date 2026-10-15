@@ -8,6 +8,8 @@ struct TodayHabitList: View {
     let layout: TodayLayout
     let selectedDate: Date
     let isPastDay: Bool
+    /// Habits logged on `selectedDate`, from the page's ledger tracks.
+    let doneIDs: Set<UUID>
     let actions: (Habit) -> HabitActions
 
     private let columns = [
@@ -20,13 +22,13 @@ struct TodayHabitList: View {
         case .tiles:
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(habits) { habit in
-                    HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
+                    HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isDone: doneIDs.contains(habit.id), actions: actions(habit))
                 }
             }
         case .rows:
             LazyVStack(spacing: 8) {
                 ForEach(habits) { habit in
-                    HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, actions: actions(habit))
+                    HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isDone: doneIDs.contains(habit.id), actions: actions(habit))
                 }
             }
         }

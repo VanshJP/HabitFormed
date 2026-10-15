@@ -74,17 +74,19 @@ Habit Formed/
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
-    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportHealthSection),
+    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportWeekBoard,
+    │                         #   ReportBubbles, ReportReceipt, ReportHealthSection),
     │                         #   ReportStyleEditor, MacroFieldsRow,
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
     ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
-    ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
+    ├── HabitRowView.swift    # One capsule row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
-    ├── HabitStatusLine.swift # Streak and cadence line, shared by tiles and rows
-    ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs
+    ├── HabitStatusLine.swift # Streak and schedule line, shared by tiles and rows
+    ├── HabitDetailView.swift # Per-habit page: streak hero, tappable history calendar, log + note, recent logs;
+    │                         #   Edit and Delete in its top bar's More menu
     ├── HistoryView.swift     # One page: hero, patterns, 12-week map, streaks, days that open in place
     ├── TimerView.swift       # Per-habit countdown session (auto-logs on finish)
     ├── CompletionFill.swift  # Done as a tile or row filled with the habit's color
@@ -105,32 +107,54 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 
 `RootView` hosts one `NavigationStack` and no tab bar, so nothing sits over
 the habits. Today is its root page, with no navigation bar; History and
-Settings are pushed from Today's top row:
+Settings are pushed from Today's top row. No page shows the system bar:
+pushed from a bar-less Today it animated in on its own track, its back
+button and title trailing the page. Every pushed page wears
+`pageTopBar(_:)` instead (`PageHeader.swift`): a back button in header
+glass, the title, an optional trailing control, drawn as part of the page
+so it moves with it, and a hook that keeps the edge swipe back working with
+the bar hidden.
 
 - **Today**: `ContentView`. No page title: the top row is the month
-  ("October ⌄", which opens the calendar) and a capsule holding the
-  perfect-day `StreakChip` (only once a streak exists), add (+), History
-  (clock, pushed) and Settings (gear, pushed). Right under it the `WeekStrip` is the date control: one
+  ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
+  chevron in the look's accent; it opens the calendar) and a capsule holding the
+  perfect-day `StreakChip` (only once a streak exists), add (+), Share report
+  (the day shown), History (clock, pushed) and Settings (gear, pushed). The
+  calendar is a full-height sheet (a shorter one floats off the screen's
+  edges on iOS 26). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
   day). The selected day sits on a soft circle of glass, never solid
-  white, that slides to the day tapped (`matchedGeometryEffect`; a glass
-  container would draw it over the letters). Strip taps only change the selected day; the strip itself moves
-  only when the calendar picks an older day (`stripAnchor`). Then the
-  grid's section,
-  titled "Habits" for today or the browsed day's name, with the day's count
-  beside the title ("2 of 6 done"), and "Share report" (plus a "Today" link
-  while browsing another day). Progress is said once, in that header.
-  Once today is perfect the link steps aside for a solid "Send today's
-  report" under the grid, the screen's one primary button.
-  The section lists every habit, as tiles or rows (`TodayLayout`, picked
+  white: one circle under the row that glides to the day tapped
+  (`AppMotion.slide`; a glass container would draw it over the letters),
+  while the grid lands on the new day at once. Strip taps only change the selected day; the strip itself moves
+  only when the calendar picks an older day (`stripAnchor`). The habits
+  follow with no title or count over them: the strip's ring is the day's
+  progress, said once. Under the grid sits a "Today" link while browsing
+  another day, and once today is perfect a solid "Share today's report",
+  the screen's one primary button.
+  Every habit shows, as tiles or rows (`TodayLayout`, picked
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
   of filled squares and needs no other line to say so. Done means logged on
   the day shown, the ledger's `.done`, and one `isDone` drives the fill,
   the white glyph, the featured tint and the spoken state, so a tile always
-  agrees with the header's count, the week strip and its own pill; a weekly
+  agrees with the week strip's ring and its own pill; a weekly
   habit's week is its status line's to say ("2 of 3 this week").
+  A tile is a watermark: its glyph at 104pt running off the top trailing
+  corner (`glyphTone` at 12%, white at 12% on the fill), the name and the
+  `HabitStatusLine` at the top, and at the bottom the way to log, every
+  kind of it a 44pt pill (the slide, a timer's play pill, a health meter,
+  a past day's toggle). Done today, the pill says when ("Logged 9:41 AM",
+  `SlideToLogTrack.loggedLabel`) beside the white check. The status line leads with the streak's
+  number ("3 days · 1 of 5 this week"), rounded, medium weight and a step
+  under the name, and is one numeral tall even without one, so tiles in a
+  row stay level. The name leads and the line sits back: the number in
+  soft white, the unit softer, the schedule gray unless it asks for
+  attention (then the habit's `glyphTone`). A row keeps
+  the same line at caption size and is a capsule: its corners are the
+  slide's pill plus the row's 10pt inset, so the two curves nest, and its
+  short slide has no words (a tile's says "Slide to log").
 - **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
   seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
@@ -142,7 +166,8 @@ Settings are pushed from Today's top row:
   list its logs (long-press one to remove it) and a "Share report" row.
 - **Settings**: pushed from the gear. Today (layout as two small pictures,
   arrange, log sound, the Siri phrase with one of your habits), Reports
-  (name on reports, Report style, daily reminder with its time, weekly recap)
+  (Report style, which holds your name too, daily reminder with its time,
+  weekly recap)
   and Look (canvas rail, plain ones first after Classic, and glass). No captions except where the words are the
   content (the Siri phrases); few-way choices are chips in their row.
 
@@ -165,7 +190,11 @@ the tile's far corner as the knob arrives) and its chevron winds clockwise
 into clock hands showing the time right now (the knob's disc is the face),
 holds there, then folds into a check (`ClockGlyph`: one stroke, a corner
 and two legs moving between poses); at ~75% the check is whole and it
-arms (a tick and a small pop), and letting go logs. Holding the knob keeps
+arms (a click and a small pop), and letting go logs. The travel is felt:
+`Haptics.grab` as the knob is taken, `slideStep` every 14pt, firming up
+toward the arm point, `arm` there (`disarm` pulling back), `success` on the
+log. The knob takes a touch up to 10pt off its disc, so a thumb a little
+wide still catches it. Holding the knob keeps
 the long-press menu shut, so a pause mid-slide never opens it. Release earlier to cancel; a flick from halfway logs too. The
 surface owns the knob's `progress`, so an undo plays it all backwards. The
 track is 44pt tall with the 36pt knob inset in it; its gray pill is what
@@ -177,7 +206,8 @@ the grid shows an `UndoToast` for four seconds; the log that finishes a
 perfect day turns it into "Perfect day" for six, and the report button
 under the grid takes it from there. A swipe up or to either side sends the
 toast off at once, like a notification banner, and dragging it holds its
-time.
+time. It sits over the whole page, not the scroll view, so taps on it
+never fall through to the header.
 
 Logs from Today chime through `ContentView.logToday`, a pentatonic step
 higher as the day fills (`SoundEffects.logChime(progress:)`), so callers
@@ -269,7 +299,13 @@ things out. No templates, layouts or placeholder tokens.
 - `ReportOptions` is the whole configuration: a `ReportTheme` (App look by
   default, which paints whatever `AppCanvas` the app wears via
   `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
-  or Focus: one big ring and a strip of glyphs), an accent (empty follows
+  Focus: one big ring and a strip of glyphs, Week: a board of the last seven
+  days, Bubbles: a honeycomb of circles that fill when done, or Receipt: a
+  torn paper slip in monospaced capitals, habits on dotted leaders, totals
+  and Health numbers as line items, a barcode; the image sent is the slip
+  alone, 340pt, clear around its torn edges, with no card or canvas), a
+  `ReportRing` for the layouts with a ring beside the verdict (Big, Corner:
+  small at the header's trailing edge, or Off), an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
   (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
   notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
@@ -279,7 +315,11 @@ things out. No templates, layouts or placeholder tokens.
   `report.metrics`, defaulting to what the old Calories and Activity
   switches had on); the note is for one card only. `ReportStyleEditor`
   edits them and is the one editor for Settings → Report style and the
-  sheet's Edit; what is on the card leads it, the look follows.
+  sheet's Edit, so every customization lives there: "On the card" leads (one
+  panel: your name, kept for every card and recap, then a band of chips
+  each for habits, details and Health numbers, 10pt apart either way), the
+  look follows (layout as a 3-wide `SketchPicker` with the Ring chips under
+  it, background, accent, type).
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
@@ -290,9 +330,9 @@ things out. No templates, layouts or placeholder tokens.
   Report style opens `DailyReportSheet(isPreset: true)` (live preview, theme
   layout as `SketchPicker` pictures, background rail, accent dots, type
   chips, "On the card" as `ToggleChip`s; nothing to send).
-- `DailyReportSheet` to send: live preview, one panel of fields (name the
-  first time, calories eaten while Calories is on, protein, carbs and fat
-  while Macros is on, this card's note), then
+- `DailyReportSheet` to send: live preview, one panel of fields (calories
+  eaten while Calories is on, protein, carbs and fat while Macros is on,
+  this card's note), then
   Text it (`MessageComposer`, Messages with the image attached) and Share
   (`SharePresenter`; Save and Copy live in the share sheet), right under
   the note. Edit (`ReportEditButton`, top trailing) opens
@@ -347,7 +387,7 @@ The design system is SpeakUp's; when in doubt, match
   (Liquid Glass). Never stack glass on glass: inside a card use
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
-  (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles and rows the tile radius. Groups of rows (History,
+  (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles the tile radius and its rows the slide's pill plus their inset (a capsule). Groups of rows (History,
   Settings, the report and add sheets) sit on a `Panel`, one pane of glass
   with hairlines. Chips use `controlChrome`, so a row of them on the canvas
   is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
@@ -364,8 +404,8 @@ The design system is SpeakUp's; when in doubt, match
   habit's glass follows Light and Dark like every untinted pane. Every
   `glassEffect` takes its tint from that setting; none is plain `.regular`. The
   one solid use of a habit's color is Today's done fill, with the glyph and
-  its marks (status highlight, week dots, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
-  (lifted toward white). Habit colors come from `AppColors.tilePalette`;
+  its marks (status line, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
+  (lifted toward white), faded to 12% as a tile's watermark. Habit colors come from `AppColors.tilePalette`;
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);

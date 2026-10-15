@@ -46,9 +46,7 @@ struct HistoryView: View {
             .pageContentInsets()
         }
         .background { AppBackground() }
-        .navigationTitle("History")
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresNavigationBar()
+        .pageTopBar("History")
         .confirmsLogRemoval($pendingRemoval, remove: delete)
         .navigationDestination(item: $detailHabit) { habit in
             HabitDetailView(habit: habit)

@@ -9,6 +9,9 @@ import UIKit
 /// the daily report and the weekly recap; `width` is the card's own.
 struct ReportPreview<Card: View>: View {
     let width: CGFloat
+    /// Clipped to a card's corners and edged; off for the receipt, which is
+    /// a slip with nothing around it.
+    var framed = true
     @ViewBuilder let card: Card
 
     @State private var available: CGFloat = 0
@@ -24,8 +27,8 @@ struct ReportPreview<Card: View>: View {
             .overlay(alignment: .top) {
                 card
                     .fixedSize(horizontal: false, vertical: true)
-                    .clipShape(shape)
-                    .overlay { shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1 / scale) }
+                    .clipShape(framed ? AnyShape(shape) : AnyShape(Rectangle()))
+                    .overlay { shape.strokeBorder(Color.white.opacity(framed ? 0.1 : 0), lineWidth: 1 / scale) }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
                     .scaleEffect(scale, anchor: .top)
                     .allowsHitTesting(false)

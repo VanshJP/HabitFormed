@@ -13,13 +13,13 @@ import SwiftUI
 ///
 /// The clamp also caps the column at `AppLayout.readableWidth`: in a wide iPad
 /// window it centres there instead of stretching, while the scroll view itself
-/// (scrolling, indicators, the edge effect) still spans the window.
+/// (scrolling, the edge effect) still spans the window. No scroll bar: pages
+/// are short and the bar only flickers over the cards.
 ///
 /// Never put one inside a scale transition or an animated `scaleEffect`: the
 /// container-relative width never settles under the transform and the main
 /// thread spins forever. Fade instead.
 struct PageScrollView<Content: View>: View {
-    var showsIndicators: Bool = true
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -31,6 +31,6 @@ struct PageScrollView<Content: View>: View {
                 .frame(maxWidth: AppLayout.readableWidth)
                 .containerRelativeFrame(.horizontal)
         }
-        .scrollIndicators(showsIndicators ? .automatic : .hidden)
+        .scrollIndicators(.hidden)
     }
 }

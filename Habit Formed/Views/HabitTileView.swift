@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// One habit on the Today grid: its glyph, name and one status line, over a
-/// bottom row that depends on how it is tracked. Done (logged on the day
-/// shown) is the tile filled with the habit's color, its glyph and marks
-/// turning white; a slide fills it from the knob as it moves.
+/// One habit on the Today grid: its name and a status line led by the
+/// streak's number at the top, its glyph as a faint watermark running off
+/// the top corner, and a bottom row that depends on how it is tracked.
+/// Done (logged on the day shown) is the tile filled with the habit's
+/// color, its marks turning white and the bottom row saying when it was
+/// logged; a slide fills it from the knob as it moves.
 /// - Manual: the slide-to-log track
 /// - HealthKit: today's reading against the target, with a meter
-/// - Timer: the week's dots and a play capsule
+/// - Timer: a play pill shaped like the slide
 ///
 /// Gestures: tap opens the habit's page, the slide logs today, a long press
 /// opens the context menu. On a past day the bottom row is a pill that
@@ -17,6 +19,12 @@ struct HabitTileView: View {
     var selectedDate: Date = .now
     /// True when the grid is showing a day before today.
     var isPastDay: Bool = false
+    /// Logged on the day shown, the ledger's `.done`, handed down from the
+    /// page's tracks so a tile never scans its logs: the fill, the white
+    /// glyph, the featured tint and the spoken state all follow it, so a
+    /// tile agrees with the week strip's ring and its own pill.
+    /// A weekly habit's week is the status line's to say.
+    let isDone: Bool
     let actions: HabitActions
 
     @Environment(HealthKitService.self) private var health
@@ -33,21 +41,16 @@ struct HabitTileView: View {
 
     private let padding = AppLayout.tilePadding
 
-    /// Logged on the day shown, the ledger's `.done`: the fill, the white
-    /// glyph, the featured tint and the spoken state all follow it, so a
-    /// tile agrees with the header's count, the week strip and its own pill.
-    /// A weekly habit's week is the status line's to say.
-    private var isDone: Bool { habit.isCompleted(on: selectedDate) }
-
     var body: some View {
         // Re-render at midnight so today-driven state updates.
         let _ = dayTracker.today
 
         return content
+            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
+            .background { watermark }
             // A resting interval habit recedes so it reads as "sitting out
             // today" yet stays discoverable.
             .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
-            .frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
             .completionFill(habit.color, amount: $fill)
             .glassCard(
                 cornerRadius: AppLayout.tileRadius,
@@ -85,22 +88,40 @@ struct HabitTileView: View {
 
     // MARK: - Layout
 
+    /// The name and the status line at the top, the way to log at the
+    /// bottom, and the watermark showing through between them.
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            topRow
-            Spacer(minLength: 12)
             Text(habit.title)
-                .font(.subheadline.weight(.semibold))
+                .font(.headline)
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
-            HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone)
-                .padding(.top, 3)
+            HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone, prominent: true)
             Spacer(minLength: 12)
             bottomSection
         }
         .padding(padding)
+    }
+
+    /// The glyph huge and faint, running off the top trailing corner
+    /// behind everything: the tile's art, there without asking to be read,
+    /// and clear of the way to log along the bottom. White on the fill.
+    private var watermark: some View {
+        Image(systemName: habit.symbol)
+            .font(.system(size: 104, weight: .medium))
+            .foregroundStyle(isDone ? Color.white.opacity(0.12) : habit.color.glyphTone.opacity(0.12))
+            .offset(x: 26, y: -22)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .clipShape(.rect(cornerRadius: AppLayout.tileRadius))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// "Logged 9:41 AM", where a done tile's way to log was.
+    private var loggedLabel: String? {
+        habit.todayCompletion.map { "Logged \($0.loggedAt.formatted(date: .omitted, time: .shortened))" }
     }
 
     // MARK: - Fill
@@ -111,27 +132,6 @@ struct HabitTileView: View {
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
         withMotion(animation) { fill = state.done ? 1 : 0 }
-    }
-
-    // MARK: - Header
-
-    private var topRow: some View {
-        HStack(alignment: .top) {
-            IconChip(icon: habit.symbol, tint: isDone ? .white : habit.color, size: 30)
-            Spacer()
-            statusBadge
-        }
-    }
-
-    /// Only where the bottom row cannot say "done" itself: a health meter
-    /// reads as progress, not completion.
-    @ViewBuilder
-    private var statusBadge: some View {
-        if isDone && habit.trackKind == .health && !isPastDay {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.body)
-                .foregroundStyle(.white)
-        }
     }
 
     // MARK: - Bottom section
@@ -152,7 +152,7 @@ struct HabitTileView: View {
     /// A past day's log as a toggle: tap to add a forgotten log or remove a
     /// wrong one. The toast on Today offers the way back.
     private var pastDayPill: some View {
-        let logged = habit.isCompleted(on: selectedDate)
+        let logged = isDone
         return Button(action: actions.togglePastDay) {
             HStack(spacing: 6) {
                 Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")
@@ -205,42 +205,43 @@ struct HabitTileView: View {
         .frame(minHeight: SlideToLogTrack.trackHeight, alignment: .bottom)
     }
 
-    /// The week's dots on the leading side, the play capsule on the trailing.
+    /// Shaped like the slide it stands in for, so every tile's bottom row
+    /// is one pill: the play glyph on a disc where the knob would sit, the
+    /// length beside it. Tap anywhere on it to start.
     private var timerRow: some View {
-        HStack(spacing: 0) {
-            WeekDotsView(completionDates: habit.completionDates, accent: isDone ? .white : habit.color)
-            Spacer(minLength: 6)
-            Button {
-                Haptics.medium()
-                actions.startTimer()
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: timerIcon)
-                        .font(.caption2.weight(.bold))
-                        .symbolEffect(.variableColor.iterative, isActive: timerIsActiveForThisHabit && timerCenter.isRunning)
-                        .symbolSwap(timerIcon)
-                    Text(timerLabel)
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 32)
-                .background(
-                    Capsule().fill(habit.isCompletedToday ? Color.white.opacity(0.18) : habit.color.opacity(0.85))
-                )
-                .frame(minHeight: SlideToLogTrack.trackHeight)
-                .contentShape(.rect)
+        Button {
+            Haptics.medium()
+            actions.startTimer()
+        } label: {
+            HStack(spacing: 0) {
+                Image(systemName: timerIcon)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white)
+                    .symbolEffect(.variableColor.iterative, isActive: timerIsActiveForThisHabit && timerCenter.isRunning)
+                    .symbolSwap(timerIcon)
+                    .frame(width: SlideToLogTrack.knobSize, height: SlideToLogTrack.knobSize)
+                    .background(Circle().fill(habit.color.mix(with: .white, by: 0.22)).opacity(isDone ? 0 : 1))
+                Text(timerLabel)
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white.opacity(isDone ? 1 : 0.7))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .padding(.trailing, SlideToLogTrack.knobSize * 0.4)
             }
-            .buttonStyle(GlassPressStyle())
-            .disabled(habit.isCompletedToday)
-            .accessibilityLabel(timerIsActiveForThisHabit ? "Open timer" : "Start \(habit.timerDurationSeconds / 60) minute timer")
-            // Inside-out gesture priority: this absorbs the long press before
-            // the tile's context menu can claim it.
-            .onLongPressGesture(minimumDuration: 0.6) {
-                guard timerIsActiveForThisHabit else { return }
-                Haptics.light()
-                showStopConfirm = true
-            }
+            .padding(.horizontal, SlideToLogTrack.inset)
+            .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
+            .background(Capsule().fill(Color.white.opacity(isDone ? 0 : 0.08)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(GlassPressStyle())
+        .disabled(habit.isCompletedToday)
+        .accessibilityLabel(timerIsActiveForThisHabit ? "Open timer" : "Start \(habit.timerDurationSeconds / 60) minute timer")
+        // Inside-out gesture priority: this absorbs the long press before
+        // the tile's context menu can claim it.
+        .onLongPressGesture(minimumDuration: 0.6) {
+            guard timerIsActiveForThisHabit else { return }
+            Haptics.light()
+            showStopConfirm = true
         }
     }
 
@@ -253,7 +254,7 @@ struct HabitTileView: View {
     }
 
     private var timerLabel: String {
-        if habit.isCompletedToday { return "Done" }
+        if habit.isCompletedToday { return loggedLabel ?? "Done" }
         if timerIsActiveForThisHabit {
             let s = timerCenter.remainingSeconds
             return String(format: "%d:%02d", s / 60, s % 60)
@@ -268,7 +269,7 @@ struct HabitTileView: View {
         if let remaining = intervalRestingDays {
             intervalRestingPill(days: remaining)
         } else {
-            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding) {
+            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding, loggedLabel: loggedLabel) {
                 actions.log()
             }
         }

@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A few choices side by side, each drawn as a small picture of what it does,
-/// so a layout shows itself instead of being named. Picked the way a look is
-/// on `SwatchRail`: ringed with a gap and named in white. Sits in a `Panel`.
+/// A few choices, three to a row, each drawn as a small picture of what it
+/// does, so a layout shows itself instead of being named. Picked the way a
+/// look is on `SwatchRail`: ringed with a gap and named in white. Sits in a
+/// `Panel`.
 struct SketchPicker<Item: Identifiable & Hashable, Sketch: View>: View {
     let items: [Item]
     @Binding var selection: Item
@@ -10,11 +11,22 @@ struct SketchPicker<Item: Identifiable & Hashable, Sketch: View>: View {
     @ViewBuilder let sketch: (Item) -> Sketch
 
     private let gap: CGFloat = 3
+    private let spacing: CGFloat = 12
 
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(items) { item in
-                cell(item)
+        // Plain rows, not a lazy grid: a lazy grid in a page whose card
+        // preview measures itself never settled.
+        let perRow = min(items.count, 3)
+        let rows = stride(from: 0, to: items.count, by: perRow).map { Array(items[$0..<min($0 + perRow, items.count)]) }
+        VStack(spacing: spacing) {
+            ForEach(rows.indices, id: \.self) { index in
+                HStack(alignment: .top, spacing: spacing) {
+                    ForEach(rows[index]) { cell($0) }
+                    // Keeps a short last row's cells the size of the rest.
+                    ForEach(0..<(perRow - rows[index].count), id: \.self) { _ in
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
+                    }
+                }
             }
         }
         .padding(AppLayout.tilePadding)

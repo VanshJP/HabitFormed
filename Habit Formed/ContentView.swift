@@ -3,9 +3,9 @@ import SwiftUI
 import SwiftData
 
 /// Today, the app's root page: a header with the perfect-day streak and the
-/// doors to History and Settings, a week strip to jump between recent days,
-/// the day's progress with the report button, and the habits as tiles or
-/// rows, each filled with its color once done.
+/// doors to History and Settings, a week strip to jump between recent days
+/// (its rings are the day's progress), the habits as tiles or rows, each
+/// filled with its color once done. The report is a door in the header.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(NotificationService.self) private var notifications
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
+    @Environment(\.appCanvas) private var canvas
 
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
@@ -52,7 +53,10 @@ struct ContentView: View {
         // Re-render when the calendar day rolls over so today's state
         // (header counter, tile state) reflects reality at midnight.
         let _ = dayTracker.today
+        // The toast sits over the whole page, not on the scroll view: on
+        // the scroll view, taps on it fell through to the header under it.
         return lifecycle(presentations(page))
+            .overlay(alignment: .top) { undoToast }
     }
 
     // MARK: - Page
@@ -62,14 +66,13 @@ struct ContentView: View {
         let week = DayLedger.summaries(endingOn: stripEnd, count: 7, tracks: tracks)
         let todayIsPerfect = DayLedger.summary(on: dayTracker.today, tracks: tracks).isPerfect
         let streak = DayLedger.perfectStreak(tracks: tracks)
-
-        let shown = week.first { $0.date.isSameDay(as: selectedDate) }
-            ?? DayLedger.summary(on: selectedDate, tracks: tracks)
+        let shownDay = selectedDate.startOfDay
+        let doneIDs = Set(tracks.filter { $0.logDays.contains(shownDay) }.map(\.id))
 
         return PageScrollView {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                 // The strip belongs to the header, so it sits close under it.
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     topBar(streak: streak, todayIsPerfect: todayIsPerfect)
                     if !habits.isEmpty {
                         WeekStrip(summaries: week, selectedDate: $selectedDate)
@@ -85,45 +88,20 @@ struct ContentView: View {
                         buttonAction: onAdd
                     )
                 } else {
+                    // No title or count over the grid: the strip's ring is the
+                    // day's progress and its glass the day shown.
+                    TodayHabitList(
+                        habits: habits,
+                        layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
+                        selectedDate: selectedDate,
+                        isPastDay: !isViewingToday,
+                        doneIDs: doneIDs,
+                        actions: actions(for:)
+                    )
+
                     // A finished day's report is the one thing left to do, so
                     // it becomes the page's solid button instead of a link.
-                    let sendsPerfectDay = isViewingToday && todayIsPerfect
-                    // Names the day the grid shows once it is not today, and
-                    // says its count once, here.
-                    GlassSection(
-                        isViewingToday ? "Habits" : selectedDate.relativeDayName,
-                        detail: shown.expected > 0 ? "\(shown.done) of \(shown.expected) done" : nil
-                    ) {
-                        TodayHabitList(
-                            habits: habits,
-                            layout: TodayLayout(rawValue: layoutRaw) ?? .tiles,
-                            selectedDate: selectedDate,
-                            isPastDay: !isViewingToday,
-                            actions: actions(for:)
-                        )
-                    } accessory: {
-                        HStack(spacing: 14) {
-                            if !isViewingToday {
-                                Button {
-                                    Haptics.selection()
-                                    backToToday()
-                                } label: {
-                                    HeaderLinkLabel("Today", icon: "arrow.uturn.forward")
-                                }
-                                .buttonStyle(.textLink)
-                            }
-                            if !sendsPerfectDay {
-                                Button {
-                                    onShareReport(selectedDate)
-                                } label: {
-                                    HeaderLinkLabel("Share report", icon: "square.and.arrow.up")
-                                }
-                                .buttonStyle(.textLink)
-                            }
-                        }
-                    }
-
-                    if sendsPerfectDay {
+                    if isViewingToday && todayIsPerfect {
                         GlassButton(
                             title: "Share today's report",
                             icon: "square.and.arrow.up",
@@ -134,13 +112,21 @@ struct ContentView: View {
                             onShareReport(Date())
                         }
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    } else if !isViewingToday {
+                        Button {
+                            Haptics.selection()
+                            backToToday()
+                        } label: {
+                            HeaderLinkLabel("Today", icon: "arrow.uturn.forward")
+                        }
+                        .buttonStyle(.textLink)
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
             .pageContentInsets()
         }
         .refreshable { await refreshHealth() }
-        .overlay(alignment: .top) { undoToast }
         .overlay {
             if celebration > 0 {
                 ConfettiView(origin: UnitPoint(x: 0.5, y: 0.2))
@@ -211,9 +197,10 @@ struct ContentView: View {
                 case .timer(let habit): TimerView(habit: habit)
                 }
             }
+            // Full height: iOS 26 floats a shorter sheet clear of the
+            // screen's edges, and this one should rise from the bottom.
             .sheet(isPresented: $showDatePicker, onDismiss: anchorStrip) {
                 DateBrowserSheet(selectedDate: $selectedDate)
-                    .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showArrange) {
                 ArrangeHabitsSheet()
@@ -309,15 +296,19 @@ struct ContentView: View {
                 Haptics.light()
                 showDatePicker = true
             } label: {
+                // As big as fits beside four doors and the streak chip:
+                // `.largeTitle` squeezes "September" past the scale floor.
                 HStack(spacing: 6) {
                     Text(monthTitle)
-                        .font(.title2.bold())
+                        .font(.title.bold())
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
+                    // The capsule's icon weight, in the accent the calendar
+                    // it opens wears.
                     Image(systemName: "chevron.down")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(canvas.look.accent)
                 }
                 .frame(minHeight: AppLayout.minHitTarget)
                 .contentShape(.rect)
@@ -343,6 +334,17 @@ struct ContentView: View {
                 }
                 .buttonStyle(GlassPressStyle())
                 .accessibilityLabel("Add habit")
+
+                // The day shown, so a browsed day shares its own report.
+                Button { onShareReport(selectedDate) } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .accessibilityLabel("Share report")
 
                 NavigationLink {
                     HistoryView(onShareReport: onShareReport, onShareWeek: onShareWeek)
@@ -372,6 +374,9 @@ struct ContentView: View {
             }
             .padding(.horizontal, 2)
             .headerGlass()
+            // Sized first, so the month shrinks instead: offered an equal
+            // share, the capsule squeezed the streak chip to bare padding.
+            .layoutPriority(1)
         }
         .padding(.top, 4)
     }
@@ -396,11 +401,10 @@ struct ContentView: View {
         stripAnchor = selected < today.adding(days: -6) ? min(today, selected.adding(days: 3)) : nil
     }
 
+    /// Lands at once, like a strip tap; the strip's glass glides on its own.
     private func backToToday() {
-        withMotion(AppMotion.snap) {
-            selectedDate = .now
-            stripAnchor = nil
-        }
+        selectedDate = .now
+        stripAnchor = nil
     }
 
     // MARK: - Reminder signature

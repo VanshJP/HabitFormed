@@ -5,6 +5,8 @@ import SwiftUI
 /// running off the screen.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 4
+    /// Between lines; nil uses `spacing`.
+    var lineSpacing: CGFloat? = nil
 
     struct CacheData {
         var size: CGSize
@@ -52,7 +54,7 @@ struct FlowLayout: Layout {
 
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
-                currentY += lineHeight + spacing
+                currentY += lineHeight + (lineSpacing ?? spacing)
                 lineHeight = 0
             }
 

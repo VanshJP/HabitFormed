@@ -75,6 +75,12 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     case grid
     /// One big ring and a strip of glyphs: the day at a glance.
     case focus
+    /// A board of the last seven days, a row per habit.
+    case week
+    /// A circle per habit in a honeycomb, filled once done.
+    case bubbles
+    /// A paper slip: a line per habit, the day's totals and a barcode.
+    case receipt
 
     var id: String { rawValue }
 
@@ -83,11 +89,42 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
         case .list: return "List"
         case .grid: return "Grid"
         case .focus: return "Focus"
+        case .week: return "Week"
+        case .bubbles: return "Bubbles"
+        case .receipt: return "Receipt"
         }
     }
 
     /// Notes and the week's dots need a row to sit in.
     var showsRowDetail: Bool { self == .list }
+
+    /// The layouts with a ring beside the verdict, which `ReportRing` can
+    /// shrink to the corner or leave off. Focus is its ring, and the
+    /// receipt prints the count.
+    var showsRing: Bool { self != .focus && self != .receipt }
+}
+
+// MARK: - Report Ring
+
+/// Where the card's progress ring sits. Persisted by raw value
+/// (`AppPreferences.reportRing`).
+nonisolated enum ReportRing: String, CaseIterable, Identifiable, Sendable {
+    /// Big beside the verdict.
+    case big
+    /// Small in the header's top corner, so the card is shorter.
+    case corner
+    /// No ring: the verdict and the day's share say it in words.
+    case off
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .big: return "Big"
+        case .corner: return "Corner"
+        case .off: return "Off"
+        }
+    }
 }
 
 // MARK: - Report Font
@@ -162,6 +199,7 @@ nonisolated struct ReportOptions: Sendable, Hashable {
     /// The app's look, which `.app` paints.
     var appLook: CanvasLook = .classic
     var layout: ReportLayout = .list
+    var ring: ReportRing = .big
     /// A palette colour's hex for the ring, mark and note bar, or empty to
     /// follow the theme's own accent.
     var accentHex = ""
