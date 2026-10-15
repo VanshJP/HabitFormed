@@ -1,10 +1,8 @@
 import SwiftUI
 import SwiftData
 
-enum AppTab: Hashable { case today, history }
-
-/// What the shell presents over both tabs: the add flow, a timer opened from
-/// a notification or the mini banner, and the daily report.
+/// What the shell presents over every page: the add flow, a timer opened
+/// from a notification or the mini banner, and the daily report.
 enum RootSheet: Identifiable {
     case addHabit
     case timer(Habit)
@@ -33,44 +31,28 @@ struct RootView: View {
     @AppStorage(AppPreferences.reportReminderMinute) private var reportReminderMinute = 0
     @AppStorage(AppPreferences.recapReminderEnabled) private var recapReminderOn = false
 
-    @State private var selectedTab: AppTab = .today
     @State private var sheet: RootSheet?
     /// The mini banner the full timer zooms out of.
     @Namespace private var timerZoom
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab(value: AppTab.today) {
-                // The canvas is painted inside each stack: SwiftUI hosts
-                // navigation content in an opaque view, so a background behind
-                // the TabView would never show.
-                NavigationStack {
-                    ContentView(
-                        onAdd: { Haptics.light(); sheet = .addHabit },
-                        onShareReport: { date in openReport(for: date) }
-                    )
-                    .background { AppBackground() }
-                    .toolbar(.hidden, for: .navigationBar)
-                }
-            } label: {
-                tabLabel("Today", icon: "square.grid.2x2", tab: .today)
-            }
-
-            Tab(value: AppTab.history) {
-                NavigationStack {
-                    HistoryView(
-                        onShareReport: { date in openReport(for: date) },
-                        onShareWeek: { openRecap() }
-                    )
-                        .background { AppBackground() }
-                        .toolbar(.hidden, for: .navigationBar)
-                }
-            } label: {
-                tabLabel("History", icon: "clock", tab: .history)
-            }
+        // One stack, no tab bar: History and Settings are pushed from
+        // Today's top row. The canvas is painted inside the stack: SwiftUI
+        // hosts navigation content in an opaque view, so a background behind
+        // it would never show.
+        NavigationStack {
+            ContentView(
+                onAdd: { Haptics.light(); sheet = .addHabit },
+                onShareReport: { date in openReport(for: date) },
+                onShareWeek: { openRecap() }
+            )
+            .background { AppBackground() }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .tint(.white)
-        .overlay(alignment: .bottom) {
+        // An inset, not an overlay, so pages scroll their last habit clear
+        // of the banner.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if timerCenter.isActive {
                 MiniTimerBanner {
                     if let habit = lookupActiveTimerHabit() {
@@ -80,7 +62,7 @@ struct RootView: View {
                 }
                 .zoomSource("timer", in: timerZoom)
                 .padding(.horizontal, AppLayout.pageHorizontal)
-                .padding(.bottom, 90)
+                .padding(.bottom, 8)
                 .readableColumn()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -150,16 +132,6 @@ struct RootView: View {
         .preferredColorScheme(.dark)
     }
 
-    /// The selected tab's glyph is filled and the other is outlined, so the
-    /// bar says where you are twice over. The bar fills any symbol it is
-    /// handed by name, so the outline goes in as an image it cannot restyle.
-    private func tabLabel(_ title: String, icon: String, tab: AppTab) -> some View {
-        let glyph = selectedTab == tab
-            ? Image(systemName: icon)
-            : Image(uiImage: UIImage(systemName: icon) ?? UIImage())
-        return Label { Text(title) } icon: { glyph }
-    }
-
     private func openReport(for date: Date) {
         Haptics.medium()
         sheet = .report(date.startOfDay)
@@ -183,8 +155,8 @@ struct RootView: View {
 
 // MARK: - Mini Timer Banner
 
-/// The running timer, floating over every tab: its ring, name and time. Tap to
-/// open the full timer.
+/// The running timer, floating over every page: its ring, name and time. Tap
+/// to open the full timer.
 private struct MiniTimerBanner: View {
     @Environment(TimerCenter.self) private var center
     let onTap: () -> Void

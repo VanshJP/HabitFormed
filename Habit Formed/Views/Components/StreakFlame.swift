@@ -169,7 +169,7 @@ struct StreakFlame: View {
 // MARK: - Streak Chip
 
 /// The perfect-day streak at the top of Today, inside the capsule it shares
-/// with the add and settings buttons. Bare content: the capsule's
+/// with the add, History and Settings buttons. Bare content: the capsule's
 /// `headerGlass()` is the chrome, and the flame is the only coloured thing on
 /// it.
 struct StreakChip: View {

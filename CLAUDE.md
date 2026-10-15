@@ -58,7 +58,7 @@ the one sanctioned `pbxproj` edit for files.
 ```
 Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
-├── ContentView.swift         # Today tab: month control, week strip, the habits, undo toast
+├── ContentView.swift         # Today, the root page: month control, week strip, the habits, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
 │                             #   ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
@@ -78,7 +78,7 @@ Habit Formed/
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
-    ├── RootView.swift        # TabView (Today, History), mini timer banner, root sheets
+    ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
     ├── HabitRowView.swift    # One compact row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
@@ -102,13 +102,14 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 
 ## Interaction model
 
-`RootView` hosts two tabs, each with no navigation bar (the page title is
-the header):
+`RootView` hosts one `NavigationStack` and no tab bar, so nothing sits over
+the habits. Today is its root page, with no navigation bar; History and
+Settings are pushed from Today's top row:
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄", which opens the calendar) and a capsule holding the
-  perfect-day `StreakChip` (only once a streak exists), add (+) and Settings
-  (gear, pushed). Right under it the `WeekStrip` is the date control: one
+  perfect-day `StreakChip` (only once a streak exists), add (+), History
+  (clock, pushed) and Settings (gear, pushed). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
   filling as that day's habits are logged (closed and green on a perfect
   day). The selected day sits on a soft circle of glass, never solid
@@ -125,7 +126,7 @@ the header):
   in Settings), and each stays in place: **done is the tile or row filled
   with its habit's color** (`CompletionFill`), so a finished day is a grid
   of filled squares and needs no other line to say so.
-- **History**: `HistoryView`, one page with no picker. `HistoryHero` is
+- **History**: `HistoryView`, pushed from the clock, one page with no picker. `HistoryHero` is
   the perfect-day streak as one big number, with the best and the last
   seven days under it and a "Weekly recap" button. Then "Patterns" (up to three
   lines `HabitInsights` found in the last eight weeks, plus an Apple
@@ -364,11 +365,11 @@ The design system is SpeakUp's; when in doubt, match
   uppercase + tracking.
 - **Sections:** `GlassSection("Title", meta:)` with a sentence-case header;
   `detail:` puts one fact right after the title.
-- **Pages:** `PageScrollView` + `.pageContentInsets()` on root tabs; sheets
+- **Pages:** `PageScrollView` + `.pageContentInsets()` on every page; sheets
   close with `Button(role: .close)` top leading (no haptic), and a Done
   that commits is `Button(role: .confirm)`; deletes confirm with an
   `.alert("Delete this X?")` (a log: "Remove this log?", `confirmsLogRemoval`), and stopping a running timer always asks
-  "Stop the timer for X?". A habit's page is pushed on the tab's stack
+  "Stop the timer for X?". A habit's page is pushed on the stack
   (`navigationDestination(item:)`), so it opens fast and swipes back from
   the edge; the timer zooms out of the mini banner (`zoomSource` +
   `.navigationTransition(.zoom)`).

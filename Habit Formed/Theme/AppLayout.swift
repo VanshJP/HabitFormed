@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// Shared page rhythm (ported from SpeakUp), so every screen starts its text
-/// on the same line and flipping tabs never reads as two different apps.
+/// on the same line and moving between pages never reads as two different apps.
 enum AppLayout {
-    /// Horizontal inset for every root tab's scroll content.
+    /// Horizontal inset for every page's scroll content.
     static let pageHorizontal: CGFloat = 16
 
-    /// Bottom breathing room above the tab bar.
+    /// Bottom breathing room under a page's last card.
     static let pageBottom: CGFloat = 16
 
     /// The widest a page's column grows, page inset included. Every iPhone is
@@ -58,7 +58,7 @@ enum AppLayout {
 }
 
 extension View {
-    /// Standard horizontal + bottom inset for a root tab's scroll column.
+    /// Standard horizontal + bottom inset for a page's scroll column.
     func pageContentInsets() -> some View {
         self
             .padding(.horizontal, AppLayout.pageHorizontal)
