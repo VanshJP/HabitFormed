@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// One habit on the Today grid: its glyph as faded art in the top corner,
-/// then its name and a status line led by the streak's number, over a
-/// bottom row that depends on how it is tracked. Done (logged on the day
-/// shown) is the tile filled with the habit's color, its glyph and marks
-/// turning white; a slide fills it from the knob as it moves.
+/// One habit on the Today grid: its name and a status line led by the
+/// streak's number at the top, its glyph as a faint watermark running off
+/// the top corner, and a bottom row that depends on how it is tracked.
+/// Done (logged on the day shown) is the tile filled with the habit's
+/// color, its marks turning white and the bottom row saying when it was
+/// logged; a slide fills it from the knob as it moves.
 /// - Manual: the slide-to-log track
 /// - HealthKit: today's reading against the target, with a meter
 /// - Timer: a play pill shaped like the slide
@@ -45,8 +46,8 @@ struct HabitTileView: View {
         let _ = dayTracker.today
 
         return content
-            .frame(maxWidth: .infinity, minHeight: 172, alignment: .topLeading)
-            .background(alignment: .topTrailing) { art }
+            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
+            .background { watermark }
             // A resting interval habit recedes so it reads as "sitting out
             // today" yet stays discoverable.
             .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
@@ -87,12 +88,10 @@ struct HabitTileView: View {
 
     // MARK: - Layout
 
-    /// The words sit at the bottom over the way to log, leaving the top to
-    /// the art. The status line is one numeral tall either way, so names
-    /// line up across a row of tiles.
+    /// The name and the status line at the top, the way to log at the
+    /// bottom, and the watermark showing through between them.
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 36)
             Text(habit.title)
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -100,23 +99,29 @@ struct HabitTileView: View {
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
             HabitStatusLine(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isOnFill: isDone, prominent: true)
+            Spacer(minLength: 12)
             bottomSection
-                .padding(.top, 12)
         }
         .padding(padding)
     }
 
-    /// The glyph drawn large and quiet in the top corner, behind the words,
-    /// in the habit's own color rather than lifted toward white: the tile's
-    /// art, the way SpeakUp's tool tiles wear theirs. White on the fill.
-    private var art: some View {
+    /// The glyph huge and faint, running off the top trailing corner
+    /// behind everything: the tile's art, there without asking to be read,
+    /// and clear of the way to log along the bottom. White on the fill.
+    private var watermark: some View {
         Image(systemName: habit.symbol)
-            .font(.system(size: 38, weight: .medium))
-            .foregroundStyle(isDone ? Color.white : habit.color)
-            .opacity(isDone ? 0.35 : 0.55)
-            .frame(width: 52, height: 52)
-            .padding(padding)
+            .font(.system(size: 104, weight: .medium))
+            .foregroundStyle(isDone ? Color.white.opacity(0.12) : habit.color.glyphTone.opacity(0.12))
+            .offset(x: 26, y: -22)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .clipShape(.rect(cornerRadius: AppLayout.tileRadius))
+            .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+
+    /// "Logged 9:41 AM", where a done tile's way to log was.
+    private var loggedLabel: String? {
+        habit.todayCompletion.map { "Logged \($0.loggedAt.formatted(date: .omitted, time: .shortened))" }
     }
 
     // MARK: - Fill
@@ -249,7 +254,7 @@ struct HabitTileView: View {
     }
 
     private var timerLabel: String {
-        if habit.isCompletedToday { return "Done" }
+        if habit.isCompletedToday { return loggedLabel ?? "Done" }
         if timerIsActiveForThisHabit {
             let s = timerCenter.remainingSeconds
             return String(format: "%d:%02d", s / 60, s % 60)
@@ -264,7 +269,7 @@ struct HabitTileView: View {
         if let remaining = intervalRestingDays {
             intervalRestingPill(days: remaining)
         } else {
-            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding) {
+            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding, loggedLabel: loggedLabel) {
                 actions.log()
             }
         }

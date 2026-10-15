@@ -141,11 +141,12 @@ the bar hidden.
   the white glyph, the featured tint and the spoken state, so a tile always
   agrees with the week strip's ring and its own pill; a weekly
   habit's week is its status line's to say ("2 of 3 this week").
-  A tile is SpeakUp's tool tile: its glyph drawn large and quiet in the
-  top trailing corner (the habit's own color at 55%, behind the words),
-  then at the bottom the name, the `HabitStatusLine` and the way to log,
-  every kind of it a 44pt pill (the slide, a timer's play pill, a health
-  meter, a past day's toggle). The status line leads with the streak's
+  A tile is a watermark: its glyph at 104pt running off the top trailing
+  corner (`glyphTone` at 12%, white at 12% on the fill), the name and the
+  `HabitStatusLine` at the top, and at the bottom the way to log, every
+  kind of it a 44pt pill (the slide, a timer's play pill, a health meter,
+  a past day's toggle). Done today, the pill says when ("Logged 9:41 AM",
+  `SlideToLogTrack.loggedLabel`) beside the white check. The status line leads with the streak's
   number ("3 days · 1 of 5 this week"), rounded, medium weight and a step
   under the name, and is one numeral tall even without one, so tiles in a
   row stay level. The name leads and the line sits back: the number in
@@ -404,8 +405,7 @@ The design system is SpeakUp's; when in doubt, match
   `glassEffect` takes its tint from that setting; none is plain `.regular`. The
   one solid use of a habit's color is Today's done fill, with the glyph and
   its marks (status line, meter) turning white on it. A habit's glyph otherwise uses `color.glyphTone`
-  (lifted toward white), except as a tile's art, which is the raw color
-  at 55%, like SpeakUp's `ToolArt`. Habit colors come from `AppColors.tilePalette`;
+  (lifted toward white), faded to 12% as a tile's watermark. Habit colors come from `AppColors.tilePalette`;
   a new habit starts in the least-worn one (`HabitDraft.freshColor`).
 - **Glyphs:** bare, never on a disc or plate (`IconChip`, `RowGlyph`).
 - **Buttons:** `GlassButton` (primary is solid white, one per screen);

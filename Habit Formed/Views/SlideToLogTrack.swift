@@ -24,6 +24,9 @@ struct SlideToLogTrack: View {
     /// "Slide to log" in the pill. A row's short track leaves it out: the
     /// knob's chevron already says which way.
     var showsLabel = true
+    /// Said at the leading end once logged ("Logged 9:41 AM"), with the
+    /// check where the knob came to rest.
+    var loggedLabel: String? = nil
     let onComplete: () -> Void
 
     @State private var isArmed = false
@@ -64,6 +67,18 @@ struct SlideToLogTrack: View {
                         .foregroundStyle(.white.opacity(0.55 * max(0, 1 - p * 2)))
                         .padding(.leading, Self.knobSize * 0.6)
                         .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
+                }
+
+                if isLogged, let loggedLabel {
+                    Text(loggedLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.leading, 2)
+                        .padding(.trailing, Self.knobSize)
+                        .transition(.opacity)
                         .allowsHitTesting(false)
                 }
 

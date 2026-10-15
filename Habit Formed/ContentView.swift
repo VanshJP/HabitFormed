@@ -374,6 +374,9 @@ struct ContentView: View {
             }
             .padding(.horizontal, 2)
             .headerGlass()
+            // Sized first, so the month shrinks instead: offered an equal
+            // share, the capsule squeezed the streak chip to bare padding.
+            .layoutPriority(1)
         }
         .padding(.top, 4)
     }
