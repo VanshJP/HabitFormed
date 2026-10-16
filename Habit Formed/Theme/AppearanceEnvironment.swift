@@ -71,4 +71,16 @@ extension EnvironmentValues {
         get { self[IsOnGlassKey.self] }
         set { self[IsOnGlassKey.self] = newValue }
     }
+
+    /// True for a habit held up by a reorder drag. The lifted copy is drawn
+    /// from the habit left in the grid, so its glass would keep showing the
+    /// spot it left; `glassCard` paints a plate instead while it is held.
+    var isLifted: Bool {
+        get { self[IsLiftedKey.self] }
+        set { self[IsLiftedKey.self] = newValue }
+    }
+}
+
+private struct IsLiftedKey: EnvironmentKey {
+    static let defaultValue = false
 }

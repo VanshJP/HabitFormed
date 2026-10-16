@@ -61,6 +61,11 @@ enum AppColors {
     /// Fill of a static well painted inside a card, such as a stat tile.
     static let wellFill = Color.white.opacity(0.06)
 
+    /// A glass card's painted stand-in while it is lifted for a drag: the
+    /// slate glass reads as over the dark canvas, opaque so the tiles it
+    /// passes over stay out of it.
+    static let liftedPlate = accent.mix(with: .black, by: 0.5)
+
     /// Near-black ink for text and glyphs on the solid white surfaces.
     static let inkOnLight = Color(red: 0.07, green: 0.07, blue: 0.08)
 

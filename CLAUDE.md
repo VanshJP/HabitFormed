@@ -192,7 +192,10 @@ Each habit tile responds to four gestures, and so do rows. They all take one `Ha
 
 Every order change goes through `Habit.move(_:from:to:in:)`, which writes
 only the places that changed; Settings → Arrange habits uses it too and is
-the way to reorder before iOS 27.
+the way to reorder before iOS 27. While a habit is held its card is
+`isLifted` and `glassCard` paints `AppColors.liftedPlate` under its tint
+instead of glass: the lifted copy is drawn from the card left in the grid,
+so glass would keep showing the spot it left.
 
 The slide-to-log knob mirrors iOS's slide-to-answer. As it travels, the
 habit's color pours out of it (a circle centred on the knob that reaches

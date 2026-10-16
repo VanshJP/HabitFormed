@@ -4,17 +4,28 @@ import SwiftUI
 
 /// iOS 26 Liquid Glass plate, lifted by Settings → Look → Glass, with a
 /// habit's tint over the lift when one is given. Sets `isOnGlass` so controls
-/// inside paint a plate instead of a second pane of glass.
+/// inside paint a plate instead of a second pane of glass. While `isLifted`
+/// the glass gives way to a painted plate in the same tint, so a habit
+/// dragged across the grid never shows the spot it left.
 struct GlassCardModifier: ViewModifier {
     var cornerRadius: CGFloat = AppLayout.cardRadius
     var tint: Color? = nil
 
     @Environment(\.glassAppearance) private var glassAppearance
+    @Environment(\.isLifted) private var isLifted
 
     func body(content: Content) -> some View {
-        content
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let tint = AppColors.glassTint(tint, on: glassAppearance)
+        return content
             .environment(\.isOnGlass, true)
-            .glassEffect(.regular.tint(AppColors.glassTint(tint, on: glassAppearance)), in: .rect(cornerRadius: cornerRadius))
+            .background {
+                if isLifted {
+                    shape.fill(AppColors.liftedPlate).overlay { shape.fill(tint) }
+                }
+            }
+            // One modifier either way, so lifting never rebuilds the card.
+            .glassEffect(isLifted ? .identity : .regular.tint(tint), in: shape)
             .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
     }
 }

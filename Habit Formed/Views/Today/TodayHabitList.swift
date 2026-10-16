@@ -15,6 +15,9 @@ struct TodayHabitList: View {
     let actions: (Habit) -> HabitActions
 
     @Environment(\.modelContext) private var modelContext
+    /// The habit a reorder drag is holding up, so its card paints a plate
+    /// rather than glass that would show where it was.
+    @State private var liftedID: UUID?
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -29,21 +32,24 @@ struct TodayHabitList: View {
                     HabitTileView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isDone: doneIDs.contains(habit.id), actions: actions(habit))
                 }
             }
-            .reorderingHabits(habits, in: modelContext)
+            .reorderingHabits(habits, in: modelContext, lifted: $liftedID)
         case .rows:
             LazyVStack(spacing: 8) {
                 cells { habit in
                     HabitRowView(habit: habit, selectedDate: selectedDate, isPastDay: isPastDay, isDone: doneIDs.contains(habit.id), actions: actions(habit))
                 }
             }
-            .reorderingHabits(habits, in: modelContext)
+            .reorderingHabits(habits, in: modelContext, lifted: $liftedID)
         }
     }
 
     @ViewBuilder
     private func cells<Cell: View>(@ViewBuilder _ cell: @escaping (Habit) -> Cell) -> some View {
         if #available(iOS 27, *) {
-            ForEach(habits, content: cell).reorderable()
+            ForEach(habits) { habit in
+                cell(habit).environment(\.isLifted, habit.id == liftedID)
+            }
+            .reorderable()
         } else {
             ForEach(habits, content: cell)
         }
@@ -51,11 +57,19 @@ struct TodayHabitList: View {
 }
 
 private extension View {
-    /// Writes a drop on Today as the habits' order.
+    /// Writes a drop on Today as the habits' order, and keeps `lifted` on
+    /// the habit held up while the drag lasts.
     @ViewBuilder
-    func reorderingHabits(_ habits: [Habit], in context: ModelContext) -> some View {
+    func reorderingHabits(_ habits: [Habit], in context: ModelContext, lifted: Binding<UUID?>) -> some View {
         if #available(iOS 27, *) {
-            reorderContainer(for: Habit.self) { difference in
+            onDragSessionUpdated { session in
+                let held: UUID? = switch session.phase {
+                case .initial, .active: session.draggedItemIDs(for: UUID.self).first
+                default: nil
+                }
+                if lifted.wrappedValue != held { lifted.wrappedValue = held }
+            }
+            .reorderContainer(for: Habit.self) { difference in
                 let moving = IndexSet(difference.sources.compactMap { id in habits.firstIndex { $0.id == id } })
                 let destination = switch difference.destination.position {
                 case .before(let id): habits.firstIndex { $0.id == id } ?? habits.count
