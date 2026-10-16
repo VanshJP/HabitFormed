@@ -201,11 +201,6 @@ struct ReportOrbit: View {
                 Text(report.verdict)
                     .font(.title2.bold())
                     .foregroundStyle(palette.ink)
-                if showStreaks, report.perfectStreak > 0 {
-                    Text(report.perfectStreak == 1 ? "1 perfect day" : "\(report.perfectStreak) perfect days in a row")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(palette.ink.opacity(0.85))
-                }
                 if report.items.count > shown.count {
                     Text("+\(report.items.count - shown.count) more")
                         .font(.caption.weight(.semibold))

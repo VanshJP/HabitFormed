@@ -4,8 +4,8 @@ import UIKit
 // MARK: - Header Chrome
 
 extension View {
-    /// The glass every page-header control wears, such as Today's
-    /// streak-and-actions capsule. Follows Settings → Look → Glass.
+    /// The glass every page-header control wears, such as Today's capsule
+    /// of actions. Follows Settings → Look → Glass.
     func headerGlass() -> some View {
         modifier(HeaderGlassChrome())
     }

@@ -44,7 +44,6 @@ enum DailyReportBuilder {
             items: items,
             done: summary.done,
             expected: summary.expected,
-            perfectStreak: DayLedger.perfectStreak(tracks: tracks, today: day),
             health: health
         )
     }

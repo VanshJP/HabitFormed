@@ -37,9 +37,6 @@ struct ReportReceipt: View {
             rule
             VStack(spacing: 6) {
                 amount("Habits done", "\(report.done)/\(report.expected)")
-                if options.showStreaks, report.perfectStreak > 0 {
-                    amount("Perfect days in a row", "\(report.perfectStreak)")
-                }
                 ForEach(health, id: \.label) { amount($0.label, $0.value) }
             }
             rule

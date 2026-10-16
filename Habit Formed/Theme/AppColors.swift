@@ -64,38 +64,6 @@ enum AppColors {
     /// Near-black ink for text and glyphs on the solid white surfaces.
     static let inkOnLight = Color(red: 0.07, green: 0.07, blue: 0.08)
 
-    // MARK: - Streak
-
-    /// The streak hero numeral, top to bottom: warm white, flame, ember.
-    static let streakFlameGradient: [Color] = [
-        Color(red: 1.00, green: 0.96, blue: 0.78),
-        Color(red: 1.00, green: 0.62, blue: 0.18),
-        Color(red: 0.95, green: 0.28, blue: 0.08),
-    ]
-
-    /// `StreakFlame` layers, each top to bottom.
-    static let streakFlameOuter: [Color] = [
-        Color(red: 1.00, green: 0.60, blue: 0.18),
-        Color(red: 0.88, green: 0.22, blue: 0.11),
-    ]
-    static let streakFlameMiddle: [Color] = [
-        Color(red: 1.00, green: 0.82, blue: 0.35),
-        Color(red: 1.00, green: 0.54, blue: 0.12),
-    ]
-    static let streakFlameCore: [Color] = [
-        Color(red: 1.00, green: 0.98, blue: 0.90),
-        Color(red: 1.00, green: 0.88, blue: 0.54),
-    ]
-    /// A live streak not yet fed today: banked coals, not a flame.
-    static let streakEmberOuter: [Color] = [
-        Color(red: 0.48, green: 0.35, blue: 0.28),
-        Color(red: 0.29, green: 0.18, blue: 0.15),
-    ]
-    static let streakEmberCore: [Color] = [
-        Color(red: 1.00, green: 0.69, blue: 0.38),
-        Color(red: 0.88, green: 0.34, blue: 0.12),
-    ]
-
     // MARK: - Habit tile palette
 
     /// Identity tones for habits: SpeakUp's muted jewels, at a saturation that

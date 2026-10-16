@@ -82,7 +82,6 @@ struct ReportHabitGrid: View {
 struct ReportFocus: View {
     let report: DailyReport
     let palette: ReportPalette
-    let showStreaks: Bool
     var numerals: Font.Design = .rounded
 
     var body: some View {
@@ -101,16 +100,9 @@ struct ReportFocus: View {
                 .padding(.horizontal, 20)
             }
 
-            VStack(spacing: 4) {
-                Text(report.verdict)
-                    .font(.title2.bold())
-                    .foregroundStyle(palette.ink)
-                if showStreaks, report.perfectStreak > 0 {
-                    Text(report.perfectStreak == 1 ? "1 perfect day" : "\(report.perfectStreak) perfect days in a row")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(palette.ink.opacity(0.85))
-                }
-            }
+            Text(report.verdict)
+                .font(.title2.bold())
+                .foregroundStyle(palette.ink)
 
             FlowLayout(spacing: 8) {
                 ForEach(report.items.prefix(ReportCardView.maxItems * 2)) { glyph($0) }

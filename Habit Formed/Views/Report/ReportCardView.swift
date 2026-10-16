@@ -79,7 +79,7 @@ struct ReportCardView: View {
             hero
             ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
         case .focus:
-            ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
+            ReportFocus(report: report, palette: palette, numerals: options.font.numerals)
         case .orbit:
             ReportOrbit(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
         case .week:
@@ -131,8 +131,7 @@ struct ReportCardView: View {
         }
     }
 
-    /// The verdict, the day's share and the perfect-day streak, beside the
-    /// big ring when it is on.
+    /// The verdict and the day's share, beside the big ring when it is on.
     private var hero: some View {
         HStack(alignment: .center, spacing: 18) {
             if options.layout.showsRing, options.ring == .big {
@@ -146,15 +145,6 @@ struct ReportCardView: View {
                 Text("\(report.percentText) of the day")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondary)
-                if options.showStreaks, report.perfectStreak > 0 {
-                    HStack(spacing: 6) {
-                        StreakFlameGlyph(heat: .of(streak: report.perfectStreak, doneToday: report.isPerfect))
-                            .frame(height: 15)
-                        Text(report.perfectStreak == 1 ? "1 perfect day" : "\(report.perfectStreak) perfect days in a row")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(palette.ink.opacity(0.85))
-                    }
-                }
             }
             Spacer(minLength: 0)
         }
@@ -386,7 +376,6 @@ extension DailyReport {
             ],
             done: 3,
             expected: 4,
-            perfectStreak: 4,
             health: DayHealthMetrics(
                 steps: 11_240, activeKcal: 610, restingKcal: 1_790, eatenKcal: 1_850,
                 exerciseMinutes: 42, sleepHours: 7 + 40.0 / 60, mindfulMinutes: nil,

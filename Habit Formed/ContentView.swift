@@ -2,8 +2,8 @@ import AppIntents
 import SwiftUI
 import SwiftData
 
-/// Today, the app's root page: a header with the perfect-day streak and the
-/// doors to History and Settings, a week strip to jump between recent days
+/// Today, the app's root page: a header with the doors to History and
+/// Settings, a week strip to jump between recent days
 /// (its rings are the day's progress), the habits as tiles or rows, each
 /// filled with its color once done. The report is a door in the header.
 struct ContentView: View {
@@ -65,7 +65,6 @@ struct ContentView: View {
         let tracks = habits.map(\.track)
         let week = DayLedger.summaries(endingOn: stripEnd, count: 7, tracks: tracks)
         let todayIsPerfect = DayLedger.summary(on: dayTracker.today, tracks: tracks).isPerfect
-        let streak = DayLedger.perfectStreak(tracks: tracks)
         let shownDay = selectedDate.startOfDay
         let doneIDs = Set(tracks.filter { $0.logDays.contains(shownDay) }.map(\.id))
 
@@ -73,7 +72,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
                 // The strip belongs to the header, so it sits close under it.
                 VStack(alignment: .leading, spacing: 16) {
-                    topBar(streak: streak, todayIsPerfect: todayIsPerfect)
+                    topBar
                     if !habits.isEmpty {
                         WeekStrip(summaries: week, selectedDate: $selectedDate)
                     }
@@ -290,14 +289,14 @@ struct ContentView: View {
 
     /// The month is the date control: tap it for the calendar. The week strip
     /// under it does the day-to-day browsing, so there is no separate title.
-    private func topBar(streak: Int, todayIsPerfect: Bool) -> some View {
+    private var topBar: some View {
         HStack(alignment: .center) {
             Button {
                 Haptics.light()
                 showDatePicker = true
             } label: {
-                // As big as fits beside four doors and the streak chip:
-                // `.largeTitle` squeezes "September" past the scale floor.
+                // As big as fits beside the four doors: `.largeTitle`
+                // squeezes "September" past the scale floor.
                 HStack(spacing: 6) {
                     Text(monthTitle)
                         .font(.title.bold())
@@ -319,12 +318,6 @@ struct ContentView: View {
             Spacer(minLength: 8)
 
             HStack(spacing: 0) {
-                // The flame earns its place: with no run going it is only noise.
-                if streak > 0 {
-                    StreakChip(streak: streak, doneToday: todayIsPerfect)
-                        .transition(.blurReplace)
-                }
-
                 Button(action: onAdd) {
                     Image(systemName: "plus")
                         .font(.body.weight(.semibold))
@@ -374,8 +367,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 2)
             .headerGlass()
-            // Sized first, so the month shrinks instead: offered an equal
-            // share, the capsule squeezed the streak chip to bare padding.
+            // Sized first, so the month shrinks instead of the doors.
             .layoutPriority(1)
         }
         .padding(.top, 4)

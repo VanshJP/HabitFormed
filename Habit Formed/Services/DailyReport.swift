@@ -30,7 +30,6 @@ nonisolated struct DailyReport: Sendable, Hashable {
     let items: [Item]
     let done: Int
     let expected: Int
-    let perfectStreak: Int
     let health: DayHealthMetrics
 
     var fraction: Double { expected == 0 ? 0 : Double(done) / Double(expected) }

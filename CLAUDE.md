@@ -120,9 +120,8 @@ the bar hidden.
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
-  chevron in the look's accent; it opens the calendar) and a capsule holding the
-  perfect-day `StreakChip` (only once a streak exists), add (+), Share report
-  (the day shown), History (clock, pushed) and Settings (gear, pushed). The
+  chevron in the look's accent; it opens the calendar) and a capsule holding
+  add (+), Share report (the day shown), History (clock, pushed) and Settings (gear, pushed). The
   calendar is a full-height sheet (a shorter one floats off the screen's
   edges on iOS 26). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
@@ -329,7 +328,8 @@ things out. No templates, layouts or placeholder tokens.
   `ReportDayRing`: an arc per expected habit, in its colour once done, done
   ones first, so a perfect day closes in every colour. Then an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
-  (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
+  (Default, Rounded, Serif, Mono), hidden habits, switches for each habit's
+  streak (the card prints no perfect-day streak; History keeps that),
   notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
   exercise, sleep, mindful, calories in vs out, macros), one chip each so
   what is picked is exactly what shows. On a day with a workout, exercise
