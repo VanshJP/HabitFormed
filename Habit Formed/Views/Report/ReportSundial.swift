@@ -243,9 +243,15 @@ struct ReportSundial: View {
 
     // MARK: - Geometry
 
-    /// Minutes from the day's midnight; a night's sleep starts before zero.
+    /// The clock's minute of the day, as the dial's hours read it (so a day
+    /// the clocks change on still puts 9 AM at 9); a night's sleep that
+    /// starts the evening before counts back from zero.
     private func minute(_ date: Date, from day: Date) -> Double {
-        date.timeIntervalSince(day) / 60
+        let parts = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
+        let clock = Double((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) + Double(parts.second ?? 0) / 60
+        if date < day { return clock - 1440 }
+        if date >= day.nextDayStart { return clock + 1440 }
+        return clock
     }
 
     /// Minutes into the day, or nil for a log made on another day.
@@ -259,11 +265,17 @@ struct ReportSundial: View {
     }
 
     /// Minutes in order, each pushed at least `gap` past the one before, so
-    /// spokes never sit closer than that.
+    /// spokes never sit closer than that; then pulled back from midnight, so
+    /// a late cluster never wraps round onto the morning's.
     static func spread(_ minutes: [Double], gap: Double) -> [Double] {
         var placed: [Double] = []
         for minute in minutes {
             placed.append(max(minute, (placed.last ?? -.infinity) + gap))
+        }
+        var limit = 1440 - gap / 2
+        for index in placed.indices.reversed() {
+            placed[index] = min(placed[index], limit)
+            limit = placed[index] - gap
         }
         return placed
     }
@@ -290,7 +302,7 @@ private struct DayArc: Shape {
     }
 
     /// Where a minute of the day sits at `radius` from the centre of `rect`.
-    static func point(minute: Double, radius: CGFloat, in rect: CGRect) -> CGPoint {
+    nonisolated static func point(minute: Double, radius: CGFloat, in rect: CGRect) -> CGPoint {
         let angle = CGFloat(minute / 1440) * 2 * .pi - .pi / 2
         return CGPoint(x: rect.midX + radius * cos(angle), y: rect.midY + radius * sin(angle))
     }
