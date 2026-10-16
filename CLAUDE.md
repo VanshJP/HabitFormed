@@ -76,7 +76,8 @@ Habit Formed/
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportWeekBoard,
-    │                         #   ReportBubbles, ReportReceipt, ReportHealthSection),
+    │                         #   ReportBubbles, ReportReceipt, ReportHealthSection,
+    │                         #   ReportRingLayouts: the day ring, Rings, Orbit),
     │                         #   ReportStyleEditor, MacroFieldsRow,
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
@@ -313,13 +314,20 @@ things out. No templates, layouts or placeholder tokens.
 - `ReportOptions` is the whole configuration: a `ReportTheme` (App look by
   default, which paints whatever `AppCanvas` the app wears via
   `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
-  Focus: one big ring and a strip of glyphs, Week: a board of the last seven
-  days, Bubbles: a honeycomb of circles that fill when done, or Receipt: a
+  Week: a board of the last seven days, Rings: the same week as a ring per
+  habit from the outside in, seven arcs each, named beside it in ring
+  order, Focus: one big ring and a strip of glyphs, Orbit: the day's ring
+  with each habit a circle on an orbit round it, sized by its streak,
+  Bubbles: a honeycomb of circles that fill when done (rows of one or three
+  take turns with rows of two, `ReportBubbles.rowPlan`, so no row lands on
+  the one above; seven is 2, 3, 2), or Receipt: a
   torn paper slip in monospaced capitals, habits on dotted leaders, totals
   and Health numbers as line items, a barcode; the image sent is the slip
   alone, 340pt, clear around its torn edges, with no card or canvas), a
   `ReportRing` for the layouts with a ring beside the verdict (Big, Corner:
-  small at the header's trailing edge, or Off), an accent (empty follows
+  small at the header's trailing edge, or Off). Every card's day ring is
+  `ReportDayRing`: an arc per expected habit, in its colour once done, done
+  ones first, so a perfect day closes in every colour. Then an accent (empty follows
   the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
   (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
   notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,

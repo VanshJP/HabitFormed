@@ -73,10 +73,14 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     case list
     /// A square per habit, filled with its colour once done, like Today.
     case grid
-    /// One big ring and a strip of glyphs: the day at a glance.
-    case focus
     /// A board of the last seven days, a row per habit.
     case week
+    /// The last seven days as rings, one per habit, from the outside in.
+    case rings
+    /// One big ring and a strip of glyphs: the day at a glance.
+    case focus
+    /// The day's ring with each habit on an orbit round it.
+    case orbit
     /// A circle per habit in a honeycomb, filled once done.
     case bubbles
     /// A paper slip: a line per habit, the day's totals and a barcode.
@@ -90,6 +94,8 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
         case .grid: return "Grid"
         case .focus: return "Focus"
         case .week: return "Week"
+        case .rings: return "Rings"
+        case .orbit: return "Orbit"
         case .bubbles: return "Bubbles"
         case .receipt: return "Receipt"
         }
@@ -98,10 +104,13 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     /// Notes and the week's dots need a row to sit in.
     var showsRowDetail: Bool { self == .list }
 
+    /// Focus and Orbit stand alone as one poster under a centred header.
+    var isPoster: Bool { self == .focus || self == .orbit }
+
     /// The layouts with a ring beside the verdict, which `ReportRing` can
-    /// shrink to the corner or leave off. Focus is its ring, and the
-    /// receipt prints the count.
-    var showsRing: Bool { self != .focus && self != .receipt }
+    /// shrink to the corner or leave off. Focus and Orbit are their ring,
+    /// Rings counts the day in its middle, and the receipt prints it.
+    var showsRing: Bool { !isPoster && self != .rings && self != .receipt }
 }
 
 // MARK: - Report Ring

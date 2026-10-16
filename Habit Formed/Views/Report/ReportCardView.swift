@@ -80,9 +80,14 @@ struct ReportCardView: View {
             ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
         case .focus:
             ReportFocus(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
+        case .orbit:
+            ReportOrbit(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
         case .week:
             hero
             ReportWeekBoard(report: report, palette: palette, showStreaks: options.showStreaks)
+        case .rings:
+            hero
+            ReportRings(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
         case .bubbles:
             hero
             ReportBubbles(items: report.items, palette: palette, showStreaks: options.showStreaks)
@@ -93,10 +98,11 @@ struct ReportCardView: View {
 
     // MARK: - Header and hero
 
-    /// Centred over Focus's ring, so that card reads as one poster. With the
-    /// ring set to the corner, it sits small at the header's trailing edge.
+    /// Centred over a poster's ring (Focus, Orbit), so that card reads as
+    /// one. With the ring set to the corner, it sits small at the header's
+    /// trailing edge.
     private var header: some View {
-        let centred = options.layout == .focus
+        let centred = options.layout.isPoster
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: centred ? .center : .leading, spacing: 2) {
                 Text(report.name.isEmpty ? "Daily report" : report.name)
@@ -113,13 +119,9 @@ struct ReportCardView: View {
         }
     }
 
-    /// The day's count in a ring, green once it closes.
+    /// The day's count in its ring, an arc per habit (`ReportDayRing`).
     private func ring(size: CGFloat, lineWidth: CGFloat, numeral: CGFloat) -> some View {
-        ProgressRing(
-            fraction: report.fraction,
-            lineWidth: lineWidth,
-            color: report.isPerfect ? AppColors.success : palette.accent
-        ) {
+        ReportDayRing(report: report, palette: palette, diameter: size, lineWidth: lineWidth) {
             Text("\(report.done)/\(report.expected)")
                 .font(.system(size: numeral, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(palette.ink)
@@ -127,14 +129,13 @@ struct ReportCardView: View {
                 .lineLimit(1)
                 .padding(.horizontal, lineWidth + 2)
         }
-        .frame(width: size, height: size)
     }
 
     /// The verdict, the day's share and the perfect-day streak, beside the
     /// big ring when it is on.
     private var hero: some View {
         HStack(alignment: .center, spacing: 18) {
-            if options.ring == .big {
+            if options.layout.showsRing, options.ring == .big {
                 ring(size: 100, lineWidth: 10, numeral: 26)
             }
 

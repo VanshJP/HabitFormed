@@ -195,9 +195,9 @@ struct ReportStyleEditor: View {
     }
 }
 
-/// A report layout in miniature: rows under a ring, squares under a ring,
-/// one big ring over a strip of dots, a board of days, a honeycomb, or a
-/// slip of paper.
+/// A report layout in miniature: rows under a ring, squares under a ring, a
+/// board of days, rings in rings, one big ring over a strip of dots, dots
+/// orbiting a ring, a honeycomb, or a slip of paper.
 private struct ReportLayoutSketch: View {
     let layout: ReportLayout
     let accent: Color
@@ -239,6 +239,32 @@ private struct ReportLayoutSketch: View {
                     }
                 }
             }
+        case .rings:
+            ZStack {
+                ForEach(0..<3, id: \.self) { index in
+                    let size = CGFloat(36 - index * 10)
+                    Circle()
+                        .stroke(faint, lineWidth: 3)
+                        .frame(width: size, height: size)
+                    Circle()
+                        .trim(from: 0, to: [0.85, 0.5, 0.7][index])
+                        .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: size, height: size)
+                }
+            }
+        case .orbit:
+            ZStack {
+                ring(16)
+                ForEach(0..<6, id: \.self) { index in
+                    let angle = CGFloat(index) / 6 * 2 * .pi - .pi / 2
+                    Circle()
+                        .fill(index.isMultiple(of: 2) ? accent : faint)
+                        .frame(width: 7, height: 7)
+                        .offset(x: 17 * cos(angle), y: 17 * sin(angle))
+                }
+            }
+            .frame(width: 42, height: 42)
         case .bubbles:
             VStack(spacing: -2) {
                 HStack(spacing: 3) { bubble(true); bubble(false); bubble(true) }

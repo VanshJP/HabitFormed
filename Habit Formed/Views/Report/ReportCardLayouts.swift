@@ -87,11 +87,7 @@ struct ReportFocus: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            ProgressRing(
-                fraction: report.fraction,
-                lineWidth: 14,
-                color: report.isPerfect ? AppColors.success : palette.accent
-            ) {
+            ReportDayRing(report: report, palette: palette, diameter: 170, lineWidth: 14) {
                 VStack(spacing: 2) {
                     Text("\(report.done)/\(report.expected)")
                         .font(.system(size: 44, weight: .bold, design: numerals).monospacedDigit())
@@ -104,7 +100,6 @@ struct ReportFocus: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .frame(width: 170, height: 170)
 
             VStack(spacing: 4) {
                 Text(report.verdict)
