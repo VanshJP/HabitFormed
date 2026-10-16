@@ -16,7 +16,7 @@ struct HabitActions {
 }
 
 /// The long-press menu every habit surface shares: log or undo the day shown,
-/// the timer, then edit, arrange and delete.
+/// the timer, then edit, arrange (before iOS 27) and delete.
 struct HabitContextMenu: View {
     let habit: Habit
     let selectedDate: Date
@@ -30,6 +30,7 @@ struct HabitContextMenu: View {
         if isPastDay {
             let logged = habit.isCompleted(on: selectedDate)
             Button(logged ? "Remove this day's log" : "Log this day", systemImage: logged ? "minus.circle" : "checkmark.circle") {
+                if !logged { Haptics.success() }
                 actions.togglePastDay()
             }
         } else if habit.isCompletedToday {
@@ -53,7 +54,10 @@ struct HabitContextMenu: View {
         }
         Divider()
         Button("Edit", systemImage: "pencil") { Haptics.light(); actions.edit() }
-        Button("Arrange habits", systemImage: "arrow.up.arrow.down") { Haptics.light(); actions.arrange() }
+        // On iOS 27 the habit itself lifts and moves (`TodayHabitList`).
+        if #unavailable(iOS 27) {
+            Button("Arrange habits", systemImage: "arrow.up.arrow.down") { Haptics.light(); actions.arrange() }
+        }
         Button("Delete", systemImage: "trash", role: .destructive) { Haptics.warning(); actions.requestDelete() }
     }
 }

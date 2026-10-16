@@ -45,12 +45,7 @@ struct ArrangeHabitsSheet: View {
     }
 
     private func move(from source: IndexSet, to destination: Int) {
-        var ordered = habits
-        ordered.move(fromOffsets: source, toOffset: destination)
-        for (index, habit) in ordered.enumerated() where habit.sortOrder != index {
-            habit.sortOrder = index
-        }
-        try? modelContext.save()
+        Habit.move(habits, from: source, to: destination, in: modelContext)
         Haptics.selection()
     }
 }

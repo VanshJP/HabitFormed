@@ -395,6 +395,20 @@ final class Habit {
         try? context.save()
     }
 
+    // MARK: - Order
+
+    /// Moves the habits at `offsets` to `destination` in Today's order,
+    /// writing only the places that changed. Arrange habits and a lift on
+    /// Today both go through here.
+    static func move(_ habits: [Habit], from offsets: IndexSet, to destination: Int, in context: ModelContext) {
+        var ordered = habits
+        ordered.move(fromOffsets: offsets, toOffset: destination)
+        for (index, habit) in ordered.enumerated() where habit.sortOrder != index {
+            habit.sortOrder = index
+        }
+        try? context.save()
+    }
+
     // MARK: - Schedule-aware streaks
 
     /// Consecutive-day streak. Only meaningful for `.daily`; use

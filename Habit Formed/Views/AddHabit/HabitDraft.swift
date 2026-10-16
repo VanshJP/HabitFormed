@@ -75,6 +75,19 @@ struct HabitDraft: Equatable {
 
     var canSave: Bool { !trimmedTitle.isEmpty }
 
+    /// How often and the reminder in one line, the add sheet's folded
+    /// schedule: "Every day, no reminder", "3 times a week, reminder on".
+    var summary: String {
+        let often = switch frequency {
+        case .daily: "Every day"
+        // A health goal is the week's total, not a count of days.
+        case .weekly where kind == .health: "Weekly"
+        case .weekly: weeklyTarget == 1 ? "Once a week" : "\(weeklyTarget) times a week"
+        case .interval: "Every \(intervalDays) days"
+        }
+        return often + (reminderEnabled ? ", reminder on" : ", no reminder")
+    }
+
     // MARK: - Linked changes
 
     /// Interval is a manual-swipe cadence, so it snaps back to daily when the

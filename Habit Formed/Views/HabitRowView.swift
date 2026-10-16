@@ -2,8 +2,8 @@ import SwiftUI
 
 /// One habit as a compact row for Today's Rows layout: glyph, name and
 /// status line (streak and schedule), with
-/// the way to log at the trailing end (a short slide, a timer, a health
-/// reading, or a past day's toggle). The row's corners follow the slide's
+/// the way to log at the trailing end (a short slide, a timer or a health
+/// reading; on a past day always the slide). The row's corners follow the slide's
 /// pill, so at default text sizes it is a capsule. Same gestures as a tile:
 /// tap opens the habit, slide logs, long press opens the shared menu. Done
 /// (logged on the day shown) fills the row with the habit's color, from the
@@ -97,15 +97,18 @@ struct HabitRowView: View {
 
     // MARK: - Trailing
 
-    /// The short slide, rather than one of the wider controls.
+    /// The short slide, rather than one of the wider controls. Every past
+    /// day gets it, as on a tile.
     private var usesSlide: Bool {
-        !isPastDay && habit.trackKind == .manual && habit.restingDaysLeft == nil
+        isPastDay || (habit.trackKind == .manual && habit.restingDaysLeft == nil)
     }
 
     @ViewBuilder
     private var trailing: some View {
         if isPastDay {
-            pastDayToggle
+            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding, showsLabel: false) {
+                actions.togglePastDay()
+            }
         } else {
             switch habit.trackKind {
             case .health: healthReading
@@ -126,21 +129,6 @@ struct HabitRowView: View {
                 }
             }
         }
-    }
-
-    private var pastDayToggle: some View {
-        let logged = isDone
-        return Button(action: actions.togglePastDay) {
-            Label(logged ? "Logged" : "Log", systemImage: logged ? "checkmark.circle.fill" : "plus.circle")
-                .font(.caption.weight(.semibold))
-                .symbolSwap(logged)
-                .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
-                .background(Capsule().fill(Color.white.opacity(logged ? 0.18 : 0.08)))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(GlassPressStyle())
-        .accessibilityLabel(logged ? "Logged on \(selectedDate.relativeDayName)" : "Log \(selectedDate.relativeDayName)")
     }
 
     /// Today's reading against the target, with a thin meter under it.

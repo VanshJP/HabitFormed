@@ -98,7 +98,7 @@ struct SlideToLogTrack: View {
         .frame(height: Self.trackHeight)
         .anchorPreference(key: BoundsKey.self, value: .bounds) { $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(isLogged ? "Logged today" : "Slide to log")
+        .accessibilityLabel(isLogged ? loggedLabel ?? "Logged" : "Slide to log")
         .accessibilityAddTraits(isLogged ? [] : .isButton)
         .accessibilityAction {
             guard !isLogged else { return }

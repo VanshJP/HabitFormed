@@ -443,8 +443,9 @@ struct ContentView: View {
         withMotion(AppMotion.snap) { habit.removeLog(on: Date(), in: modelContext) }
     }
 
-    /// Past days are fixed with one tap rather than a slide: a forgotten log
-    /// is the most common correction, and the toast offers the way back.
+    /// A past day logs with a slide and loses its log only from the menu,
+    /// so neither happens by accident; the toast offers the way back. The
+    /// slide or the menu plays the log's haptic.
     private func togglePastDay(_ habit: Habit) {
         let day = selectedDate
         if habit.isCompleted(on: day) {
@@ -452,7 +453,6 @@ struct ContentView: View {
             habit.removeLog(on: day, in: modelContext)
             undo = UndoLog(habit: habit, day: day, wasLogged: false)
         } else {
-            Haptics.success()
             SoundEffects.logChime()
             habit.log(on: day, in: modelContext)
             undo = UndoLog(habit: habit, day: day, wasLogged: true)

@@ -11,8 +11,9 @@ import SwiftUI
 /// - Timer: a play pill shaped like the slide
 ///
 /// Gestures: tap opens the habit's page, the slide logs today, a long press
-/// opens the context menu. On a past day the bottom row is a pill that
-/// toggles that day's log, so a forgotten day is one tap to fix.
+/// opens the context menu. On a past day every kind of habit gets the slide,
+/// for that day, so a stray tap never logs one; taking one back is the
+/// menu's "Remove this day's log".
 struct HabitTileView: View {
     let habit: Habit
     /// The day the grid is showing. Equals today in normal use.
@@ -139,7 +140,9 @@ struct HabitTileView: View {
     @ViewBuilder
     private var bottomSection: some View {
         if isPastDay {
-            pastDayPill
+            SlideToLogTrack(accent: habit.color, isLogged: isDone, progress: $fill, isSliding: $isSliding, loggedLabel: "Logged") {
+                actions.togglePastDay()
+            }
         } else {
             switch habit.trackKind {
             case .health: healthProgressView
@@ -147,29 +150,6 @@ struct HabitTileView: View {
             case .manual: manualSlide
             }
         }
-    }
-
-    /// A past day's log as a toggle: tap to add a forgotten log or remove a
-    /// wrong one. The toast on Today offers the way back.
-    private var pastDayPill: some View {
-        let logged = isDone
-        return Button(action: actions.togglePastDay) {
-            HStack(spacing: 6) {
-                Image(systemName: logged ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.footnote.weight(.semibold))
-                    .symbolSwap(logged)
-                Text(logged ? "Logged" : "Log")
-                    .font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(logged ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity, minHeight: SlideToLogTrack.trackHeight)
-            .background(
-                Capsule().fill(Color.white.opacity(logged ? 0.18 : 0.08))
-            )
-            .contentShape(Capsule())
-        }
-        .buttonStyle(GlassPressStyle())
-        .accessibilityLabel(logged ? "Logged on \(selectedDate.relativeDayName)" : "Log \(selectedDate.relativeDayName)")
     }
 
     /// Today's HealthKit reading against the target; weekly habits show the

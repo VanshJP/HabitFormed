@@ -5,7 +5,10 @@ import SwiftData
 /// and color folded away), how you log it, how often, and a reminder. A new
 /// habit opens on its name, with ideas under it that fill everything in one
 /// tap, and fills itself in from what is typed ("Read 20 min" picks the book
-/// and a 20 minute timer). Close is the X; the one solid button, pinned at
+/// and a 20 minute timer), so Return adds it. How you log it stays in view,
+/// since it is the choice that makes habits different; how often and the
+/// reminder fold into one line ("Every day, no reminder") until opened.
+/// Editing shows everything. Close is the X; the one solid button, pinned at
 /// the bottom, adds or saves. Every field lives in a `HabitDraft` that is
 /// written on save.
 struct AddHabitView: View {
@@ -21,6 +24,8 @@ struct AddHabitView: View {
     @State private var confirmDiscard = false
     @State private var isSaving = false
     @State private var showLook = false
+    /// How often and the reminder, folded for a new habit.
+    @State private var showSchedule = false
     /// The idea last tapped, so its chip stays lit while the name is its own.
     @State private var pickedIdea: String?
     /// Other habits' usual log times, for a new habit's suggested reminder.
@@ -46,8 +51,13 @@ struct AddHabitView: View {
                         }
                     }
                     HabitTrackSection(draft: $draft)
-                    HabitScheduleSection(draft: $draft)
-                    HabitReminderSection(draft: $draft, routine: routine)
+                    if habit == nil {
+                        scheduleRow
+                    }
+                    if showSchedule {
+                        HabitScheduleSection(draft: $draft)
+                        HabitReminderSection(draft: $draft, routine: routine)
+                    }
                 }
                 .padding(.horizontal, AppLayout.pageHorizontal)
                 .padding(.bottom, AppLayout.pageBottom)
@@ -66,11 +76,13 @@ struct AddHabitView: View {
                     Button(role: .close) {
                         if isDirty { confirmDiscard = true } else { dismiss() }
                     }
+                    // On the button, so the dialog grows out of the X rather
+                    // than floating over the middle of the form.
+                    .confirmationDialog("Discard your changes?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                        Button("Discard changes", role: .destructive) { dismiss() }
+                        Button("Keep editing", role: .cancel) {}
+                    }
                 }
-            }
-            .confirmationDialog("Discard your changes?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-                Button("Discard changes", role: .destructive) { dismiss() }
-                Button("Keep editing", role: .cancel) {}
             }
             .interactiveDismissDisabled(isDirty)
             .onAppear(perform: load)
@@ -103,6 +115,8 @@ struct AddHabitView: View {
                 .foregroundStyle(.white)
                 .focused($nameFocused)
                 .submitLabel(.done)
+                // The name fills in the rest, so Return adds a new habit.
+                .onSubmit { if habit == nil { save() } }
                 .inputWell(isFocused: nameFocused)
             }
             // The glyph's 44pt hit area overhangs it by 4, so its box starts
@@ -139,6 +153,37 @@ struct AddHabitView: View {
         withMotion(AppMotion.settle) { showLook.toggle() }
     }
 
+    // MARK: - How often
+
+    /// How often and the reminder as one line that opens their sections
+    /// right under it.
+    private var scheduleRow: some View {
+        Panel {
+            Button {
+                Haptics.light()
+                withMotion(AppMotion.settle) { showSchedule.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "repeat")
+                    Text(draft.summary)
+                        .contentTransition(.interpolate)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .rotationEffect(.degrees(showSchedule ? 180 : 0))
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, AppLayout.tilePadding)
+                .frame(minHeight: AppLayout.minHitTarget)
+                .contentShape(.rect)
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityLabel(draft.summary)
+            .accessibilityHint(showSchedule ? "Hides how often and the reminder" : "Shows how often and the reminder")
+        }
+    }
+
     /// A new habit's glyph and plan follow its name while typed, until the
     /// person picks their own. Editing never moves them.
     private func followName() {
@@ -156,6 +201,7 @@ struct AddHabitView: View {
         didLoad = true
         if let habit {
             draft = HabitDraft(habit: habit)
+            showSchedule = true
         } else {
             let existing = (try? modelContext.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
             draft.colorHex = HabitDraft.freshColor(after: existing.map(\.colorHex))

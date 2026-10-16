@@ -117,8 +117,9 @@ pushed from a bar-less Today it animated in on its own track, its back
 button and title trailing the page. Every pushed page wears
 `pageTopBar(_:)` instead (`PageHeader.swift`): a back button in header
 glass, the title, an optional trailing control, drawn as part of the page
-so it moves with it, and a hook that keeps the edge swipe back working with
-the bar hidden.
+so it moves with it, and a hook (`SwipeBackHook`) that keeps swiping back
+working with the bar hidden, from the edge or anywhere on the page (a swipe
+that starts on a sideways rail scrolls the rail).
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
@@ -148,8 +149,8 @@ the bar hidden.
   A tile is a watermark: its glyph at 104pt running off the top trailing
   corner (`glyphTone` at 12%, white at 12% on the fill), the name and the
   `HabitStatusLine` at the top, and at the bottom the way to log, every
-  kind of it a 44pt pill (the slide, a timer's play pill, a health meter,
-  a past day's toggle). Done today, the pill says when ("Logged 9:41 AM",
+  kind of it a 44pt pill (the slide, a timer's play pill, a health meter;
+  on a past day always the slide). Done today, the pill says when ("Logged 9:41 AM",
   `SlideToLogTrack.loggedLabel`) beside the white check. The status line leads with the streak's
   number ("3 days · 1 of 5 this week"), rounded, medium weight and a step
   under the name, and is one numeral tall even without one, so tiles in a
@@ -179,14 +180,19 @@ The rule across screens: say each fact once, keep captions for what is not
 obvious, paint only the selected choice in a grid, and prefer one line of
 text over another card.
 
-Each habit tile responds to three gestures, and so do rows. They all take one `HabitActions` and share
+Each habit tile responds to four gestures, and so do rows. They all take one `HabitActions` and share
 `HabitContextMenu`; keep it that way for new surfaces:
 
 | Gesture                  | Action                                |
 |--------------------------|---------------------------------------|
 | **Single tap**           | Open `HabitDetailView` (history + log) |
 | **Slide knob right**     | Log today in place (`SlideToLogTrack`) |
-| **Long-press**           | `contextMenu`: Log / Undo today, Start timer, Edit, Arrange, Delete |
+| **Long-press**           | `contextMenu`: Log / Undo today, Start timer, Edit, Arrange (before iOS 27), Delete |
+| **Long-press and drag**  | Move it in Today's order (iOS 27: `reorderable()` in `TodayHabitList`; the menu gives way as it lifts) |
+
+Every order change goes through `Habit.move(_:from:to:in:)`, which writes
+only the places that changed; Settings → Arrange habits uses it too and is
+the way to reorder before iOS 27.
 
 The slide-to-log knob mirrors iOS's slide-to-answer. As it travels, the
 habit's color pours out of it (a circle centred on the knob that reaches
@@ -219,9 +225,12 @@ there play the haptic only. The perfect day adds `SoundEffects.perfectDay`
 (a rolled chord on its own player) and `Haptics.celebrate` over the
 confetti. Taking back your own log is `Haptics.undo`, not a warning.
 
-When the grid shows a **past day**, the bottom row of every tile becomes a
-pill that toggles that day's log (fixing a forgotten day is one tap). The
-habit page's calendar does the same per day.
+When the grid shows a **past day**, every tile and row logs it with the
+slide, whatever its kind (a timer cannot run for yesterday), and once done
+says "Logged" with no control to tap. Taking a past day's log back is the
+long-press menu's "Remove this day's log", with the toast to undo it, so a
+stray tap never logs or unlogs a day. The
+habit page's calendar stays the deliberate way to set any day.
 
 All log writes go through `Habit.log(on:in:)` and `Habit.removeLog(on:in:)`
 so a day never holds two completions. Logs made with no window open (Siri,
@@ -251,6 +260,11 @@ the plan (`HabitDraft.Plan`: how and how often) each follow the name only
 while they still hold what it last set (`HabitDraft.follow`), so a chip the
 person taps, or an idea, makes that part theirs; editing never moves them.
 A length or count outside the chips joins them as the lit one.
+
+So Return adds a new habit. "How do you log it?" (check off, timer, Apple
+Health) stays in view, since it is what makes habits different; how often
+and the reminder fold into one line under it (`HabitDraft.summary`: "Every
+day, no reminder") that opens them in place. Editing shows everything.
 
 ### Reminders
 
