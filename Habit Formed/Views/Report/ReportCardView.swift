@@ -389,7 +389,12 @@ extension DailyReport {
             health: DayHealthMetrics(
                 steps: 11_240, activeKcal: 610, restingKcal: 1_790, eatenKcal: 1_850,
                 exerciseMinutes: 42, sleepHours: 7 + 40.0 / 60, mindfulMinutes: nil,
-                protein: 142, carbs: 180, fat: 61
+                protein: 142, carbs: 180, fat: 61,
+                exerciseKinds: [
+                    ExerciseKind(name: "Strength", minutes: 26),
+                    ExerciseKind(name: "Walk", minutes: 9),
+                    ExerciseKind(name: "Other", minutes: 7, isOther: true),
+                ]
             )
         )
     }

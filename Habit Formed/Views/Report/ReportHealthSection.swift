@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The card's Apple Health numbers, each only when picked
 /// (`ReportOptions.metrics`): calories in and out, the macros over their
-/// split, and a line of chips for steps, exercise, sleep and mindful time.
+/// split, exercise over what it went on (on a day with a workout), and a
+/// line of chips for steps, exercise, sleep and mindful time.
 /// Painted fills only, like the rest of the card, so `ImageRenderer` draws it.
 struct ReportHealthSection: View {
     let health: DayHealthMetrics
@@ -19,6 +20,9 @@ struct ReportHealthSection: View {
         Group {
             if options.shows(.calories) { calories }
             if options.shows(.macros) { macros }
+            if options.shows(.exercise), !health.exerciseKinds.isEmpty, let total = health.exerciseMinutes {
+                exercise(total: total)
+            }
             chipLine
         }
     }
@@ -67,6 +71,42 @@ struct ReportHealthSection: View {
         .background(palette.well, in: wellShape)
     }
 
+    // MARK: - Exercise
+
+    /// The day's exercise minutes, then each kind of workout they went on
+    /// with its colour ("Other" for minutes outside one) over a bar of the
+    /// split, as the macros are drawn.
+    private func exercise(total: Double) -> some View {
+        let kinds = health.exerciseKinds
+        return VStack(spacing: 12) {
+            HStack(spacing: 5) {
+                Image(systemName: ReportMetric.exercise.icon)
+                    .font(.caption2.weight(.semibold))
+                Text("\(ReportFormat.duration(minutes: total)) exercise")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(palette.ink.opacity(0.85))
+            HStack(spacing: 0) {
+                ForEach(kinds.indices, id: \.self) { index in
+                    if index > 0 { columnRule }
+                    column(kinds[index].name, ReportFormat.duration(minutes: kinds[index].minutes), dot: kindColor(kinds, index))
+                }
+            }
+            MacroSplitBar(segments: kinds.indices.map { index in
+                (share: kinds[index].minutes / max(total, 1), color: palette.dataTint(kindColor(kinds, index)))
+            })
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 12)
+        .background(palette.well, in: wellShape)
+    }
+
+    private func kindColor(_ kinds: [ExerciseKind], _ index: Int) -> Color {
+        if kinds[index].isOther { return AppColors.accent }
+        return AppColors.exerciseKinds[index % AppColors.exerciseKinds.count]
+    }
+
     // MARK: - Columns
 
     private var columnRule: some View {
@@ -88,6 +128,8 @@ struct ReportHealthSection: View {
                 }
                 Text(label)
                     .eyebrowStyle(palette.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
         .frame(maxWidth: .infinity)
@@ -108,7 +150,7 @@ struct ReportHealthSection: View {
         if options.shows(.steps), let steps = health.steps {
             chips.append(Chip(icon: ReportMetric.steps.icon, text: "\(ReportFormat.count(steps)) steps"))
         }
-        if options.shows(.exercise), let minutes = health.exerciseMinutes {
+        if options.shows(.exercise), health.exerciseKinds.isEmpty, let minutes = health.exerciseMinutes {
             chips.append(Chip(icon: ReportMetric.exercise.icon, text: "\(ReportFormat.duration(minutes: minutes)) exercise"))
         }
         if options.shows(.sleep), let hours = health.sleepHours {

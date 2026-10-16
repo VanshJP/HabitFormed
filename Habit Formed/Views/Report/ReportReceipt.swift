@@ -192,6 +192,9 @@ struct ReportReceipt: View {
         }
         if options.shows(.exercise), let minutes = health.exerciseMinutes {
             lines.append(("Exercise", ReportFormat.duration(minutes: minutes)))
+            for kind in health.exerciseKinds {
+                lines.append(("  \(kind.name)", ReportFormat.duration(minutes: kind.minutes)))
+            }
         }
         if options.shows(.sleep), let hours = health.sleepHours {
             lines.append(("Sleep", ReportFormat.duration(minutes: hours * 60)))

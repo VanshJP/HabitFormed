@@ -324,7 +324,11 @@ things out. No templates, layouts or placeholder tokens.
   (Default, Rounded, Serif, Mono), hidden habits, switches for streaks,
   notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
   exercise, sleep, mindful, calories in vs out, macros), one chip each so
-  what is picked is exactly what shows. Notes and the week's dots exist only
+  what is picked is exactly what shows. On a day with a workout, exercise
+  is drawn like the macros: the total over what it went on
+  (`DayHealthMetrics.exerciseKinds`: Health's exercise minutes inside each
+  workout, by kind, the rest as "Other"; without an Apple Watch, the
+  workouts' own lengths), at most three parts. Notes and the week's dots exist only
   in List. All in `@AppStorage` (metrics as one comma-joined
   `report.metrics`, defaulting to what the old Calories and Activity
   switches had on); the note is for one card only. `ReportStyleEditor`

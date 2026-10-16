@@ -123,6 +123,17 @@ enum AppColors {
     static let macroCarbs = Color(red: 0.749, green: 0.576, blue: 0.318)
     static let macroFat = info
 
+    // MARK: - Exercise
+
+    /// The report card's exercise split, longest kind first: the palette's
+    /// sage, copper and indigo, clear of the macros' hues so the two bars
+    /// never read as one. Minutes outside a named workout are `accent` gray.
+    static let exerciseKinds: [Color] = [
+        Color(red: 0.451, green: 0.624, blue: 0.502),
+        Color(red: 0.749, green: 0.471, blue: 0.400),
+        Color(red: 0.349, green: 0.400, blue: 0.651),
+    ]
+
     // MARK: - Glass tints
 
     /// Identity tint for a whole card or tile (rule 12: 0.06).

@@ -17,6 +17,9 @@ nonisolated struct DayHealthMetrics: Sendable, Hashable {
     var protein: Double?
     var carbs: Double?
     var fat: Double?
+    /// What the exercise minutes went on, by kind of workout. Empty on a day
+    /// without a workout.
+    var exerciseKinds: [ExerciseKind] = []
 
     static let empty = DayHealthMetrics()
 
@@ -43,6 +46,42 @@ nonisolated struct DayHealthMetrics: Sendable, Hashable {
         let total = p + c + f
         guard total > 0, total.isFinite else { return nil }
         return (p / total, c / total, f / total)
+    }
+}
+
+/// Exercise minutes spent on one kind of workout ("Strength", "Walk"), or
+/// outside any named one ("Other").
+nonisolated struct ExerciseKind: Sendable, Hashable {
+    let name: String
+    let minutes: Double
+    var isOther = false
+
+    /// The kinds longest first, at most `limit` of them: past it the shortest
+    /// fold into "Other", which comes last. With a `total`, "Other" is what
+    /// the named kinds leave of it, and kinds adding up past it (workouts
+    /// that overlap) are scaled to fit; without one it is `other`. Empty when
+    /// no named kind has a minute.
+    static func split(_ named: [String: Double], other: Double, total: Double?, limit: Int = 3) -> [ExerciseKind] {
+        var kinds = named.filter { $0.value >= 0.5 }
+            .map { ExerciseKind(name: $0.key, minutes: $0.value) }
+            .sorted { $0.minutes != $1.minutes ? $0.minutes > $1.minutes : $0.name < $1.name }
+        guard !kinds.isEmpty else { return [] }
+        let covered = kinds.reduce(0) { $0 + $1.minutes }
+        var rest = other
+        if let total {
+            if covered > total, covered > 0 {
+                kinds = kinds.map { ExerciseKind(name: $0.name, minutes: $0.minutes * total / covered) }
+            }
+            rest = max(total - covered, 0)
+        }
+        let room = rest >= 0.5 ? limit - 1 : limit
+        if kinds.count > room {
+            let keep = max(limit - 1, 1)
+            rest += kinds.dropFirst(keep).reduce(0) { $0 + $1.minutes }
+            kinds = Array(kinds.prefix(keep))
+        }
+        if rest >= 0.5 { kinds.append(ExerciseKind(name: "Other", minutes: rest, isOther: true)) }
+        return kinds
     }
 }
 
@@ -128,6 +167,7 @@ final class HealthKitService {
         for id in qtypes {
             if let t = HKQuantityType.quantityType(forIdentifier: id) { set.insert(t) }
         }
+        set.insert(HKObjectType.workoutType())
         return set
     }
 
@@ -174,7 +214,89 @@ final class HealthKitService {
            seconds > 0 {
             metrics.mindfulMinutes = seconds / 60
         }
+        metrics.exerciseKinds = await exerciseKinds(total: metrics.exerciseMinutes, start: start, end: end)
+        // Without an Apple Watch Health counts no exercise minutes, so the
+        // workouts' own lengths make the total.
+        if metrics.exerciseMinutes == nil, !metrics.exerciseKinds.isEmpty {
+            metrics.exerciseMinutes = metrics.exerciseKinds.reduce(0) { $0 + $1.minutes }
+        }
         return metrics
+    }
+
+    /// The day's exercise minutes by kind of workout: what Health counted as
+    /// exercise during each one, with the rest as "Other". Without exercise
+    /// minutes, each workout's own length. Empty on a day without a workout.
+    private func exerciseKinds(total: Double?, start: Date, end: Date) async -> [ExerciseKind] {
+        guard let workouts = await workouts(start: start, end: end), !workouts.isEmpty else { return [] }
+        let exercise = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime)
+        var named: [String: Double] = [:]
+        var other = 0.0
+        for workout in workouts {
+            var minutes = workout.minutes
+            if total != nil, let exercise {
+                minutes = await sumQuantity(type: exercise, unit: .minute(), start: workout.start, end: workout.end) ?? 0
+            }
+            if let name = workout.name {
+                named[name, default: 0] += minutes
+            } else {
+                other += minutes
+            }
+        }
+        return ExerciseKind.split(named, other: other, total: total)
+    }
+
+    /// One workout as plain values, so it can leave HealthKit's callback.
+    private nonisolated struct Workout: Sendable {
+        let name: String?
+        let start: Date
+        let end: Date
+        let minutes: Double
+    }
+
+    private func workouts(start: Date, end: Date) async -> [Workout]? {
+        await withCheckedContinuation { cont in
+            let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+            let q = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                guard error == nil, let samples else { cont.resume(returning: nil); return }
+                let workouts = samples.compactMap { $0 as? HKWorkout }.map {
+                    Workout(name: Self.name(of: $0.workoutActivityType), start: $0.startDate, end: $0.endDate, minutes: $0.duration / 60)
+                }
+                cont.resume(returning: workouts)
+            }
+            store.execute(q)
+        }
+    }
+
+    /// A short name for a kind of workout, or nil for one that counts as
+    /// "Other". Kinds alike share a name, so two strength sessions are one.
+    nonisolated private static func name(of type: HKWorkoutActivityType) -> String? {
+        switch type {
+        case .traditionalStrengthTraining, .functionalStrengthTraining: return "Strength"
+        case .walking: return "Walk"
+        case .running: return "Run"
+        case .cycling, .handCycling: return "Cycle"
+        case .swimming: return "Swim"
+        case .hiking: return "Hike"
+        case .yoga: return "Yoga"
+        case .pilates: return "Pilates"
+        case .highIntensityIntervalTraining: return "HIIT"
+        case .coreTraining: return "Core"
+        case .mixedCardio, .crossTraining, .jumpRope: return "Cardio"
+        case .elliptical: return "Elliptical"
+        case .rowing: return "Rowing"
+        case .stairClimbing, .stairs, .stepTraining: return "Stairs"
+        case .flexibility, .preparationAndRecovery, .cooldown: return "Stretch"
+        case .socialDance, .cardioDance: return "Dance"
+        case .boxing, .kickboxing, .martialArts: return "Combat"
+        case .climbing: return "Climb"
+        case .tennis, .pickleball, .badminton, .squash, .racquetball, .tableTennis: return "Racket"
+        case .basketball: return "Basketball"
+        case .soccer: return "Soccer"
+        case .golf: return "Golf"
+        case .mindAndBody, .taiChi: return "Mind and body"
+        case .downhillSkiing, .crossCountrySkiing, .snowboarding: return "Snow"
+        default: return nil
+        }
     }
 
     // MARK: - Readings
