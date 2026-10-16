@@ -20,8 +20,27 @@ nonisolated struct DayHealthMetrics: Sendable, Hashable {
     /// What the exercise minutes went on, by kind of workout. Empty on a day
     /// without a workout.
     var exerciseKinds: [ExerciseKind] = []
+    /// The night's sleep, from falling asleep to waking (`mainSleep`).
+    var sleepSpan: DateInterval?
+    /// When each of the day's workouts ran.
+    var workoutSpans: [DateInterval] = []
 
     static let empty = DayHealthMetrics()
+
+    /// The night's sleep as one span: asleep samples less than an hour apart
+    /// join, and the stretch with the most sleep wins, so a nap stays out.
+    static func mainSleep(_ spans: [DateInterval]) -> DateInterval? {
+        var stretches: [(span: DateInterval, asleep: TimeInterval)] = []
+        for span in spans.sorted(by: { $0.start < $1.start }) {
+            if let last = stretches.last, span.start.timeIntervalSince(last.span.end) < 3600 {
+                let joined = DateInterval(start: last.span.start, end: max(last.span.end, span.end))
+                stretches[stretches.count - 1] = (joined, last.asleep + span.duration)
+            } else {
+                stretches.append((span, span.duration))
+            }
+        }
+        return stretches.max { $0.asleep < $1.asleep }?.span
+    }
 
     /// Active plus resting energy. Nil only when Health has neither.
     var burnedKcal: Double? {
@@ -205,16 +224,19 @@ final class HealthKitService {
         metrics.fat = await quantity(.dietaryFatTotal, .gram())
 
         if let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
-           let seconds = await sumSleepAsleep(type: type, start: sleepStart, end: sleepEnd),
-           seconds > 0 {
-            metrics.sleepHours = seconds / 3600
+           let spans = await asleepSpans(type: type, start: sleepStart, end: sleepEnd) {
+            let seconds = spans.reduce(0) { $0 + $1.duration }
+            if seconds > 0 { metrics.sleepHours = seconds / 3600 }
+            metrics.sleepSpan = DayHealthMetrics.mainSleep(spans)
         }
         if let type = HKCategoryType.categoryType(forIdentifier: .mindfulSession),
            let seconds = await sumCategoryDuration(type: type, start: start, end: end),
            seconds > 0 {
             metrics.mindfulMinutes = seconds / 60
         }
-        metrics.exerciseKinds = await exerciseKinds(total: metrics.exerciseMinutes, start: start, end: end)
+        let dayWorkouts = await workouts(start: start, end: end) ?? []
+        metrics.workoutSpans = dayWorkouts.map { DateInterval(start: $0.start, end: max($0.end, $0.start)) }
+        metrics.exerciseKinds = await exerciseKinds(of: dayWorkouts, total: metrics.exerciseMinutes)
         // Without an Apple Watch Health counts no exercise minutes, so the
         // workouts' own lengths make the total.
         if metrics.exerciseMinutes == nil, !metrics.exerciseKinds.isEmpty {
@@ -226,8 +248,8 @@ final class HealthKitService {
     /// The day's exercise minutes by kind of workout: what Health counted as
     /// exercise during each one, with the rest as "Other". Without exercise
     /// minutes, each workout's own length. Empty on a day without a workout.
-    private func exerciseKinds(total: Double?, start: Date, end: Date) async -> [ExerciseKind] {
-        guard let workouts = await workouts(start: start, end: end), !workouts.isEmpty else { return [] }
+    private func exerciseKinds(of workouts: [Workout], total: Double?) async -> [ExerciseKind] {
+        guard !workouts.isEmpty else { return [] }
         let exercise = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime)
         var named: [String: Double] = [:]
         var other = 0.0
@@ -529,6 +551,12 @@ final class HealthKitService {
     }
 
     private func sumSleepAsleep(type: HKCategoryType, start: Date, end: Date) async -> Double? {
+        await asleepSpans(type: type, start: start, end: end)?.reduce(0) { $0 + $1.duration }
+    }
+
+    /// Each asleep sample's span (core, deep, REM or unspecified), or nil
+    /// when Health has no answer.
+    private func asleepSpans(type: HKCategoryType, start: Date, end: Date) async -> [DateInterval]? {
         await withCheckedContinuation { cont in
             let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
             let q = HKSampleQuery(sampleType: type, predicate: pred, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
@@ -539,11 +567,11 @@ final class HealthKitService {
                     HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
                     HKCategoryValueSleepAnalysis.asleepREM.rawValue,
                 ]
-                let total = samples
+                let spans = samples
                     .compactMap { $0 as? HKCategorySample }
-                    .filter { asleepValues.contains($0.value) }
-                    .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
-                cont.resume(returning: total)
+                    .filter { asleepValues.contains($0.value) && $0.endDate > $0.startDate }
+                    .map { DateInterval(start: $0.startDate, end: $0.endDate) }
+                cont.resume(returning: spans)
             }
             store.execute(q)
         }

@@ -18,6 +18,10 @@ nonisolated struct DailyReport: Sendable, Hashable {
         let note: String?
         /// The 7 days ending on the report day, oldest first.
         let week: [Bool]
+        /// When the day's log was made, for a done habit.
+        var loggedAt: Date? = nil
+        /// A Health habit's reading against its goal, 0 to 1.
+        var progress: Double? = nil
 
         var isDone: Bool { status == .done }
     }
@@ -83,5 +87,52 @@ nonisolated enum ReportFormat {
     static func grams(_ value: Double?) -> String {
         guard let value else { return "n/a" }
         return "\(value.safeRounded) g"
+    }
+}
+
+// MARK: - Health lines
+
+/// One Apple Health number as a label and its value ("Sleep", "7h 44m"), for
+/// the layouts that print numbers as lines rather than wells.
+nonisolated struct HealthLine: Sendable, Hashable {
+    let label: String
+    let value: String
+    /// A part of the line above it: a kind of workout under Exercise.
+    var isPart = false
+}
+
+nonisolated extension DayHealthMetrics {
+    /// The picked numbers Health has for the day, as lines. A number Health
+    /// does not have is left out: a line reading "n/a" looks like a misprint.
+    func lines(showing metrics: Set<ReportMetric>) -> [HealthLine] {
+        var lines: [HealthLine] = []
+        if metrics.contains(.steps), let steps {
+            lines.append(HealthLine(label: "Steps", value: ReportFormat.count(steps)))
+        }
+        if metrics.contains(.exercise), let exerciseMinutes {
+            lines.append(HealthLine(label: "Exercise", value: ReportFormat.duration(minutes: exerciseMinutes)))
+            for kind in exerciseKinds {
+                lines.append(HealthLine(label: kind.name, value: ReportFormat.duration(minutes: kind.minutes), isPart: true))
+            }
+        }
+        if metrics.contains(.sleep), let sleepHours {
+            lines.append(HealthLine(label: "Sleep", value: ReportFormat.duration(minutes: sleepHours * 60)))
+        }
+        if metrics.contains(.mindful), let mindfulMinutes {
+            lines.append(HealthLine(label: "Mindful", value: ReportFormat.duration(minutes: mindfulMinutes)))
+        }
+        if metrics.contains(.calories) {
+            if let eatenKcal { lines.append(HealthLine(label: "Eaten", value: ReportFormat.kcal(eatenKcal))) }
+            if let burnedKcal { lines.append(HealthLine(label: "Burned", value: ReportFormat.kcal(burnedKcal))) }
+            if let netKcal {
+                lines.append(HealthLine(label: netKcal <= 0 ? "Deficit" : "Surplus", value: ReportFormat.signedKcal(netKcal)))
+            }
+        }
+        if metrics.contains(.macros) {
+            if let protein { lines.append(HealthLine(label: "Protein", value: ReportFormat.grams(protein))) }
+            if let carbs { lines.append(HealthLine(label: "Carbs", value: ReportFormat.grams(carbs))) }
+            if let fat { lines.append(HealthLine(label: "Fat", value: ReportFormat.grams(fat))) }
+        }
+        return lines
     }
 }

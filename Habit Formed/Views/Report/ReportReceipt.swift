@@ -18,7 +18,7 @@ struct ReportReceipt: View {
 
     var body: some View {
         let shown = Array(report.items.prefix(ReportCardView.maxItems))
-        let health = healthLines
+        let health = report.health.lines(showing: options.metrics)
 
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -37,7 +37,7 @@ struct ReportReceipt: View {
             rule
             VStack(spacing: 6) {
                 amount("Habits done", "\(report.done)/\(report.expected)")
-                ForEach(health, id: \.label) { amount($0.label, $0.value) }
+                ForEach(health, id: \.self) { amount($0.isPart ? "  \($0.label)" : $0.label, $0.value) }
             }
             rule
             HStack {
@@ -177,39 +177,6 @@ struct ReportReceipt: View {
             parts.append("Streak \(item.streak) \(item.streakUnit)")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    /// The picked Apple Health numbers Health has for the day, as line
-    /// items: a line reading "n/a" would look like a misprint.
-    private var healthLines: [(label: String, value: String)] {
-        let health = report.health
-        var lines: [(label: String, value: String)] = []
-        if options.shows(.steps), let steps = health.steps {
-            lines.append(("Steps", ReportFormat.count(steps)))
-        }
-        if options.shows(.exercise), let minutes = health.exerciseMinutes {
-            lines.append(("Exercise", ReportFormat.duration(minutes: minutes)))
-            for kind in health.exerciseKinds {
-                lines.append(("  \(kind.name)", ReportFormat.duration(minutes: kind.minutes)))
-            }
-        }
-        if options.shows(.sleep), let hours = health.sleepHours {
-            lines.append(("Sleep", ReportFormat.duration(minutes: hours * 60)))
-        }
-        if options.shows(.mindful), let minutes = health.mindfulMinutes {
-            lines.append(("Mindful", ReportFormat.duration(minutes: minutes)))
-        }
-        if options.shows(.calories) {
-            if let eaten = health.eatenKcal { lines.append(("Eaten", ReportFormat.kcal(eaten))) }
-            if let burned = health.burnedKcal { lines.append(("Burned", ReportFormat.kcal(burned))) }
-            if let net = health.netKcal { lines.append((net <= 0 ? "Deficit" : "Surplus", ReportFormat.signedKcal(net))) }
-        }
-        if options.shows(.macros) {
-            if let protein = health.protein { lines.append(("Protein", ReportFormat.grams(protein))) }
-            if let carbs = health.carbs { lines.append(("Carbs", ReportFormat.grams(carbs))) }
-            if let fat = health.fat { lines.append(("Fat", ReportFormat.grams(fat))) }
-        }
-        return lines
     }
 }
 

@@ -91,6 +91,33 @@ enum AppColors {
     static let macroCarbs = Color(red: 0.749, green: 0.576, blue: 0.318)
     static let macroFat = info
 
+    // MARK: - Report papers
+
+    /// The grounds and inks of the report layouts that are things of their
+    /// own (`ReportLayout.ownsLook`): each prints the same whatever the
+    /// card's background, like a real front page, card or envelope would.
+    static let newsprint = Color(red: 0.925, green: 0.918, blue: 0.890)    // #ECEAE3
+    static let newsInk = Color(red: 0.082, green: 0.078, blue: 0.071)      // #151412
+    static let newsRed = Color(red: 0.639, green: 0.133, blue: 0.106)      // #A3221B
+    static let kraft = Color(red: 0.851, green: 0.769, blue: 0.608)        // #D9C49B
+    static let kraftInk = Color(red: 0.173, green: 0.141, blue: 0.078)     // #2C2414
+    static let kraftRule = Color(red: 0.431, green: 0.353, blue: 0.208)    // #6E5A35
+    static let table = Color(red: 0.106, green: 0.098, blue: 0.086)        // #1B1916
+    static let tableInk = Color(red: 0.914, green: 0.886, blue: 0.827)     // #E9E2D3
+    static let nightSky = Color(red: 0.039, green: 0.059, blue: 0.133)     // #0A0F22
+    static let starlight = Color(red: 0.933, green: 0.945, blue: 0.973)    // #EEF1F8
+    static let envelope = Color(red: 0.863, green: 0.898, blue: 0.933)     // #DCE5EE
+    static let envelopeInk = Color(red: 0.114, green: 0.141, blue: 0.200)  // #1D2433
+    static let airmailRed = Color(red: 0.718, green: 0.196, blue: 0.165)   // #B7322A
+    static let airmailBlue = Color(red: 0.184, green: 0.306, blue: 0.549)  // #2F4E8C
+    static let stampPaper = Color(red: 1.000, green: 0.992, blue: 0.973)   // #FFFDF8
+
+    // MARK: - Garden
+
+    /// The Garden report's stems and leaves: the palette's sage, so the
+    /// greenery reads as ground, not as one more habit.
+    static let leaf = Color(red: 0.451, green: 0.624, blue: 0.502)
+
     // MARK: - Exercise
 
     /// The report card's exercise split, longest kind first: the palette's

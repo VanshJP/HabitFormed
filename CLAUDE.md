@@ -62,7 +62,7 @@ Habit Formed/
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
 │                             #   HabitGuess, ReportOptions (+ ReportTheme)
 ├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
-│                             #   renderer, share, Messages, HabitInsights, OnDeviceModel
+│                             #   renderer, share, Messages, HabitInsights, OnDeviceModel, ReportHeadline
 ├── Intents/                  # Siri: HabitEntity, LogHabitTodayIntent, AddHabitIntent, TodayStatusIntent,
 │                             #   HabitShortcuts
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
@@ -77,7 +77,9 @@ Habit Formed/
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
     ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportWeekBoard,
     │                         #   ReportBubbles, ReportReceipt, ReportHealthSection,
-    │                         #   ReportRingLayouts: the day ring, Rings, Orbit),
+    │                         #   ReportRingLayouts: the day ring, Rings, Orbit, ReportSundial, ReportGarden,
+    │                         #   and the ones with a look of their own: ReportFrontPage, ReportPunchCard,
+    │                         #   ReportConstellation, ReportStamps),
     │                         #   ReportStyleEditor, MacroFieldsRow,
     │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
     │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
@@ -317,12 +319,34 @@ things out. No templates, layouts or placeholder tokens.
   habit from the outside in, seven arcs each, named beside it in ring
   order, Focus: one big ring and a strip of glyphs, Orbit: the day's ring
   with each habit a circle on an orbit round it, sized by its streak,
+  Sundial: a 24-hour dial, midnight at the top, each log a bead at its
+  time named along a spoke (spokes closer than 45 minutes fan apart with a
+  hairline back), the night's sleep (`DayHealthMetrics.sleepSpan`, the
+  longest stretch, so a nap stays out) and workouts (`workoutSpans`) as rim
+  bands while the card shows them, a hand at now on today's, Garden: a plant
+  per habit, a leaf per step of its run (four at most), a bloom once done,
+  a bud while open filled to a Health habit's `progress`, Constellation: a
+  night sky, done stars joined in the order logged (`Item.loggedAt`), dashed
+  on through the dark ones, three to a row winding back and forth,
   Bubbles: a honeycomb of circles that fill when done (rows of one or three
   take turns with rows of two, `ReportBubbles.rowPlan`, so no row lands on
-  the one above; seven is 2, 3, 2), or Receipt: a
+  the one above; seven is 2, 3, 2), Front page: "The Daily Habit", its
+  headline and the line under it written from the numbers by
+  `ReportHeadline` (no model), done and still open in two columns, "By the
+  numbers", a ticker of runs, Punch card: a kraft card on a dark table, a
+  hole punched through per day logged in the last week, Stamps: a stamp per
+  habit on an airmail envelope, postmarked once done, Health as a customs
+  declaration, or Receipt: a
   torn paper slip in monospaced capitals, habits on dotted leaders, totals
   and Health numbers as line items, a barcode; the image sent is the slip
-  alone, 340pt, clear around its torn edges, with no card or canvas), a
+  alone, 340pt, clear around its torn edges, with no card or canvas).
+  Front page, Punch card, Constellation, Stamps and Receipt are things of
+  their own (`ReportLayout.ownsLook`): the whole image, in their own paper,
+  ink and type from `AppColors` (Report papers) and iOS's own faces (Didot,
+  Courier, Futura, Baskerville, Bodoni), so the editor hides Background
+  and Type for them (and Accent, but for the receipt's mark); they print
+  Health as lines (`DayHealthMetrics.lines(showing:)`, shared with the
+  receipt). Then
   `ReportRing` for the layouts with a ring beside the verdict (Big, Corner:
   small at the header's trailing edge, or Off). Every card's day ring is
   `ReportDayRing`: an arc per expected habit, in its colour once done, done
@@ -345,7 +369,8 @@ things out. No templates, layouts or placeholder tokens.
   panel: your name, kept for every card and recap, then a band of chips
   each for habits, details and Health numbers, 10pt apart either way), the
   look follows (layout as a 3-wide `SketchPicker` with the Ring chips under
-  it, background, accent, type).
+  it, background, accent, type, the last three only where the layout uses
+  them).
 - `DailyReportBuilder` turns habits + options into a `DailyReport` value;
   `ReportCardView` draws it at a fixed 390pt width with painted fills only
   (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink

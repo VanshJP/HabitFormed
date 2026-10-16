@@ -81,8 +81,20 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     case focus
     /// The day's ring with each habit on an orbit round it.
     case orbit
+    /// A 24-hour dial: each log at its time, sleep and workouts as bands.
+    case sundial
+    /// A plant per habit: a leaf per day of its run, a bloom once done.
+    case garden
+    /// A night sky: each done habit a star, joined in the order logged.
+    case constellation
     /// A circle per habit in a honeycomb, filled once done.
     case bubbles
+    /// The day as a newspaper's front page, its headline written from it.
+    case frontPage
+    /// A loyalty card: a row per habit, a hole punched per day done.
+    case punchCard
+    /// A stamp per habit on an airmail envelope, postmarked once done.
+    case stamps
     /// A paper slip: a line per habit, the day's totals and a barcode.
     case receipt
 
@@ -96,6 +108,12 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
         case .week: return "Week"
         case .rings: return "Rings"
         case .orbit: return "Orbit"
+        case .sundial: return "Sundial"
+        case .garden: return "Garden"
+        case .constellation: return "Constellation"
+        case .frontPage: return "Front page"
+        case .punchCard: return "Punch card"
+        case .stamps: return "Stamps"
         case .bubbles: return "Bubbles"
         case .receipt: return "Receipt"
         }
@@ -107,10 +125,22 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     /// Focus and Orbit stand alone as one poster under a centred header.
     var isPoster: Bool { self == .focus || self == .orbit }
 
+    /// The layouts that are a thing of their own (a front page, a punch card,
+    /// a night sky, an envelope, a receipt): the whole image, with their own
+    /// paper, ink and type, so the card's background, accent and type do not
+    /// reach them.
+    var ownsLook: Bool {
+        switch self {
+        case .frontPage, .punchCard, .constellation, .stamps, .receipt: return true
+        default: return false
+        }
+    }
+
     /// The layouts with a ring beside the verdict, which `ReportRing` can
     /// shrink to the corner or leave off. Focus and Orbit are their ring,
-    /// Rings counts the day in its middle, and the receipt prints it.
-    var showsRing: Bool { !isPoster && self != .rings && self != .receipt }
+    /// Rings and Sundial count the day in their middle, and the layouts with
+    /// a look of their own print it their way.
+    var showsRing: Bool { !isPoster && !ownsLook && self != .rings && self != .sundial }
 }
 
 // MARK: - Report Ring

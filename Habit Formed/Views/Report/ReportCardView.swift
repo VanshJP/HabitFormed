@@ -7,9 +7,10 @@ import SwiftUI
 /// with `ImageRenderer`, so it uses painted fills only (no glass).
 ///
 /// Fixed at `width` points with Dynamic Type pinned, so the card looks the
-/// same on every phone it is forwarded to. The receipt is the exception: it
-/// is the slip alone at `receiptWidth`, with nothing behind it, so the image
-/// sent is just the receipt.
+/// same on every phone it is forwarded to. The layouts that are things of
+/// their own (`ReportLayout.ownsLook`) are the whole image instead: the front
+/// page, the punch card, the night sky and the envelope at `width`, and the
+/// receipt, the slip alone at `receiptWidth` with nothing behind it.
 struct ReportCardView: View {
     let report: DailyReport
     let options: ReportOptions
@@ -29,12 +30,21 @@ struct ReportCardView: View {
 
     var body: some View {
         Group {
-            if options.layout == .receipt {
+            switch options.layout {
+            case .receipt:
                 // The slip is the whole image: its own header, Health lines,
                 // note and mark, and no card or canvas behind it.
                 ReportReceipt(report: report, options: options)
                     .frame(width: Self.receiptWidth)
-            } else {
+            case .frontPage:
+                ReportFrontPage(report: report, options: options)
+            case .punchCard:
+                ReportPunchCard(report: report, options: options)
+            case .constellation:
+                ReportConstellation(report: report, options: options)
+            case .stamps:
+                ReportStamps(report: report, options: options)
+            default:
                 card
             }
         }
@@ -88,10 +98,17 @@ struct ReportCardView: View {
         case .rings:
             hero
             ReportRings(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
+        case .sundial:
+            hero
+            ReportSundial(report: report, options: options, palette: palette)
+        case .garden:
+            hero
+            ReportGarden(report: report, palette: palette)
         case .bubbles:
             hero
             ReportBubbles(items: report.items, palette: palette, showStreaks: options.showStreaks)
-        case .receipt:
+        case .frontPage, .punchCard, .constellation, .stamps, .receipt:
+            // Drawn whole in `body`.
             EmptyView()
         }
     }
@@ -356,11 +373,12 @@ struct HabitFormedMark: View {
 extension DailyReport {
     /// A filled-in report for previews.
     static var sample: DailyReport {
-        func item(_ title: String, _ symbol: String, _ hex: String, _ status: DayStatus, _ detail: String?, _ streak: Int, note: String? = nil) -> Item {
+        func item(_ title: String, _ symbol: String, _ hex: String, _ status: DayStatus, _ detail: String?, _ streak: Int, note: String? = nil, at hour: Int? = nil) -> Item {
             Item(
                 id: UUID(), title: title, symbol: symbol, colorHex: hex, status: status,
                 detail: detail, streak: streak, streakUnit: streak == 1 ? "day" : "days", note: note,
-                week: [true, true, false, true, true, true, status == .done]
+                week: [true, true, false, true, true, true, status == .done],
+                loggedAt: hour.flatMap { Calendar.current.date(bySettingHour: $0, minute: 10, second: 0, of: Date()) }
             )
         }
         return DailyReport(
@@ -368,9 +386,9 @@ extension DailyReport {
             isToday: true,
             name: "Vansh",
             items: [
-                item("Read", "book.fill", "#5966A6", .done, nil, 12, note: "Finished chapter 4"),
-                item("Practice piano", "pianokeys", "#8C5C84", .done, "30 min", 5),
-                item("10k steps", "figure.walk", "#2BA8A8", .done, "11.2k of 10k steps", 3),
+                item("Read", "book.fill", "#5966A6", .done, nil, 12, note: "Finished chapter 4", at: 7),
+                item("Practice piano", "pianokeys", "#8C5C84", .done, "30 min", 5, at: 13),
+                item("10k steps", "figure.walk", "#2BA8A8", .done, "11.2k of 10k steps", 3, at: 18),
                 item("Meditate", "brain.head.profile", "#739F80", .open, "10 min", 0),
                 item("Workout", "dumbbell.fill", "#BF7866", .flexible, "2/4 this week", 2),
             ],

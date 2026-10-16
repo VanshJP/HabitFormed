@@ -63,6 +63,13 @@ enum DailyReportBuilder {
         let entry = habit.completion(on: day)
         let note = entry?.note.trimmingCharacters(in: .whitespacesAndNewlines)
         let week = Date.trailingDays(7, endingOn: day).map { track.logDays.contains($0) }
+        let reading = healthReading(
+            for: habit,
+            isToday: isToday,
+            loggedValue: entry?.value,
+            liveValues: liveValues,
+            liveWeeklyValues: liveWeeklyValues
+        )
 
         return DailyReport.Item(
             id: habit.id,
@@ -70,21 +77,29 @@ enum DailyReportBuilder {
             symbol: habit.symbol,
             colorHex: habit.colorHex,
             status: status,
-            detail: detail(
-                for: habit,
-                track: track,
-                status: status,
-                day: day,
-                isToday: isToday,
-                loggedValue: entry?.value,
-                liveValues: liveValues,
-                liveWeeklyValues: liveWeeklyValues
-            ),
+            detail: detail(for: habit, track: track, status: status, day: day, reading: reading),
             streak: streak,
             streakUnit: habit.streakUnit(for: streak),
             note: (note?.isEmpty ?? true) ? nil : note,
-            week: week
+            week: week,
+            loggedAt: entry?.loggedAt,
+            progress: reading.map { habit.targetValue > 0 ? min(max($0 / habit.targetValue, 0), 1) : 0 }
         )
+    }
+
+    /// A Health habit's number for the day: today's live reading, or the
+    /// value its log kept for a past day. Nil for other habits.
+    private static func healthReading(
+        for habit: Habit,
+        isToday: Bool,
+        loggedValue: Double?,
+        liveValues: [String: Double],
+        liveWeeklyValues: [String: Double]
+    ) -> Double? {
+        guard habit.source != .none else { return nil }
+        let key = habit.source.rawValue
+        let live = isToday ? (habit.frequency == .weekly ? liveWeeklyValues[key] : liveValues[key]) : nil
+        return live ?? loggedValue
     }
 
     private static func detail(
@@ -92,20 +107,13 @@ enum DailyReportBuilder {
         track: HabitTrack,
         status: DayStatus,
         day: Date,
-        isToday: Bool,
-        loggedValue: Double?,
-        liveValues: [String: Double],
-        liveWeeklyValues: [String: Double]
+        reading: Double?
     ) -> String? {
         if habit.source != .none {
-            let weekly = habit.frequency == .weekly
-            let live = isToday
-                ? (weekly ? liveWeeklyValues[habit.source.rawValue] : liveValues[habit.source.rawValue])
-                : nil
-            guard let value = live ?? loggedValue else {
+            guard let value = reading else {
                 return status == .done ? nil : "Under target"
             }
-            let range = weekly ? " this week" : ""
+            let range = habit.frequency == .weekly ? " this week" : ""
             return "\(habit.source.compactValue(value)) of \(habit.source.compactValue(habit.targetValue))\(habit.source.compactUnit)\(range)"
         }
 

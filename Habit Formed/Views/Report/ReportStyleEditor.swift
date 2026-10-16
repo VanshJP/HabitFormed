@@ -52,26 +52,39 @@ struct ReportStyleEditor: View {
                     }
                 }
             }
-            GlassSection("Background") {
-                ReportThemeRow(themeRaw: $themeRaw)
+            // A layout with a look of its own (a front page, an envelope)
+            // prints the same whatever these say; the receipt's store mark
+            // still takes the accent.
+            if !layout.ownsLook {
+                GlassSection("Background") {
+                    ReportThemeRow(themeRaw: $themeRaw)
+                }
             }
-            GlassSection("Accent") {
-                Panel { accentGrid }
+            if !layout.ownsLook || layout == .receipt {
+                GlassSection("Accent") {
+                    Panel { accentGrid }
+                }
             }
-            GlassSection("Type") {
-                GlassEffectContainer(spacing: 8) {
-                    FlowLayout.chips {
-                        ForEach(ReportFont.allCases) { font in
-                            ChoiceChip(title: font.title, isSelected: fontRaw == font.rawValue) {
-                                fontRaw = font.rawValue
-                            }
-                            .fontDesign(font.design)
+            if !layout.ownsLook {
+                typeSection
+            }
+        }
+        .motion(AppMotion.settle, value: layoutRaw)
+    }
+
+    private var typeSection: some View {
+        GlassSection("Type") {
+            GlassEffectContainer(spacing: 8) {
+                FlowLayout.chips {
+                    ForEach(ReportFont.allCases) { font in
+                        ChoiceChip(title: font.title, isSelected: fontRaw == font.rawValue) {
+                            fontRaw = font.rawValue
                         }
+                        .fontDesign(font.design)
                     }
                 }
             }
         }
-        .motion(AppMotion.settle, value: layoutRaw)
     }
 
     // MARK: - Accent
@@ -197,7 +210,8 @@ struct ReportStyleEditor: View {
 
 /// A report layout in miniature: rows under a ring, squares under a ring, a
 /// board of days, rings in rings, one big ring over a strip of dots, dots
-/// orbiting a ring, a honeycomb, or a slip of paper.
+/// orbiting a ring, a dial, stems in a row, joined stars, a honeycomb, a
+/// front page, a punch card, stamps, or a slip of paper.
 private struct ReportLayoutSketch: View {
     let layout: ReportLayout
     let accent: Color
@@ -265,6 +279,104 @@ private struct ReportLayoutSketch: View {
                 }
             }
             .frame(width: 42, height: 42)
+        case .sundial:
+            ZStack {
+                Circle()
+                    .stroke(faint, lineWidth: 3)
+                Circle()
+                    .trim(from: 0.92, to: 1)
+                    .stroke(accent.opacity(0.6), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                ForEach([0.3, 0.42, 0.55, 0.78], id: \.self) { (fraction: Double) in
+                    let angle = fraction * 2 * .pi - .pi / 2
+                    Circle()
+                        .fill(accent)
+                        .frame(width: 6, height: 6)
+                        .offset(x: 20 * cos(angle), y: 20 * sin(angle))
+                }
+            }
+            .frame(width: 40, height: 40)
+        case .garden:
+            let plants: [(height: CGFloat, done: Bool)] = [(22, true), (12, false), (28, true), (18, true)]
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(plants.indices, id: \.self) { index in
+                    VStack(spacing: 0) {
+                        Circle()
+                            .fill(plants[index].done ? accent : faint)
+                            .frame(width: 8, height: 8)
+                        Capsule()
+                            .fill(faint)
+                            .frame(width: 2, height: plants[index].height)
+                    }
+                }
+            }
+            .overlay(alignment: .bottom) { Capsule().fill(faint).frame(width: 50, height: 2) }
+        case .constellation:
+            let stars: [CGPoint] = [CGPoint(x: 6, y: 30), CGPoint(x: 18, y: 12), CGPoint(x: 33, y: 22), CGPoint(x: 46, y: 6)]
+            ZStack(alignment: .topLeading) {
+                Path { path in path.addLines(Array(stars.prefix(3))) }
+                    .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                Path { path in path.addLines(Array(stars.suffix(2))) }
+                    .stroke(Color.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                ForEach(stars.indices, id: \.self) { index in
+                    Circle()
+                        .fill(index < 3 ? accent : faint)
+                        .frame(width: index < 3 ? 7 : 5, height: index < 3 ? 7 : 5)
+                        .position(stars[index])
+                }
+            }
+            .frame(width: 52, height: 36)
+        case .frontPage:
+            VStack(alignment: .leading, spacing: 3) {
+                Capsule().fill(AppColors.newsInk).frame(width: 30, height: 4)
+                Rectangle().fill(AppColors.newsInk).frame(height: 1.5)
+                HStack(alignment: .top, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2.5) {
+                        ForEach([1, 0.7, 0.85], id: \.self) { (share: Double) in
+                            Capsule().fill(AppColors.newsInk.opacity(0.45)).frame(width: 16 * share, height: 2)
+                        }
+                    }
+                    Rectangle().fill(AppColors.newsInk.opacity(0.3)).frame(width: 1, height: 12)
+                    VStack(alignment: .leading, spacing: 2.5) {
+                        ForEach([0.8, 1, 0.6], id: \.self) { (share: Double) in
+                            Capsule().fill(AppColors.newsInk.opacity(0.45)).frame(width: 16 * share, height: 2)
+                        }
+                    }
+                }
+            }
+            .padding(6)
+            .background(AppColors.newsprint, in: .rect(cornerRadius: 2))
+            .rotationEffect(.degrees(3))
+        case .punchCard:
+            VStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { row in
+                    HStack(spacing: 3) {
+                        ForEach(0..<5, id: \.self) { day in
+                            Circle()
+                                .fill((row + day) % 3 == 0 ? AppColors.kraft : AppColors.table)
+                                .overlay { Circle().stroke(AppColors.kraftRule, lineWidth: 0.75) }
+                                .frame(width: 6, height: 6)
+                        }
+                    }
+                }
+            }
+            .padding(6)
+            .background(AppColors.kraft, in: .rect(cornerRadius: 4))
+        case .stamps:
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(index == 1 ? faint : accent)
+                        .padding(2.5)
+                        .background(AppColors.stampPaper)
+                        .overlay {
+                            Rectangle().strokeBorder(AppColors.envelope, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [0, 3.5]))
+                        }
+                        .frame(width: 14, height: 18)
+                }
+            }
+            .padding(5)
+            .background(AppColors.envelope, in: .rect(cornerRadius: 2))
         case .bubbles:
             VStack(spacing: -2) {
                 HStack(spacing: 3) { bubble(true); bubble(false); bubble(true) }
