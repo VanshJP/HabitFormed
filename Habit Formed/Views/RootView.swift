@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 
 /// What the shell presents over every page: the add flow, a timer opened
-/// from a notification or the mini banner, and the daily report.
+/// from a notification or the mini banner, and the report sheet, opened on
+/// a day's card or on the week's.
 enum RootSheet: Identifiable {
     case addHabit
     case timer(Habit)
@@ -76,9 +77,9 @@ struct RootView: View {
                 TimerView(habit: habit)
                     .navigationTransition(.zoom(sourceID: "timer", in: timerZoom))
             case .report(let date):
-                DailyReportSheet(day: date)
+                ReportSheet(day: date)
             case .recap(let date):
-                WeeklyRecapSheet(end: date)
+                ReportSheet(day: date, scope: .week)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .habitOpenTimerFromNotification)) { note in

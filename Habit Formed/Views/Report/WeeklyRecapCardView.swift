@@ -14,54 +14,38 @@ struct WeeklyRecapCardView: View {
     /// Rows drawn before "+N more".
     static let maxRows = 12
 
-    private var palette: ReportPalette { ReportPalette(look: options.look, accentHex: options.accentHex) }
+    private var palette: ReportPalette { ReportPalette(options: options) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            header
-            hero
-            WeeklyRecapGrid(recap: recap, palette: palette, maxRows: Self.maxRows)
+            ReportCardHeader(
+                title: recap.name.isEmpty ? "Weekly recap" : recap.name,
+                subtitle: recap.rangeText,
+                palette: palette
+            )
+            .reportRegion(.header)
+            VStack(alignment: .leading, spacing: 18) {
+                hero
+                WeeklyRecapGrid(recap: recap, palette: palette, maxRows: Self.maxRows)
+            }
+            .reportRegion(.habits)
             headlines
-            HabitFormedMark(tint: palette.accent, ink: palette.faint)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
+            if !options.trimmedNote.isEmpty {
+                ReportNote(text: options.trimmedNote, palette: palette)
+                    .reportRegion(.note)
+            }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 28)
-        .frame(width: Self.width, alignment: .leading)
-        .background { background }
-        .fontDesign(options.font.design)
-        .environment(\.dynamicTypeSize, .large)
-        .environment(\.colorScheme, palette.isLight ? .light : .dark)
+        .reportCardFrame(options: options, palette: palette)
+        .reportInk(palette)
     }
 
-    @ViewBuilder
-    private var background: some View {
-        if let look = options.look {
-            CanvasLookView(look: look, mood: .session)
-        } else {
-            palette.paper
-        }
-    }
-
-    // MARK: - Header and hero
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(recap.name.isEmpty ? "Weekly recap" : recap.name)
-                .font(.title3.bold())
-                .foregroundStyle(palette.ink)
-            Text(recap.rangeText)
-                .font(.subheadline)
-                .foregroundStyle(palette.secondary)
-        }
-    }
+    // MARK: - Hero
 
     private var hero: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("\(recap.perfectDays)")
                 .font(.system(size: 64, weight: .bold, design: options.font.numerals).monospacedDigit())
-                .foregroundStyle(recap.perfectDays > 0 ? AppColors.success : palette.ink)
+                .foregroundStyle(recap.perfectDays > 0 ? palette.success : palette.ink)
             VStack(alignment: .leading, spacing: 3) {
                 Text(recap.perfectDays == 1 ? "perfect day" : "perfect days")
                     .font(.title3.bold())
@@ -75,27 +59,36 @@ struct WeeklyRecapCardView: View {
 
     // MARK: - Headlines
 
+    /// Each number first, then what it belongs to, so a long habit name
+    /// shrinks on its own line instead of cutting the number off.
     private var headlines: some View {
         HStack(alignment: .top, spacing: 12) {
-            headline("Logged", "\(recap.logged) of \(recap.expected)")
+            headline("Logged", "\(recap.logged) of \(recap.expected)", nil)
             if let longest = recap.longestStreak {
-                headline("Longest", "\(longest.title), \(longest.value)")
+                headline("Longest run", longest.value, longest.title)
             }
             if let climber = recap.climber {
-                headline("Climber", "\(climber.title) \(climber.value)")
+                headline("Climbed most", "\(climber.value) logs", climber.title)
             }
         }
     }
 
-    private func headline(_ label: String, _ value: String) -> some View {
+    private func headline(_ label: String, _ value: String, _ habit: String?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .eyebrowStyle(palette.secondary)
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: options.font.numerals).monospacedDigit())
+                .font(.system(size: 17, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(palette.ink)
-                .lineLimit(2)
+                .lineLimit(1)
                 .minimumScaleFactor(0.8)
+            if let habit {
+                Text(habit)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

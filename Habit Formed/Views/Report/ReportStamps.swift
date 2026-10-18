@@ -10,17 +10,22 @@ struct ReportStamps: View {
     let report: DailyReport
     let options: ReportOptions
 
+    /// Three rows of three, then "+N more", so the envelope stays short in a
+    /// chat.
+    static let maxStamps = 9
+
     private let stampSize = CGSize(width: 106, height: 132)
     private let gap: CGFloat = 12
     private let bodoni = "BodoniSvtyTwoITCTT-Book"
     private let bodoniItalic = "BodoniSvtyTwoITCTT-BookIta"
+    private let condensed = "Futura-CondensedMedium"
     private var soft: Color { AppColors.envelopeInk.opacity(0.72) }
 
     var body: some View {
-        let shown = Array(report.items.prefix(ReportCardView.maxItems))
+        let shown = Array(report.items.prefix(Self.maxStamps))
         let rows = stride(from: 0, to: shown.count, by: 3).map { Array(shown[$0..<min($0 + 3, shown.count)]) }
         let lines = report.health.lines(showing: options.metrics)
-        let note = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = options.trimmedNote
 
         VStack(spacing: 0) {
             stripes
@@ -45,7 +50,7 @@ struct ReportStamps: View {
                 .frame(maxWidth: .infinity)
                 if report.items.count > shown.count {
                     Text("+\(report.items.count - shown.count) more in the next envelope")
-                        .font(.custom("Courier", size: 11))
+                        .font(.custom("Courier", size: 12))
                         .foregroundStyle(soft)
                 }
                 if !lines.isEmpty { customs(lines) }
@@ -54,13 +59,11 @@ struct ReportStamps: View {
                         .font(.custom(bodoniItalic, size: 17))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                HStack(alignment: .firstTextBaseline) {
-                    Text(options.showStreaks ? "Postmarked = done today, the corner is the run" : "Postmarked = done today")
-                    Spacer(minLength: 8)
-                    Text("Habit Formed")
-                }
-                .font(.custom("Courier", size: 10.5))
-                .foregroundStyle(soft)
+                Text(options.showStreaks ? "Postmarked = done today, the corner is the run" : "Postmarked = done today")
+                    .font(.custom("Courier", size: 11))
+                    .foregroundStyle(soft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
             }
             .padding(.horizontal, 24)
             .padding(.top, 22)
@@ -87,7 +90,7 @@ struct ReportStamps: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(report.name.isEmpty ? "Today’s post" : "From \(report.name)")
+                Text(title)
                     .font(.custom(bodoniItalic, size: 30))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -97,10 +100,10 @@ struct ReportStamps: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 1) {
-                Text("\(report.done) of \(report.expected)")
+                Text(report.expected == 0 ? "\(report.done)" : "\(report.done) of \(report.expected)")
                     .font(.custom(bodoni, size: 28))
                 Text("Postmarked")
-                    .font(.custom("Courier", size: 10))
+                    .font(.custom("Courier", size: 11))
                     .textCase(.uppercase)
                     .kerning(1.2)
                     .foregroundStyle(soft)
@@ -108,32 +111,39 @@ struct ReportStamps: View {
         }
     }
 
+    /// "From Vansh", or the post of the day when no name is set.
+    private var title: String {
+        if !report.name.isEmpty { return "From \(report.name)" }
+        return report.isToday ? "Today’s post" : "The day’s post"
+    }
+
     // MARK: - A stamp
 
     private func stamp(_ item: DailyReport.Item) -> some View {
         let ink = Color(hex: item.colorHex).mix(with: .black, by: 0.3)
         return VStack(alignment: .leading, spacing: 0) {
+            // The run as the stamp's value; a stamp with no run has none.
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                if options.showStreaks {
+                if options.showStreaks, item.streak > 0 {
                     Text("\(item.streak)")
                         .font(.custom(bodoni, size: 26))
                     Text(item.streakUnit)
-                        .font(.custom("Courier-Bold", size: 8))
+                        .font(.custom(condensed, size: 11))
                         .textCase(.uppercase)
                 }
             }
             .frame(height: 26, alignment: .bottom)
             Spacer(minLength: 0)
             Image(systemName: item.symbol)
-                .font(.system(size: 26, weight: .regular))
+                .font(.system(size: 22, weight: .regular))
                 .frame(maxWidth: .infinity)
             Spacer(minLength: 0)
             Text(item.title)
-                .font(.custom("Courier-Bold", size: 9))
+                .font(.custom(condensed, size: 12))
                 .textCase(.uppercase)
-                .kerning(0.5)
+                .kerning(0.4)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(.white)
@@ -150,8 +160,9 @@ struct ReportStamps: View {
         .frame(width: stampSize.width, height: stampSize.height)
         .overlay(alignment: .topTrailing) {
             if item.isDone {
+                // Kept inside the gap, so the next stamp never covers it.
                 Postmark(day: report.date)
-                    .offset(x: 18, y: 30)
+                    .offset(x: 4, y: 30)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -167,7 +178,7 @@ struct ReportStamps: View {
                 Spacer(minLength: 8)
                 Text("Contents")
             }
-            .font(.custom("Courier-Bold", size: 9))
+            .font(.custom("Courier-Bold", size: 11))
             .textCase(.uppercase)
             .kerning(1)
             .padding(.bottom, 4)
@@ -210,7 +221,7 @@ private struct Postmark: View {
                         Text(day.formatted(.dateTime.weekday(.abbreviated)))
                         Text(day.formatted(.dateTime.month(.abbreviated).day()))
                     }
-                    .font(.custom("Courier-Bold", size: 7.5))
+                    .font(.custom("Courier-Bold", size: 8))
                     .textCase(.uppercase)
                     .foregroundStyle(AppColors.envelopeInk)
                 }

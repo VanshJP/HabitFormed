@@ -1,35 +1,31 @@
 import SwiftUI
-import UIKit
 
 // MARK: - Preview
 
-/// The card as the sheet shows it: the card view itself, live and scaled
-/// to fit, so a theme or a switch shows the moment it is tapped. The image
-/// is drawn only when the card is sent (`ReportCardRenderer`). Shared by
-/// the daily report and the weekly recap; `width` is the card's own.
+/// The card as the send page shows it: the very poster that is sent
+/// (`ReportPosterView`), live and scaled to the page's width, so a theme or
+/// a switch shows the moment it is tapped and a card too tall for a chat
+/// shows widened, as a friend will get it. The image is drawn only when the
+/// card is sent (`ReportCardRenderer`).
 struct ReportPreview<Card: View>: View {
-    let width: CGFloat
-    /// Clipped to a card's corners and edged; off for the receipt, which is
-    /// a slip with nothing around it.
-    var framed = true
     @ViewBuilder let card: Card
 
     @State private var available: CGFloat = 0
-    @State private var height: CGFloat = 0
+    @State private var size: CGSize = .zero
 
     var body: some View {
-        let scale = available > 0 ? min(available / width, 1) : 1
+        let scale = available > 0 && size.width > 0 ? min(available / size.width, 1) : 1
         let shape = RoundedRectangle(cornerRadius: AppLayout.cardRadius / scale, style: .continuous)
         Color.clear
             .frame(maxWidth: .infinity)
-            .frame(height: height * scale)
+            .frame(height: size.height * scale)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { available = $0 }
             .overlay(alignment: .top) {
                 card
-                    .fixedSize(horizontal: false, vertical: true)
-                    .clipShape(framed ? AnyShape(shape) : AnyShape(Rectangle()))
-                    .overlay { shape.strokeBorder(Color.white.opacity(framed ? 0.1 : 0), lineWidth: 1 / scale) }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+                    .fixedSize()
+                    .clipShape(shape)
+                    .overlay { shape.strokeBorder(Color.white.opacity(0.1), lineWidth: 1 / scale) }
+                    .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
                     .scaleEffect(scale, anchor: .top)
                     .allowsHitTesting(false)
             }
@@ -40,88 +36,58 @@ struct ReportPreview<Card: View>: View {
     }
 }
 
-// MARK: - Theme
+// MARK: - Stage
 
-/// The card's theme as a rail of swatches. Both cards share one stored
-/// theme, so a week's recap looks like the days it sums up.
-struct ReportThemeRow: View {
-    @Binding var themeRaw: String
-    @Environment(\.appCanvas) private var canvas
+/// The card while it is being edited: the whole of it, scaled to fit both
+/// ways and centred, so every change shows without scrolling. Its parts
+/// take taps (`reportRegion`), which open their tools below.
+struct ReportStage<Card: View>: View {
+    @ViewBuilder let card: Card
+
+    @State private var size: CGSize = .zero
 
     var body: some View {
-        SwatchRail(
-            items: ReportTheme.allCases,
-            selection: Binding(
-                get: { ReportTheme(rawValue: themeRaw) ?? .app },
-                set: { themeRaw = $0.rawValue }
-            ),
-            name: \.displayName
-        ) { theme in
-            if let look = theme.look(appLook: canvas.look) {
-                CanvasLookView(look: look, mood: .session)
-            } else {
-                ReportPalette(look: nil).paper
-            }
+        GeometryReader { proxy in
+            let fits = size.width > 0 && size.height > 0 && proxy.size.width > 0 && proxy.size.height > 0
+            let scale = fits ? min(proxy.size.width / size.width, proxy.size.height / size.height, 1) : 1
+            let shape = RoundedRectangle(cornerRadius: AppLayout.cardRadius / scale, style: .continuous)
+            card
+                .fixedSize()
+                .clipShape(shape)
+                .overlay { shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1 / scale) }
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+                .scaleEffect(scale)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .opacity(fits ? 1 : 0)
         }
     }
 }
 
-// MARK: - Edit
+// MARK: - Thumbnail
 
-/// Opens and closes a sheet's look controls. The look is set ahead of time
-/// (Settings, Report card), so sending needs none of them.
-struct ReportEditButton: View {
-    @Binding var isEditing: Bool
+/// A card in miniature for the layout gallery: the real card, with your day
+/// on it, scaled to fit a fixed 4:5 box.
+struct ReportThumbnail<Card: View>: View {
+    var width: CGFloat = 92
+    @ViewBuilder let card: Card
 
-    var body: some View {
-        // Done is the system's confirm, the glass check that pairs with the
-        // sheet's close.
-        if isEditing {
-            Button(role: .confirm) { toggle() }
-                .accessibilityLabel("Done editing the report")
-        } else {
-            Button("Edit") { toggle() }
-                .accessibilityLabel("Edit the report")
-        }
-    }
-
-    private func toggle() {
-        Haptics.light()
-        withMotion(AppMotion.settle) { isEditing.toggle() }
-    }
-}
-
-// MARK: - Send
-
-/// Text it and Share. The card goes alone, with no message typed under it,
-/// so a friend gets one image they can forward as is. `render` draws the
-/// full-size card at the moment of sending.
-struct ReportSendBar: View {
-    let render: () -> UIImage?
+    @State private var size: CGSize = .zero
 
     var body: some View {
-        HStack(spacing: 10) {
-            if MessageComposer.canSend {
-                GlassButton(title: "Text it", icon: "message.fill", style: .secondary, size: .large, fullWidth: true) {
-                    guard let image = render() else { return }
-                    Haptics.medium()
-                    MessageComposer.shared.present(image: image)
-                }
-            }
-            GlassButton(title: "Share", icon: "square.and.arrow.up", style: .primary, size: .large, fullWidth: true) {
-                guard let image = render() else { return }
-                Haptics.medium()
-                SharePresenter.present(image: image)
-            }
+        let height = width * ReportCardRenderer.maxAspect
+        let fits = size.width > 0 && size.height > 0
+        let scale = fits ? min(width / size.width, height / size.height) : 1
+        ZStack {
+            card
+                .fixedSize()
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+                .scaleEffect(scale)
+                .opacity(fits ? 1 : 0)
         }
-    }
-}
-
-extension View {
-    /// Spacing for a bar pinned to the sheet's foot.
-    func pinnedBar() -> some View {
-        padding(.horizontal, AppLayout.pageHorizontal)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
+        .frame(width: width, height: height)
+        .background(Color.black.opacity(0.25))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.wellRadius, style: .continuous))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }

@@ -10,10 +10,11 @@ struct ReportWeekBoard: View {
     let palette: ReportPalette
     let showStreaks: Bool
 
-    private let square: CGFloat = 16
-    private let gap: CGFloat = 4
-    private let glyphColumn: CGFloat = 22
-    private let streakColumn: CGFloat = 22
+    private let square: CGFloat = 14
+    private let gap: CGFloat = 3
+    private let glyphColumn: CGFloat = 20
+    /// Wide enough for a flame and three digits.
+    private let streakColumn: CGFloat = 36
 
     var body: some View {
         let shown = Array(report.items.prefix(ReportCardView.maxItems))
@@ -34,14 +35,14 @@ struct ReportWeekBoard: View {
             }
 
             if shown.isEmpty {
-                Text("No habits on this card.")
+                Text("No habits on this card")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondary)
             }
             ForEach(shown) { item in
                 let tint = palette.habitTint(item.colorHex)
                 line {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Image(systemName: item.symbol)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(tint)
@@ -49,22 +50,25 @@ struct ReportWeekBoard: View {
                         Text(item.title)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(palette.ink.opacity(item.isDone ? 1 : 0.7))
-                            .lineLimit(1)
+                            .lineLimit(2)
                             .minimumScaleFactor(0.85)
                     }
                 } days: {
                     ForEach(0..<7, id: \.self) { cell(item, day: $0) }
                 } streak: {
-                    Text(item.streak > 0 ? "\(item.streak)" : "")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(palette.secondary)
+                    // Something even with no run, so the column keeps its room.
+                    if item.streak > 0 {
+                        ReportStreakCount(streak: item.streak, color: palette.secondary)
+                    } else {
+                        Color.clear.frame(height: 1)
+                    }
                 }
             }
             if report.items.count > shown.count {
                 Text("+\(report.items.count - shown.count) more")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.secondary)
-                    .padding(.leading, glyphColumn + 8)
+                    .padding(.leading, glyphColumn + 6)
             }
         }
         .padding(14)
@@ -73,12 +77,12 @@ struct ReportWeekBoard: View {
 
     /// One row of the board: the name column takes what is left, so every
     /// row's squares and streak line up under the day letters.
-    private func line(
-        @ViewBuilder name: () -> some View,
-        @ViewBuilder days: () -> some View,
-        @ViewBuilder streak: () -> some View
+    private func line<Name: View, Days: View, Streak: View>(
+        @ViewBuilder name: () -> Name,
+        @ViewBuilder days: () -> Days,
+        @ViewBuilder streak: () -> Streak
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             name()
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: gap) { days() }
@@ -92,7 +96,7 @@ struct ReportWeekBoard: View {
     private func cell(_ item: DailyReport.Item, day: Int) -> some View {
         let logged = item.week.indices.contains(day) && item.week[day]
         let openToday = day == 6 && item.status == .open
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
         return shape
             .fill(logged ? Color(hex: item.colorHex) : openToday ? .clear : palette.rule)
             .overlay {

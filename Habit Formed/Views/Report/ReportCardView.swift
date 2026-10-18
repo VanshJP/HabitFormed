@@ -2,144 +2,156 @@ import SwiftUI
 
 // MARK: - Report Card
 
-/// The shareable card for one day: who and when, how much got done, every
-/// included habit, and whatever extras are switched on. Rendered to an image
-/// with `ImageRenderer`, so it uses painted fills only (no glass).
+/// The shareable card for one day: who and when, the day's count in the
+/// header's corner, every included habit, and whatever extras are switched
+/// on. Rendered to an image with `ImageRenderer`, so it uses painted fills
+/// only (no glass).
 ///
 /// Fixed at `width` points with Dynamic Type pinned, so the card looks the
 /// same on every phone it is forwarded to. The layouts that are things of
 /// their own (`ReportLayout.ownsLook`) are the whole image instead: the front
-/// page, the punch card, the night sky and the envelope at `width`, and the
-/// receipt, the slip alone at `receiptWidth` with nothing behind it.
+/// page, the punch card, the night sky and the envelope edge to edge, and
+/// the receipt, a slip lying on the card's ground.
 struct ReportCardView: View {
     let report: DailyReport
     let options: ReportOptions
 
     static let width: CGFloat = 390
     static let receiptWidth: CGFloat = 340
-
-    /// The drawn width for a layout, for the renderer and the preview.
-    static func width(for layout: ReportLayout) -> CGFloat {
-        layout == .receipt ? receiptWidth : width
-    }
     /// Rows listed before "+N more", so a long list keeps the card a sensible
     /// height in a chat.
     static let maxItems = 12
 
-    private var palette: ReportPalette { ReportPalette(look: options.look, accentHex: options.accentHex) }
+    private var palette: ReportPalette { ReportPalette(options: options) }
+
+    /// What the card lies on when it is sent: its own ground, or the colour
+    /// under a layout with paper of its own.
+    static func backdrop(for options: ReportOptions) -> ReportBackdrop {
+        switch options.layout {
+        case .frontPage: return .color(AppColors.newsprint)
+        case .punchCard, .stamps: return .color(AppColors.table)
+        case .constellation: return .color(AppColors.nightSky)
+        default: return ReportBackdrop(options: options)
+        }
+    }
 
     var body: some View {
         Group {
             switch options.layout {
             case .receipt:
-                // The slip is the whole image: its own header, Health lines,
-                // note and mark, and no card or canvas behind it.
                 ReportReceipt(report: report, options: options)
                     .frame(width: Self.receiptWidth)
+                    .reportRegion(.habits, outlined: false)
+                    .padding(.vertical, 28)
+                    .frame(width: Self.width)
+                    .reportCanvas(look: options.look, paper: palette.paper)
             case .frontPage:
                 ReportFrontPage(report: report, options: options)
+                    .reportRegion(.habits, outlined: false)
             case .punchCard:
                 ReportPunchCard(report: report, options: options)
+                    .reportRegion(.habits, outlined: false)
             case .constellation:
                 ReportConstellation(report: report, options: options)
+                    .reportRegion(.habits, outlined: false)
             case .stamps:
                 ReportStamps(report: report, options: options)
+                    .reportRegion(.habits, outlined: false)
             default:
                 card
             }
         }
-        .environment(\.dynamicTypeSize, .large)
-        .environment(\.colorScheme, palette.isLight ? .light : .dark)
+        .reportInk(palette)
     }
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
+                .reportRegion(.header)
             habits
-            ReportHealthSection(health: report.health, options: options, palette: palette)
-            note
-            HabitFormedMark(tint: palette.accent, ink: palette.faint)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
+                .reportRegion(.habits)
+            if ReportHealthSection.shows(health: report.health, options: options) {
+                ReportHealthSection(health: report.health, options: options, palette: palette)
+                    .reportRegion(.health)
+            }
+            if !options.trimmedNote.isEmpty {
+                ReportNote(text: options.trimmedNote, palette: palette)
+                    .reportRegion(.note)
+            }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 28)
-        .frame(width: Self.width, alignment: .leading)
-        .background { background }
-        .fontDesign(options.font.design)
+        .reportCardFrame(options: options, palette: palette)
     }
 
-    @ViewBuilder
-    private var background: some View {
-        if let look = options.look {
-            CanvasLookView(look: look, mood: .session)
-        } else {
-            palette.paper
-        }
-    }
-
-    /// The layout's habits, under the hero ring where the layout has one.
+    /// The layout's habits.
     @ViewBuilder
     private var habits: some View {
         switch options.layout {
         case .list:
-            hero
             habitList
         case .grid:
-            hero
             ReportHabitGrid(items: report.items, palette: palette, showStreaks: options.showStreaks)
         case .focus:
             ReportFocus(report: report, palette: palette, numerals: options.font.numerals)
         case .orbit:
             ReportOrbit(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
         case .week:
-            hero
             ReportWeekBoard(report: report, palette: palette, showStreaks: options.showStreaks)
         case .rings:
-            hero
             ReportRings(report: report, palette: palette, showStreaks: options.showStreaks, numerals: options.font.numerals)
         case .sundial:
-            hero
             ReportSundial(report: report, options: options, palette: palette)
         case .garden:
-            hero
-            ReportGarden(report: report, palette: palette)
+            ReportGarden(report: report, palette: palette, showStreaks: options.showStreaks)
         case .bubbles:
-            hero
             ReportBubbles(items: report.items, palette: palette, showStreaks: options.showStreaks)
+        case .ledger:
+            ReportLedger(report: report, options: options, palette: palette)
+        case .timeline:
+            ReportTimeline(report: report, options: options, palette: palette)
+        case .minimal:
+            ReportMinimal(report: report, options: options, palette: palette)
         case .frontPage, .punchCard, .constellation, .stamps, .receipt:
             // Drawn whole in `body`.
             EmptyView()
         }
     }
 
-    // MARK: - Header and hero
+    // MARK: - Header
 
     /// Centred over a poster's ring (Focus, Orbit), so that card reads as
-    /// one. With the ring set to the corner, it sits small at the header's
-    /// trailing edge.
+    /// one; otherwise the day's count sits at the trailing edge.
     private var header: some View {
-        let centred = options.layout.isPoster
-        return HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: centred ? .center : .leading, spacing: 2) {
-                Text(report.name.isEmpty ? "Daily report" : report.name)
-                    .font(.title3.bold())
-                    .foregroundStyle(palette.ink)
-                Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.subheadline)
-                    .foregroundStyle(palette.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
-            if options.layout.showsRing, options.ring == .corner {
-                ring(size: 54, lineWidth: 6, numeral: 15)
-            }
+        ReportCardHeader(
+            title: report.name.isEmpty ? "Daily report" : report.name,
+            subtitle: report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+            badge: report.isPerfect ? "Perfect day" : nil,
+            palette: palette,
+            centred: options.layout.isPoster
+        ) {
+            if options.layout.showsRing { count }
         }
     }
 
-    /// The day's count in its ring, an arc per habit (`ReportDayRing`).
+    /// The day's count as a ring (an arc per habit, `ReportDayRing`) or as
+    /// a number.
+    @ViewBuilder
+    private var count: some View {
+        switch options.ring {
+        case .big:
+            ring(size: 84, lineWidth: 9, numeral: 22)
+        case .corner:
+            ring(size: 56, lineWidth: 6, numeral: 15)
+        case .off:
+            Text(report.countText)
+                .font(.system(size: 32, weight: .bold, design: options.font.numerals).monospacedDigit())
+                .foregroundStyle(palette.ink)
+                .lineLimit(1)
+        }
+    }
+
     private func ring(size: CGFloat, lineWidth: CGFloat, numeral: CGFloat) -> some View {
         ReportDayRing(report: report, palette: palette, diameter: size, lineWidth: lineWidth) {
-            Text("\(report.done)/\(report.expected)")
+            Text(report.countText)
                 .font(.system(size: numeral, weight: .bold, design: options.font.numerals).monospacedDigit())
                 .foregroundStyle(palette.ink)
                 .minimumScaleFactor(0.6)
@@ -148,26 +160,7 @@ struct ReportCardView: View {
         }
     }
 
-    /// The verdict and the day's share, beside the big ring when it is on.
-    private var hero: some View {
-        HStack(alignment: .center, spacing: 18) {
-            if options.layout.showsRing, options.ring == .big {
-                ring(size: 100, lineWidth: 10, numeral: 26)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(report.verdict)
-                    .font(.title2.bold())
-                    .foregroundStyle(palette.ink)
-                Text("\(report.percentText) of the day")
-                    .font(.subheadline)
-                    .foregroundStyle(palette.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    // MARK: - Habits
+    // MARK: - List
 
     private var habitList: some View {
         let shown = Array(report.items.prefix(Self.maxItems))
@@ -175,7 +168,7 @@ struct ReportCardView: View {
 
         return VStack(alignment: .leading, spacing: 0) {
             if shown.isEmpty {
-                Text("No habits on this card.")
+                Text("No habits on this card")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondary)
                     .padding(.vertical, 12)
@@ -215,12 +208,14 @@ struct ReportCardView: View {
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(palette.ink.opacity(item.isDone ? 1 : 0.65))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
                 if let line = detailLine(item) {
                     Text(line)
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
                 if options.showNotes, let note = item.note {
                     Text("“\(note)”")
@@ -229,12 +224,12 @@ struct ReportCardView: View {
                         .lineLimit(2)
                 }
             }
-
-            Spacer(minLength: 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if options.showWeek {
+                // The six days before; today is the mark beside them.
                 HStack(spacing: 3) {
-                    ForEach(Array(item.week.enumerated()), id: \.offset) { _, logged in
+                    ForEach(Array(item.week.dropLast().enumerated()), id: \.offset) { _, logged in
                         Circle()
                             .fill(logged ? tint : palette.rule)
                             .frame(width: 5, height: 5)
@@ -256,8 +251,9 @@ struct ReportCardView: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// Done is the habit's colour; open is a dashed ring; missed is a quiet
-    /// cross; a flexible weekly day is a dash.
+    /// Done is the habit's colour; open is a dashed ring; missed a quiet
+    /// empty ring (a card sent to friends is no place for red crosses); a
+    /// flexible weekly day is a dash.
     private func statusMark(_ status: DayStatus, tint: Color) -> some View {
         Group {
             switch status {
@@ -266,104 +262,12 @@ struct ReportCardView: View {
             case .open:
                 Image(systemName: "circle.dashed").foregroundStyle(palette.faint)
             case .missed:
-                Image(systemName: "xmark.circle").foregroundStyle(AppColors.error.opacity(0.85))
+                Image(systemName: "circle").foregroundStyle(palette.faint)
             case .flexible, .resting:
                 Image(systemName: "minus.circle").foregroundStyle(palette.faint)
             }
         }
         .font(.system(size: 20, weight: .semibold))
-    }
-
-    // MARK: - Note
-
-    @ViewBuilder
-    private var note: some View {
-        let text = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty {
-            HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(palette.accent)
-                    .frame(width: 3)
-                Text(text)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(palette.ink.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-// MARK: - Palette
-
-/// Ink, wells and accents for a theme: white on the canvases, near-black on
-/// paper. The accent is the look's own unless a palette colour is picked.
-struct ReportPalette {
-    let isLight: Bool
-    let accent: Color
-
-    /// `look` is the card's canvas, or nil for paper.
-    init(look: CanvasLook?, accentHex: String = "") {
-        isLight = look == nil
-        if !accentHex.isEmpty {
-            let picked = Color(hex: accentHex)
-            accent = isLight ? picked : picked.glyphTone
-        } else {
-            accent = look?.accent ?? AppColors.primary
-        }
-    }
-
-    var paper: Color { Color(red: 0.984, green: 0.980, blue: 0.965) }
-    var ink: Color { isLight ? AppColors.inkOnLight : .white }
-    var secondary: Color { ink.opacity(isLight ? 0.6 : 0.55) }
-    var faint: Color { ink.opacity(isLight ? 0.4 : 0.45) }
-    var well: Color { isLight ? AppColors.inkOnLight.opacity(0.05) : Color.white.opacity(0.07) }
-    var rule: Color { isLight ? AppColors.inkOnLight.opacity(0.12) : Color.white.opacity(0.12) }
-
-    /// A habit's colour, lifted on dark canvases and kept deep on paper so it
-    /// clears contrast either way.
-    func habitTint(_ hex: String) -> Color {
-        dataTint(Color(hex: hex))
-    }
-
-    /// Any data colour (a macro, a habit) toned for the card's ground.
-    func dataTint(_ color: Color) -> Color {
-        isLight ? color : color.glyphTone
-    }
-}
-
-// MARK: - Font
-
-extension ReportFont {
-    var design: Font.Design {
-        switch self {
-        case .standard: return .default
-        case .rounded: return .rounded
-        case .serif: return .serif
-        case .mono: return .monospaced
-        }
-    }
-
-    /// Big numbers stay rounded on the default face, as they always were.
-    var numerals: Font.Design { self == .standard ? .rounded : design }
-}
-
-// MARK: - Mark
-
-/// The app's small wordmark: a hexagon grid glyph and the name.
-struct HabitFormedMark: View {
-    var tint: Color
-    var ink: Color
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "circle.hexagongrid.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tint)
-            Text("Habit Formed")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
-        }
     }
 }
 
@@ -408,13 +312,13 @@ extension DailyReport {
     }
 }
 
-#Preview("Themes") {
+#Preview("Layouts") {
     ScrollView {
         VStack(spacing: 24) {
-            ForEach(ReportTheme.allCases) { theme in
+            ForEach(ReportLayout.gallery) { layout in
                 ReportCardView(
                     report: .sample,
-                    options: ReportOptions(theme: theme, metrics: Set(ReportMetric.allCases), note: "Rest day tomorrow.")
+                    options: ReportOptions(layout: layout, metrics: Set(ReportMetric.allCases), note: "Rest day tomorrow.")
                 )
             }
         }

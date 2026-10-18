@@ -4,25 +4,28 @@ import SwiftUI
 /// a star, lit in its colour once done and sized by its run; lit stars are
 /// joined in the order they were logged, and dashed lines carry the figure on
 /// through the stars still dark. Stars wind through the sky three to a row,
-/// so each join is short. The Apple Health numbers follow as sky notes. It is
-/// the whole image, night whatever the card's background. Painted fills
-/// only, so `ImageRenderer` draws it.
+/// so each join is short, each named under it in its column. The Apple
+/// Health numbers follow as sky notes. It is the whole image, night whatever
+/// the card's background. Painted fills only, so `ImageRenderer` draws it.
 struct ReportConstellation: View {
     let report: DailyReport
     let options: ReportOptions
 
     private let width: CGFloat = 342
-    private let cellHeight: CGFloat = 86
-    private let labelWidth: CGFloat = 108
+    private let cellHeight: CGFloat = 88
+    /// The first row's stars sit this far down, so the largest clears the top.
+    private let topInset: CGFloat = 24
+    /// A column's width less a gap, so names side by side never touch.
+    private var labelWidth: CGFloat { width / 3 - 10 }
     private var soft: Color { AppColors.starlight.opacity(0.68) }
 
     var body: some View {
         let stars = ordered
-        let points = stars.indices.map { position($0) }
+        let points = stars.indices.map { position($0, of: stars.count) }
         let lit = stars.filter(\.isDone).count
-        let skyHeight = CGFloat(max((stars.count + 2) / 3, 1)) * cellHeight + 8
+        let skyHeight = CGFloat(max((stars.count + 2) / 3, 1)) * cellHeight
         let lines = report.health.lines(showing: options.metrics)
-        let note = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = options.trimmedNote
 
         VStack(alignment: .leading, spacing: 16) {
             header
@@ -39,21 +42,15 @@ struct ReportConstellation: View {
                 }
                 ForEach(stars.indices, id: \.self) { index in
                     label(stars[index])
-                        .position(x: min(max(points[index].x, labelWidth / 2), width - labelWidth / 2), y: points[index].y + 28)
+                        .position(x: labelX(index, of: stars.count), y: points[index].y + starSize(stars[index]) / 2 + 20)
                 }
             }
             .frame(width: width, height: skyHeight)
 
             if report.items.count > stars.count {
                 Text("+\(report.items.count - stars.count) more past the horizon")
-                    .font(.custom("Baskerville-Italic", size: 13))
+                    .font(.custom("Baskerville-Italic", size: 14))
                     .foregroundStyle(soft)
-            }
-            if !stars.isEmpty {
-                Text(lit == 0 ? "Dashed lines join the stars still to light" : "Lit stars are done, joined in the order you logged them. Dashed lines finish the figure")
-                    .font(.custom("Baskerville", size: 14))
-                    .foregroundStyle(soft)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if !note.isEmpty {
                 Text(note)
@@ -62,10 +59,6 @@ struct ReportConstellation: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !lines.isEmpty { skyNotes(lines) }
-            Text("Habit Formed")
-                .font(.custom("Baskerville", size: 13))
-                .foregroundStyle(soft)
-                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 24)
         .padding(.top, 28)
@@ -85,15 +78,30 @@ struct ReportConstellation: View {
 
     /// Three to a row, the rows winding back and forth so the next star is
     /// always beside the last, each nudged off the grid so the sky is not one.
-    private func position(_ index: Int) -> CGPoint {
+    /// One or two stars share the sky's width instead of hugging its left.
+    private func position(_ index: Int, of count: Int) -> CGPoint {
+        let dx: [CGFloat] = [-12, 8, -4, 12, -8, 6, 10, -12, 3, -6, 11, -2]
+        let dy: [CGFloat] = [-6, 5, -2, 3, -5, 4, 2, -3, 6, -4, 0, 4]
+        return CGPoint(
+            x: labelX(index, of: count) + dx[index % dx.count],
+            y: CGFloat(index / 3) * cellHeight + topInset + dy[index % dy.count]
+        )
+    }
+
+    /// The middle of a star's column, where its name sits.
+    private func labelX(_ index: Int, of count: Int) -> CGFloat {
+        if count < 3 { return width * CGFloat(index + 1) / CGFloat(count + 1) }
         let row = index / 3
         let column = row.isMultiple(of: 2) ? index % 3 : 2 - index % 3
-        let dx: [CGFloat] = [-16, 12, -6, 18, -12, 8, 14, -18, 4, -8, 16, -2]
-        let dy: [CGFloat] = [-6, 8, -2, 4, -8, 6, 2, -4, 8, -6, 0, 6]
-        return CGPoint(
-            x: CGFloat(column) * width / 3 + width / 6 + dx[index % dx.count],
-            y: CGFloat(row) * cellHeight + 22 + dy[index % dy.count]
-        )
+        return CGFloat(column) * width / 3 + width / 6
+    }
+
+    /// A lit star's width, larger the longer its run while streaks show; a
+    /// dark one's small ring.
+    private func starSize(_ item: DailyReport.Item) -> CGFloat {
+        let run = CGFloat(min(item.streak, 6))
+        if item.isDone { return options.showStreaks ? 16 + run * 3 : 22 }
+        return 6 + (options.showStreaks ? min(run, 4) * 1.5 : 0)
     }
 
     /// Solid between lit stars in the order logged; dashed on from the last
@@ -116,23 +124,17 @@ struct ReportConstellation: View {
 
     @ViewBuilder
     private func star(_ item: DailyReport.Item) -> some View {
-        let run = CGFloat(min(item.streak, 6))
+        let size = starSize(item)
         if item.isDone {
-            let tint = Color(hex: item.colorHex).glyphTone
-            let size = options.showStreaks ? 18 + run * 4 : 24
             ZStack {
-                Circle()
-                    .stroke(tint.opacity(0.35), lineWidth: 1)
-                    .frame(width: size + 12, height: size + 12)
                 Sparkle()
-                    .fill(tint)
+                    .fill(Color(hex: item.colorHex).glyphTone)
                     .frame(width: size, height: size)
                 Circle()
                     .fill(Color.white)
                     .frame(width: 3.5, height: 3.5)
             }
         } else {
-            let size = 6 + (options.showStreaks ? min(run, 4) * 1.5 : 0)
             Circle()
                 .strokeBorder(AppColors.starlight.opacity(0.55), lineWidth: 1.2)
                 .frame(width: size, height: size)
@@ -148,12 +150,12 @@ struct ReportConstellation: View {
                 .foregroundStyle(item.isDone ? AppColors.starlight : soft)
             if let meta = meta(item) {
                 Text(meta)
-                    .font(.system(size: 9.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(soft)
             }
         }
         .lineLimit(1)
-        .minimumScaleFactor(0.75)
+        .minimumScaleFactor(0.8)
         .padding(.horizontal, 3)
         .background(AppColors.nightSky)
         .frame(width: labelWidth)
@@ -195,13 +197,15 @@ struct ReportConstellation: View {
                 Text(subtitle)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(soft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 1) {
-                Text("\(report.done) of \(report.expected)")
+                Text(report.expected == 0 ? "\(report.done)" : "\(report.done) of \(report.expected)")
                     .font(.custom("Baskerville-SemiBold", size: 28))
                 Text("Stars lit")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .textCase(.uppercase)
                     .foregroundStyle(soft)
             }
@@ -214,18 +218,19 @@ struct ReportConstellation: View {
         return (report.name.isEmpty ? date : "\(report.name) · \(date)").uppercased()
     }
 
+    /// The Health numbers two to a line, so each keeps its full size.
     private func skyNotes(_ lines: [HealthLine]) -> some View {
-        let rows = stride(from: 0, to: lines.count, by: 3).map { Array(lines[$0..<min($0 + 3, lines.count)]) }
+        let rows = stride(from: 0, to: lines.count, by: 2).map { Array(lines[$0..<min($0 + 2, lines.count)]) }
         return VStack(alignment: .leading, spacing: 6) {
             ForEach(rows.indices, id: \.self) { index in
-                HStack(spacing: 8) {
+                HStack(spacing: 12) {
                     ForEach(rows[index], id: \.self) { line in
                         Text("\(line.label.uppercased()) \(line.value)")
                             .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                            .minimumScaleFactor(0.9)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    ForEach(0..<(3 - rows[index].count), id: \.self) { _ in
+                    if rows[index].count < 2 {
                         Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                     }
                 }

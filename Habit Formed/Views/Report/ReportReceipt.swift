@@ -1,15 +1,18 @@
 import SwiftUI
 
-/// The report's Receipt layout: the day as a till receipt, and the image
-/// sent is the slip alone, torn edges and all. A line per habit runs to its status
-/// over dotted leaders, a dot of the habit's color before its name; then the
-/// day's totals, any Apple Health numbers as line items, the verdict and a
-/// barcode. It is the whole card, header and note included, and always
-/// monospaced capitals: a receipt's own type, whatever the card's Type says.
-/// Painted fills only, so `ImageRenderer` draws it.
+/// The report's Receipt layout: the day as a till receipt, a slip lying on
+/// the card's ground, torn edges and all. The reporter's name heads it like
+/// a store's; a line per habit runs to its status over dotted leaders, a dot
+/// of the habit's color before its name; then any Apple Health numbers as
+/// line items, the day's total and a barcode. It is always monospaced
+/// capitals: a receipt's own type, whatever the card's Type says. Painted
+/// fills only, so `ImageRenderer` draws it.
 struct ReportReceipt: View {
     let report: DailyReport
     let options: ReportOptions
+
+    /// Lines printed before "+N more", so the slip stays short in a chat.
+    static let maxItems = 8
 
     /// Paper's ink, whatever the card's background: the slip is always paper.
     private let ink = ReportPalette(look: nil)
@@ -17,13 +20,13 @@ struct ReportReceipt: View {
     private let small = Font.system(size: 11, design: .monospaced)
 
     var body: some View {
-        let shown = Array(report.items.prefix(ReportCardView.maxItems))
+        let shown = Array(report.items.prefix(Self.maxItems))
         let health = report.health.lines(showing: options.metrics)
 
         VStack(alignment: .leading, spacing: 14) {
             header
             rule
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 8) {
                 if shown.isEmpty {
                     Text("No habits on this card")
                         .foregroundStyle(ink.secondary)
@@ -34,16 +37,17 @@ struct ReportReceipt: View {
                         .foregroundStyle(ink.secondary)
                 }
             }
-            rule
-            VStack(spacing: 6) {
-                amount("Habits done", "\(report.done)/\(report.expected)")
-                ForEach(health, id: \.self) { amount($0.isPart ? "  \($0.label)" : $0.label, $0.value) }
+            if !health.isEmpty {
+                rule
+                VStack(spacing: 6) {
+                    ForEach(health, id: \.self) { amount($0.isPart ? "  \($0.label)" : $0.label, $0.value) }
+                }
             }
             rule
             HStack {
                 Text("Total")
                 Spacer()
-                Text(report.percentText)
+                Text(report.countText)
             }
             .font(.system(size: 17, weight: .bold, design: .monospaced))
             footer
@@ -56,8 +60,8 @@ struct ReportReceipt: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 24 + ReceiptSlip.depth)
         .background(ink.paper, in: ReceiptSlip())
-        // A faint edge, so the slip stands off a white chat as well as a
-        // dark one.
+        // A faint edge, so the slip stands off a paper ground as well as a
+        // canvas.
         .overlay { ReceiptSlip().stroke(ink.rule, lineWidth: 1) }
     }
 
@@ -69,19 +73,18 @@ struct ReportReceipt: View {
 
     // MARK: - Parts
 
+    /// The reporter's name where a store's would be, and the day.
     private var header: some View {
         VStack(spacing: 4) {
             Image(systemName: "circle.hexagongrid.fill")
                 .font(.system(size: 22))
                 .foregroundStyle(markTint)
-            Text("Habit Formed")
+            Text(report.name.isEmpty ? "Daily report" : report.name)
                 .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(report.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year()))
                 .foregroundStyle(ink.secondary)
-            if !report.name.isEmpty {
-                Text("Report for \(report.name)")
-                    .foregroundStyle(ink.secondary)
-            }
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
@@ -116,7 +119,8 @@ struct ReportReceipt: View {
                 Text(detail)
                     .font(small)
                     .foregroundStyle(ink.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 13)
             }
         }
@@ -134,11 +138,15 @@ struct ReportReceipt: View {
         }
     }
 
+    /// The verdict only where the total does not already say it, then the
+    /// note, the barcode and the thanks.
     private var footer: some View {
-        let note = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = options.trimmedNote
         return VStack(spacing: 10) {
-            Text(report.verdict)
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
+            if report.isPerfect || report.expected == 0 {
+                Text(report.verdict)
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+            }
             if !note.isEmpty {
                 Text(note)
                     .textCase(nil)
@@ -170,20 +178,28 @@ struct ReportReceipt: View {
         }
     }
 
+    /// "30 min · 12-day streak".
     private func detailLine(_ item: DailyReport.Item) -> String? {
         var parts: [String] = []
         if let detail = item.detail { parts.append(detail) }
         if options.showStreaks, item.streak > 0 {
-            parts.append("Streak \(item.streak) \(item.streakUnit)")
+            parts.append("\(item.streak)-\(runUnit(item)) streak")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// "day", "week" or "cycle" from a streak's unit ("days", "wks").
+    private func runUnit(_ item: DailyReport.Item) -> String {
+        if item.streakUnit.hasPrefix("wk") { return "week" }
+        if item.streakUnit.hasPrefix("cycle") { return "cycle" }
+        return "day"
     }
 }
 
 // MARK: - Shapes
 
 /// A slip torn along its top and bottom: a rectangle with saw teeth for
-/// those edges. The Layout picker's sketch wears it too.
+/// those edges.
 struct ReceiptSlip: Shape {
     static let depth: CGFloat = 5
     var tooth: CGFloat = 10

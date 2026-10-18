@@ -7,8 +7,9 @@ struct WeeklyRecapGrid: View {
     let palette: ReportPalette
     let maxRows: Int
 
-    private let cell: CGFloat = 24
-    private let cellSpacing: CGFloat = 6
+    /// Small enough that a name keeps about 20 characters beside its week.
+    private let cell: CGFloat = 22
+    private let cellSpacing: CGFloat = 4
 
     var body: some View {
         let shown = Array(recap.rows.prefix(maxRows))
@@ -44,6 +45,7 @@ struct WeeklyRecapGrid: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(palette.ink)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: cellSpacing) {
                         ForEach(Array(row.days.enumerated()), id: \.offset) { _, status in
@@ -67,7 +69,7 @@ struct WeeklyRecapGrid: View {
     /// an outline for today still open, a ghost on a weekly habit's free day,
     /// and nothing on a day it sat out.
     private func square(_ status: DayStatus, hex: String) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
         let fill: Color = switch status {
         case .done: palette.habitTint(hex)
         case .missed: palette.rule

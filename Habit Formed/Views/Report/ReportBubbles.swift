@@ -9,27 +9,28 @@ struct ReportBubbles: View {
     let palette: ReportPalette
     let showStreaks: Bool
 
+    /// One size for every count, so a name always has three lines to wrap
+    /// in; a long list makes a taller card rather than smaller bubbles.
+    private let size: CGFloat = 104
     private let gap: CGFloat = 8
 
     var body: some View {
         let shown = Array(items.prefix(ReportCardView.maxItems))
         let rows = Self.rows(of: shown)
-        // Five rows would make a tall card, so their bubbles are smaller.
-        let size: CGFloat = rows.count > 4 ? 88 : 104
         // Centres one bubble and a gap apart sit 0.866 of that apart down a
         // honeycomb, so rows overlap by the difference.
         let rowSpacing = (size + gap) * 0.866 - size
 
         VStack(spacing: rowSpacing) {
             if shown.isEmpty {
-                Text("No habits on this card.")
+                Text("No habits on this card")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             ForEach(rows, id: \.first?.id) { row in
                 HStack(spacing: gap) {
-                    ForEach(row) { bubble($0, size: size) }
+                    ForEach(row) { bubble($0) }
                 }
             }
             if items.count > shown.count {
@@ -76,30 +77,31 @@ struct ReportBubbles: View {
         return best
     }
 
-    private func bubble(_ item: DailyReport.Item, size: CGFloat) -> some View {
+    private func bubble(_ item: DailyReport.Item) -> some View {
         let tint = palette.habitTint(item.colorHex)
-        return VStack(spacing: 3) {
+        return VStack(spacing: 2) {
             Image(systemName: item.symbol)
-                .font(.title3.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(item.isDone ? .white : tint)
             Text(item.title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(item.isDone ? .white : palette.ink.opacity(0.75))
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .lineLimit(3)
+                .minimumScaleFactor(0.92)
             if showStreaks, item.streak > 0 {
                 Text("\(item.streak) \(item.streakUnit)")
                     .font(.caption2.weight(.medium).monospacedDigit())
                     .foregroundStyle(item.isDone ? .white.opacity(0.75) : palette.secondary)
+                    .lineLimit(1)
             }
         }
-        .padding(14)
+        .padding(10)
         .frame(width: size, height: size)
         .background {
             ZStack {
                 if item.isDone {
-                    Circle().fill(Color(hex: item.colorHex))
+                    Circle().fill(palette.doneFill(item.colorHex))
                 } else {
                     Circle().fill(palette.well)
                     Circle().strokeBorder(tint.opacity(0.5), lineWidth: 1.5)

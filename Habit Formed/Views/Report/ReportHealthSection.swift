@@ -1,70 +1,145 @@
 import SwiftUI
 
 /// The card's Apple Health numbers, each only when picked
-/// (`ReportOptions.metrics`): calories in and out, the macros over their
-/// split, exercise over what it went on (on a day with a workout), and a
-/// line of chips for steps, exercise, sleep and mindful time.
-/// Painted fills only, like the rest of the card, so `ImageRenderer` draws it.
+/// (`ReportOptions.metrics`) and only when Health has it for the day, in at
+/// most two wells: activity (steps, exercise, sleep and mindful time, with
+/// exercise split over the day's workouts when there were any), then food
+/// (calories in and out over the macros and their split). Painted fills
+/// only, like the rest of the card, so `ImageRenderer` draws it.
 struct ReportHealthSection: View {
     let health: DayHealthMetrics
     let options: ReportOptions
     let palette: ReportPalette
+
+    /// True when the section draws anything at all: a picked number Health
+    /// has for the day. A well of blanks would read as a broken card.
+    static func shows(health: DayHealthMetrics, options: ReportOptions) -> Bool {
+        !activityStats(health, options).isEmpty
+            || !calorieStats(health, options).isEmpty
+            || !macroStats(health, options).isEmpty
+    }
 
     private var wellShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: AppLayout.tileRadius, style: .continuous)
     }
 
     var body: some View {
-        // A group, so each part is its own child of the card's stack and one
-        // left off takes no space.
-        Group {
-            if options.shows(.calories) { calories }
-            if options.shows(.macros) { macros }
-            if options.shows(.exercise), !health.exerciseKinds.isEmpty, let total = health.exerciseMinutes {
-                exercise(total: total)
+        let activity = Self.activityStats(health, options)
+        let calories = Self.calorieStats(health, options)
+        let macros = Self.macroStats(health, options)
+
+        VStack(spacing: 12) {
+            if !activity.isEmpty {
+                activityWell(activity)
             }
-            chipLine
+            if !calories.isEmpty || !macros.isEmpty {
+                foodWell(calories: calories, macros: macros)
+            }
         }
     }
 
-    // MARK: - Calories
+    // MARK: - Numbers
 
-    private var calories: some View {
-        let net = health.netKcal
-        return HStack(spacing: 0) {
-            column("Eaten", ReportFormat.kcal(health.eatenKcal))
-            columnRule
-            column("Burned", ReportFormat.kcal(health.burnedKcal))
-            columnRule
-            column(
-                net.map { $0 <= 0 ? "Deficit" : "Surplus" } ?? "Net",
-                ReportFormat.signedKcal(net),
-                tint: net.map { $0 <= 0 ? AppColors.success : AppColors.warning }
-            )
+    /// One number in a well: its value over its label.
+    private struct Stat {
+        enum Tone { case plain, good, caution }
+
+        let label: String
+        let value: String
+        var tone: Tone = .plain
+        /// A colour's dot before the label, tying it to a split bar.
+        var dot: Color? = nil
+    }
+
+    private static func activityStats(_ health: DayHealthMetrics, _ options: ReportOptions) -> [Stat] {
+        var stats: [Stat] = []
+        if options.shows(.steps), let steps = health.steps {
+            stats.append(Stat(label: "Steps", value: ReportFormat.count(steps)))
+        }
+        if options.shows(.exercise), let minutes = health.exerciseMinutes {
+            stats.append(Stat(label: "Exercise", value: ReportFormat.duration(minutes: minutes)))
+        }
+        if options.shows(.sleep), let hours = health.sleepHours {
+            stats.append(Stat(label: "Sleep", value: ReportFormat.duration(minutes: hours * 60)))
+        }
+        if options.shows(.mindful), let minutes = health.mindfulMinutes {
+            stats.append(Stat(label: "Mindful", value: ReportFormat.duration(minutes: minutes)))
+        }
+        return stats
+    }
+
+    private static func calorieStats(_ health: DayHealthMetrics, _ options: ReportOptions) -> [Stat] {
+        guard options.shows(.calories) else { return [] }
+        var stats: [Stat] = []
+        if let eaten = health.eatenKcal {
+            stats.append(Stat(label: "Eaten", value: ReportFormat.kcal(eaten)))
+        }
+        if let burned = health.burnedKcal {
+            stats.append(Stat(label: "Burned", value: ReportFormat.kcal(burned)))
+        }
+        if let net = health.netKcal {
+            stats.append(Stat(
+                label: net <= 0 ? "Deficit" : "Surplus",
+                value: ReportFormat.signedKcal(net),
+                tone: net <= 0 ? .good : .caution
+            ))
+        }
+        return stats
+    }
+
+    private static func macroStats(_ health: DayHealthMetrics, _ options: ReportOptions) -> [Stat] {
+        guard options.shows(.macros) else { return [] }
+        var stats: [Stat] = []
+        if let protein = health.protein {
+            stats.append(Stat(label: "Protein", value: ReportFormat.grams(protein), dot: AppColors.macroProtein))
+        }
+        if let carbs = health.carbs {
+            stats.append(Stat(label: "Carbs", value: ReportFormat.grams(carbs), dot: AppColors.macroCarbs))
+        }
+        if let fat = health.fat {
+            stats.append(Stat(label: "Fat", value: ReportFormat.grams(fat), dot: AppColors.macroFat))
+        }
+        return stats
+    }
+
+    // MARK: - Wells
+
+    /// Up to four columns, then what the exercise went on when the day had
+    /// a workout.
+    private func activityWell(_ stats: [Stat]) -> some View {
+        let kinds = options.shows(.exercise) && health.exerciseMinutes != nil ? health.exerciseKinds : []
+        return VStack(spacing: 10) {
+            columns(stats)
+            if !kinds.isEmpty {
+                exerciseSplit(kinds)
+            }
         }
         .padding(.vertical, 12)
         .background(palette.well, in: wellShape)
     }
 
-    // MARK: - Macros
-
-    /// Grams, each with its colour's dot, over a bar of how the energy splits.
-    private var macros: some View {
+    /// Calories in and out over the macros, a hairline between them.
+    private func foodWell(calories: [Stat], macros: [Stat]) -> some View {
         VStack(spacing: 12) {
-            HStack(spacing: 0) {
-                column("Protein", ReportFormat.grams(health.protein), dot: AppColors.macroProtein)
-                columnRule
-                column("Carbs", ReportFormat.grams(health.carbs), dot: AppColors.macroCarbs)
-                columnRule
-                column("Fat", ReportFormat.grams(health.fat), dot: AppColors.macroFat)
+            if !calories.isEmpty {
+                columns(calories)
             }
-            if let shares = health.macroShares {
-                MacroSplitBar(segments: [
-                    (shares.protein, palette.dataTint(AppColors.macroProtein)),
-                    (shares.carbs, palette.dataTint(AppColors.macroCarbs)),
-                    (shares.fat, palette.dataTint(AppColors.macroFat)),
-                ])
-                .padding(.horizontal, 16)
+            if !calories.isEmpty, !macros.isEmpty {
+                Rectangle()
+                    .fill(palette.rule)
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 16)
+            }
+            if !macros.isEmpty {
+                columns(macros)
+                if let shares = health.macroShares {
+                    MacroSplitBar(segments: [
+                        (shares.protein, palette.dataTint(AppColors.macroProtein)),
+                        (shares.carbs, palette.dataTint(AppColors.macroCarbs)),
+                        (shares.fat, palette.dataTint(AppColors.macroFat)),
+                    ])
+                    .padding(.horizontal, 16)
+                }
             }
         }
         .padding(.vertical, 12)
@@ -73,33 +148,33 @@ struct ReportHealthSection: View {
 
     // MARK: - Exercise
 
-    /// The day's exercise minutes, then each kind of workout they went on
-    /// with its colour ("Other" for minutes outside one) over a bar of the
-    /// split, as the macros are drawn.
-    private func exercise(total: Double) -> some View {
-        let kinds = health.exerciseKinds
-        return VStack(spacing: 12) {
-            HStack(spacing: 5) {
-                Image(systemName: ReportMetric.exercise.icon)
-                    .font(.caption2.weight(.semibold))
-                Text("\(ReportFormat.duration(minutes: total)) exercise")
+    /// Each kind of workout with its colour's dot and minutes ("Other" for
+    /// minutes outside one), over a bar of the split, as the macros are drawn.
+    private func exerciseSplit(_ kinds: [ExerciseKind]) -> some View {
+        let total = max(kinds.reduce(0) { $0 + $1.minutes }, 1)
+        return VStack(spacing: 8) {
+            FlowLayout(spacing: 14, lineSpacing: 4, centred: true) {
+                ForEach(kinds.indices, id: \.self) { index in
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(palette.dataTint(kindColor(kinds, index)))
+                            .frame(width: 6, height: 6)
+                        Text(kinds[index].name)
+                            .foregroundStyle(palette.secondary)
+                        Text(ReportFormat.duration(minutes: kinds[index].minutes))
+                            .foregroundStyle(palette.ink.opacity(0.85))
+                    }
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
-            }
-            .foregroundStyle(palette.ink.opacity(0.85))
-            HStack(spacing: 0) {
-                ForEach(kinds.indices, id: \.self) { index in
-                    if index > 0 { columnRule }
-                    column(kinds[index].name, ReportFormat.duration(minutes: kinds[index].minutes), dot: kindColor(kinds, index))
+                    .lineLimit(1)
                 }
             }
+            .padding(.horizontal, 12)
             MacroSplitBar(segments: kinds.indices.map { index in
-                (share: kinds[index].minutes / max(total, 1), color: palette.dataTint(kindColor(kinds, index)))
+                (share: kinds[index].minutes / total, color: palette.dataTint(kindColor(kinds, index)))
             })
             .padding(.horizontal, 16)
         }
-        .padding(.vertical, 12)
-        .background(palette.well, in: wellShape)
     }
 
     private func kindColor(_ kinds: [ExerciseKind], _ index: Int) -> Color {
@@ -109,78 +184,45 @@ struct ReportHealthSection: View {
 
     // MARK: - Columns
 
+    private func columns(_ stats: [Stat]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(stats.indices, id: \.self) { index in
+                if index > 0 { columnRule }
+                column(stats[index])
+            }
+        }
+    }
+
     private var columnRule: some View {
         Rectangle().fill(palette.rule).frame(width: 0.5, height: 30)
     }
 
-    private func column(_ label: String, _ value: String, tint: Color? = nil, dot: Color? = nil) -> some View {
+    private func column(_ stat: Stat) -> some View {
         VStack(spacing: 3) {
-            Text(value)
+            Text(stat.value)
                 .font(.system(size: 15, weight: .bold, design: options.font.numerals).monospacedDigit())
-                .foregroundStyle(tint ?? palette.ink)
+                .foregroundStyle(ink(for: stat.tone))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.75)
             HStack(spacing: 4) {
-                if let dot {
+                if let dot = stat.dot {
                     Circle()
                         .fill(palette.dataTint(dot))
                         .frame(width: 6, height: 6)
                 }
-                Text(label)
+                Text(stat.label)
                     .eyebrowStyle(palette.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Chips
-
-    private struct Chip: Identifiable {
-        let icon: String
-        let text: String
-        var id: String { icon }
-    }
-
-    /// Only numbers Health has for the day: a chip with nothing in it would
-    /// read as a broken card.
-    private var metricChips: [Chip] {
-        var chips: [Chip] = []
-        if options.shows(.steps), let steps = health.steps {
-            chips.append(Chip(icon: ReportMetric.steps.icon, text: "\(ReportFormat.count(steps)) steps"))
-        }
-        if options.shows(.exercise), health.exerciseKinds.isEmpty, let minutes = health.exerciseMinutes {
-            chips.append(Chip(icon: ReportMetric.exercise.icon, text: "\(ReportFormat.duration(minutes: minutes)) exercise"))
-        }
-        if options.shows(.sleep), let hours = health.sleepHours {
-            chips.append(Chip(icon: ReportMetric.sleep.icon, text: "\(ReportFormat.duration(minutes: hours * 60)) sleep"))
-        }
-        if options.shows(.mindful), let minutes = health.mindfulMinutes {
-            chips.append(Chip(icon: ReportMetric.mindful.icon, text: "\(ReportFormat.duration(minutes: minutes)) mindful"))
-        }
-        return chips
-    }
-
-    @ViewBuilder
-    private var chipLine: some View {
-        let chips = metricChips
-        if !chips.isEmpty {
-            FlowLayout(spacing: 6) {
-                ForEach(chips) { chip in
-                    HStack(spacing: 5) {
-                        Image(systemName: chip.icon)
-                            .font(.caption2.weight(.semibold))
-                        Text(chip.text)
-                            .font(.caption.weight(.semibold))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(palette.ink.opacity(0.85))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(palette.well, in: Capsule())
-                }
-            }
+    private func ink(for tone: Stat.Tone) -> Color {
+        switch tone {
+        case .plain: return palette.ink
+        case .good: return palette.success
+        case .caution: return AppColors.warning
         }
     }
 }

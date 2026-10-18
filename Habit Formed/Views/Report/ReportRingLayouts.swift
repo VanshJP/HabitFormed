@@ -61,14 +61,14 @@ struct ReportRings: View {
 
     /// Past this many, rings would be too thin to read.
     static let maxRings = 8
-    private let diameter: CGFloat = 196
+    private let diameter: CGFloat = 188
     /// The outer ring's edge, leaving room round it for the weekday letters.
-    private let outerRadius: CGFloat = 82
+    private let outerRadius: CGFloat = 76
     private let holeRadius: CGFloat = 30
 
     var body: some View {
         let shown = Array(report.items.prefix(Self.maxRings))
-        let step = min(16, (outerRadius - holeRadius) / CGFloat(max(shown.count, 1)))
+        let step = min(14, (outerRadius - holeRadius) / CGFloat(max(shown.count, 1)))
         let lineWidth = step * 0.7
 
         HStack(alignment: .center, spacing: 14) {
@@ -77,11 +77,11 @@ struct ReportRings: View {
                 ForEach(shown.indices, id: \.self) { index in
                     ring(shown[index], radius: outerRadius - step * CGFloat(index) - lineWidth / 2, lineWidth: lineWidth)
                 }
-                Text("\(report.done)/\(report.expected)")
+                Text(report.countText)
                     .font(.system(size: 17, weight: .bold, design: numerals).monospacedDigit())
                     .foregroundStyle(palette.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .minimumScaleFactor(0.65)
                     .frame(width: holeRadius * 2 - 6)
             }
             .frame(width: diameter, height: diameter)
@@ -95,9 +95,9 @@ struct ReportRings: View {
         ForEach(0..<7, id: \.self) { index in
             let angle = (CGFloat(index) + 0.5) / 7 * 2 * .pi - .pi / 2
             Text(report.date.adding(days: index - 6).formatted(.dateTime.weekday(.narrow)))
-                .font(.system(size: 9, weight: index == 6 ? .heavy : .semibold))
+                .font(.caption2.weight(index == 6 ? .heavy : .semibold))
                 .foregroundStyle(index == 6 ? palette.ink : palette.faint)
-                .offset(x: (outerRadius + 9) * cos(angle), y: (outerRadius + 9) * sin(angle))
+                .offset(x: (outerRadius + 10) * cos(angle), y: (outerRadius + 10) * sin(angle))
         }
     }
 
@@ -119,29 +119,31 @@ struct ReportRings: View {
         .frame(width: radius * 2, height: radius * 2)
     }
 
+    /// The habits in ring order, outside first, each with its run at the
+    /// trailing edge so the flames line up.
     private func legend(_ shown: [DailyReport.Item]) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Last 7 days")
                 .eyebrowStyle(palette.secondary)
             if shown.isEmpty {
-                Text("No habits on this card.")
+                Text("No habits on this card")
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
             }
             ForEach(shown) { item in
-                HStack(spacing: 6) {
+                HStack(alignment: .top, spacing: 6) {
                     Circle()
                         .fill(palette.habitTint(item.colorHex))
                         .frame(width: 7, height: 7)
+                        .padding(.top, 4.5)
                     Text(item.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(palette.ink.opacity(item.isDone ? 1 : 0.65))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.92)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if showStreaks, item.streak > 0 {
-                        Text("\(item.streak)")
-                            .font(.caption2.weight(.bold).monospacedDigit())
-                            .foregroundStyle(palette.secondary)
+                        ReportStreakCount(streak: item.streak, color: palette.secondary)
                     }
                 }
             }
@@ -159,35 +161,36 @@ struct ReportRings: View {
 
 /// The day as a small solar system: its ring in the middle, and each habit a
 /// circle on an orbit round it, filled with its colour once done. With
-/// streaks on, a habit kept longer is a bigger circle. The orbit's line
-/// breaks for each circle, so nothing is drawn through one.
+/// streaks on, a habit kept a week or more is the bigger circle. The orbit's
+/// line breaks for each circle, so nothing is drawn through one, and gives
+/// way to the circles alone once there are too many for it to read as a
+/// line.
 struct ReportOrbit: View {
     let report: DailyReport
     let palette: ReportPalette
     let showStreaks: Bool
     var numerals: Font.Design = .rounded
 
-    private let orbit: CGFloat = 122
-    private let side: CGFloat = 300
+    private let orbit: CGFloat = 112
+    private let side: CGFloat = 272
+    /// Past this many circles the line between them would be short dashes.
+    private let maxLined = 8
 
     var body: some View {
         let shown = Array(report.items.prefix(ReportCardView.maxItems))
 
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             ZStack {
-                path(shown)
+                if shown.count <= maxLined {
+                    path(shown)
+                }
                 ReportDayRing(report: report, palette: palette, diameter: 136, lineWidth: 12) {
-                    VStack(spacing: 0) {
-                        Text("\(report.done)/\(report.expected)")
-                            .font(.system(size: 32, weight: .bold, design: numerals).monospacedDigit())
-                            .foregroundStyle(palette.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                        Text(report.percentText)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(palette.secondary)
-                    }
-                    .padding(.horizontal, 16)
+                    Text(report.countText)
+                        .font(.system(size: 32, weight: .bold, design: numerals).monospacedDigit())
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .padding(.horizontal, 16)
                 }
                 ForEach(shown.indices, id: \.self) { index in
                     let angle = CGFloat(index) / CGFloat(shown.count) * 2 * .pi - .pi / 2
@@ -197,22 +200,18 @@ struct ReportOrbit: View {
             }
             .frame(width: side, height: side)
 
-            VStack(spacing: 4) {
-                Text(report.verdict)
-                    .font(.title2.bold())
-                    .foregroundStyle(palette.ink)
-                if report.items.count > shown.count {
-                    Text("+\(report.items.count - shown.count) more")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(palette.secondary)
-                }
+            if report.items.count > shown.count {
+                Text("+\(report.items.count - shown.count) more")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.secondary)
             }
         }
         .frame(maxWidth: .infinity)
     }
 
+    /// Two sizes only, so a bigger circle reads as a choice: a week's run.
     private func size(of item: DailyReport.Item) -> CGFloat {
-        showStreaks ? 34 + CGFloat(min(item.streak, 14)) : 42
+        showStreaks && item.streak >= 7 ? 48 : 38
     }
 
     /// The orbit as arcs from one circle to the next, each stopping 4pt
@@ -250,7 +249,7 @@ struct ReportOrbit: View {
             .background {
                 ZStack {
                     if item.isDone {
-                        Circle().fill(Color(hex: item.colorHex))
+                        Circle().fill(palette.doneFill(item.colorHex))
                     } else {
                         Circle().fill(palette.well)
                         Circle().strokeBorder(tint.opacity(0.6), lineWidth: 1.5)

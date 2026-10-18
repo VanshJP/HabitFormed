@@ -1,83 +1,118 @@
 import SwiftUI
 
-/// The report's Garden layout: a plant per habit on one strip of ground. A
+/// The report's Garden layout: a plant per habit, up to five to a bed. A
+/// bloom in its colour says done today, and a bud says still open, a Health
+/// habit's bud filled as far as its reading has come. With streaks on, a
 /// leaf per step of its run (a day, or a week for a weekly habit) grows the
-/// stem, a bloom in its colour says done today, and a bud says still open,
-/// a Health habit's bud filled as far as its reading has come. Name and run
-/// under each. Painted fills only, so `ImageRenderer` draws it.
+/// stem, and the run is named under the plant. Each bed is as tall as its
+/// tallest plant. Painted fills only, so `ImageRenderer` draws it.
 struct ReportGarden: View {
     let report: DailyReport
     let palette: ReportPalette
+    let showStreaks: Bool
 
-    /// Past this many, plants grow too narrow to name.
-    static let maxPlants = 8
-    /// Leaves past this many would grow the stem off the card; the run under
-    /// the plant still says the whole count.
+    /// Plants a bed holds before the next one starts, so every name wraps on
+    /// whole words.
+    static let perBed = 5
+    /// Two beds at most; past them, "+N more".
+    static let maxPlants = 10
+    /// Leaves past this many would grow the stem too tall; the run under the
+    /// plant still says the whole count.
     private let maxLeaves = 4
-    /// Tall enough for four leaves and a bloom.
-    private let bed: CGFloat = 214
+    private let leafStep: CGFloat = 30
+    private let bloom: CGFloat = 32
 
-    private var stem: Color { palette.dataTint(AppColors.leaf).opacity(palette.isLight ? 0.9 : 0.75) }
-    private var leaf: Color { palette.dataTint(AppColors.leaf) }
+    private var stemColor: Color { palette.dataTint(AppColors.leaf).opacity(palette.isLight ? 0.9 : 0.75) }
+    private var leafColor: Color { palette.dataTint(AppColors.leaf) }
 
     var body: some View {
         let shown = Array(report.items.prefix(Self.maxPlants))
+        let beds = Self.beds(of: shown)
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             if shown.isEmpty {
-                Text("No habits on this card.")
+                Text("No habits on this card")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondary)
-            } else {
-                VStack(spacing: 0) {
-                    HStack(alignment: .bottom, spacing: 0) {
-                        ForEach(shown) { plant($0).frame(maxWidth: .infinity) }
-                    }
-                    .frame(height: bed, alignment: .bottom)
-                    Rectangle().fill(palette.faint).frame(height: 1.5)
-                    Rectangle().fill(palette.well).frame(height: 8)
-                    HStack(alignment: .top, spacing: 0) {
-                        ForEach(shown) { tag($0).frame(maxWidth: .infinity) }
-                    }
-                    .padding(.top, 8)
-                }
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text("A bloom is done today, a bud is still open, and each leaf is one more in a row")
-                    .font(.caption)
+            ForEach(beds.indices, id: \.self) { index in
+                bed(beds[index])
+            }
+            if report.items.count > shown.count {
+                Text("+\(report.items.count - shown.count) more")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if report.items.count > shown.count {
-                    Spacer(minLength: 8)
-                    Text("+\(report.items.count - shown.count) more")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(palette.secondary)
-                }
             }
+        }
+    }
+
+    /// The plants shared evenly over as few beds as hold them: seven is four
+    /// and three.
+    private static func beds(of items: [DailyReport.Item]) -> [[DailyReport.Item]] {
+        guard !items.isEmpty else { return [] }
+        let count = (items.count + perBed - 1) / perBed
+        let size = (items.count + count - 1) / count
+        return stride(from: 0, to: items.count, by: size).map { Array(items[$0..<min($0 + size, items.count)]) }
+    }
+
+    // MARK: - A bed
+
+    private func bed(_ plants: [DailyReport.Item]) -> some View {
+        let height = plants.map { reach(of: $0) }.max() ?? 0
+
+        return VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 0) {
+                ForEach(plants) { plant($0).frame(maxWidth: .infinity) }
+            }
+            .frame(height: height + 4, alignment: .bottom)
+            Rectangle().fill(palette.faint).frame(height: 1.5)
+            Rectangle().fill(palette.well).frame(height: 8)
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(plants) { tag($0).frame(maxWidth: .infinity) }
+            }
+            .padding(.top, 8)
         }
     }
 
     // MARK: - A plant
 
+    private func leafCount(of item: DailyReport.Item) -> Int {
+        showStreaks ? min(item.streak, maxLeaves) : 0
+    }
+
+    private func stemHeight(of item: DailyReport.Item) -> CGFloat {
+        let count = leafCount(of: item)
+        return count == 0 && !item.isDone ? 16 : 30 + CGFloat(count) * leafStep
+    }
+
+    private func headSize(of item: DailyReport.Item) -> CGSize {
+        if item.isDone { return CGSize(width: bloom, height: bloom) }
+        return leafCount(of: item) == 0 ? CGSize(width: 9, height: 14) : CGSize(width: 13, height: 20)
+    }
+
+    /// How far a plant stands above the ground, its head included.
+    private func reach(of item: DailyReport.Item) -> CGFloat {
+        stemHeight(of: item) - 4 + headSize(of: item).height
+    }
+
     private func plant(_ item: DailyReport.Item) -> some View {
-        let leaves = min(item.streak, maxLeaves)
-        let height: CGFloat = leaves == 0 && !item.isDone ? 16 : 34 + CGFloat(leaves) * 38
+        let count = leafCount(of: item)
+        let height = stemHeight(of: item)
         return ZStack(alignment: .bottom) {
             Capsule()
-                .fill(stem)
+                .fill(stemColor)
                 .frame(width: 2.5, height: height)
-            ForEach(0..<leaves, id: \.self) { index in
+            ForEach(0..<count, id: \.self) { index in
                 let left = index.isMultiple(of: 2)
                 Ellipse()
-                    .fill(leaf)
+                    .fill(leafColor)
                     .frame(width: 17, height: 8)
                     .rotationEffect(.degrees(left ? -35 : 35))
-                    .offset(x: left ? -8 : 8, y: -(18 + CGFloat(index) * 38))
+                    .offset(x: left ? -8 : 8, y: -(16 + CGFloat(index) * leafStep))
             }
             head(item)
                 .offset(y: -height + 4)
         }
-        .frame(height: bed, alignment: .bottom)
     }
 
     /// A bloom of six petals round a pale heart once done; a closed bud
@@ -98,22 +133,24 @@ struct ReportGarden: View {
                     .fill(Color.white.opacity(0.9))
                     .frame(width: 9, height: 9)
             }
-            .frame(width: 32, height: 32)
+            .frame(width: bloom, height: bloom)
         } else {
             let tint = palette.habitTint(item.colorHex)
-            let small = item.streak == 0
+            let size = headSize(of: item)
             Ellipse()
                 .fill(tint.opacity(0.18))
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(tint)
-                        .frame(height: (small ? 14 : 20) * (item.progress ?? 0))
+                        .frame(height: size.height * CGFloat(item.progress ?? 0))
                 }
                 .clipShape(Ellipse())
                 .overlay { Ellipse().strokeBorder(tint, lineWidth: 1.5) }
-                .frame(width: small ? 9 : 13, height: small ? 14 : 20)
+                .frame(width: size.width, height: size.height)
         }
     }
+
+    // MARK: - Tag
 
     private func tag(_ item: DailyReport.Item) -> some View {
         VStack(spacing: 2) {
@@ -122,19 +159,22 @@ struct ReportGarden: View {
                 .foregroundStyle(palette.ink.opacity(item.isDone ? 1 : 0.75))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
-            Text(run(item))
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(palette.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .allowsTightening(true)
+            if let line = runText(item) {
+                Text(line)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(palette.secondary)
+                    .lineLimit(1)
+            }
         }
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 3)
     }
 
-    /// "3 days", "2 wks", "45%" for a Health habit still growing, "new".
-    private func run(_ item: DailyReport.Item) -> String {
+    /// "45%" for a Health habit still growing; with streaks on, "3 days" or
+    /// "2 wks". Nothing for a run not yet started.
+    private func runText(_ item: DailyReport.Item) -> String? {
         if !item.isDone, let progress = item.progress { return "\((progress * 100).safeRounded)%" }
-        return item.streak > 0 ? "\(item.streak) \(item.streakUnit)" : "new"
+        guard showStreaks, item.streak > 0 else { return nil }
+        return "\(item.streak) \(item.streakUnit)"
     }
 }

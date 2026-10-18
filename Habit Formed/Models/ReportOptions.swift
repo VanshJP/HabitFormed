@@ -22,6 +22,10 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
     case dusk
     case tide
     case paper
+    /// Warm gray paper.
+    case stone
+    /// Cool blue-gray paper.
+    case cloud
 
     var id: String { rawValue }
 
@@ -35,6 +39,8 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         case .dusk: return "Dusk"
         case .tide: return "Tide"
         case .paper: return "Paper"
+        case .stone: return "Stone"
+        case .cloud: return "Cloud"
         case .black: return "Black"
         case .graphite: return "Graphite"
         case .navy: return "Navy"
@@ -43,8 +49,8 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The canvas behind the card, or nil for paper. `appLook` is the app's
-    /// current one, used by `.app`.
+    /// The canvas behind the card, or nil for the papers. `appLook` is the
+    /// app's current one, used by `.app`.
     func look(appLook: CanvasLook) -> CanvasLook? {
         switch self {
         case .app: return appLook
@@ -54,12 +60,55 @@ nonisolated enum ReportTheme: String, CaseIterable, Identifiable, Sendable {
         case .ember: return .ember
         case .dusk: return .dusk
         case .tide: return .tide
-        case .paper: return nil
+        case .paper, .stone, .cloud: return nil
         case .black: return .black
         case .graphite: return .graphite
         case .navy: return .navy
         case .plum: return .plum
         case .forest: return .forest
+        }
+    }
+
+    /// True for the light themes, which print on paper.
+    var isPaper: Bool { self == .paper || self == .stone || self == .cloud }
+}
+
+// MARK: - Report Scope
+
+/// Which card the report sheet makes: the day, the last seven days, or the
+/// year so far. Not stored: each way in opens on its own.
+nonisolated enum ReportScope: String, CaseIterable, Identifiable, Sendable {
+    case day
+    case week
+    case year
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .day: return "Day"
+        case .week: return "Week"
+        case .year: return "Year"
+        }
+    }
+}
+
+// MARK: - Year Layout
+
+/// How the year card draws its days. Persisted by raw value
+/// (`AppPreferences.reportYearLayout`).
+nonisolated enum YearLayout: String, CaseIterable, Identifiable, Sendable {
+    /// A row per month, a square per day: the year in pixels.
+    case pixels
+    /// Twelve small month calendars, four to a row.
+    case months
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pixels: return "Pixels"
+        case .months: return "Months"
         }
     }
 }
@@ -97,8 +146,22 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
     case stamps
     /// A paper slip: a line per habit, the day's totals and a barcode.
     case receipt
+    /// A table: a row per habit, today, the run and the week in columns.
+    case ledger
+    /// The day in the order it was logged, each log at its time.
+    case timeline
+    /// The count set large and the habits under it in two columns.
+    case minimal
 
     var id: String { rawValue }
+
+    /// The order the editor offers them: the plain, professional ones
+    /// first, then the charts, then the things of their own.
+    static let gallery: [ReportLayout] = [
+        .list, .ledger, .minimal, .timeline, .grid, .week,
+        .rings, .focus, .orbit, .sundial, .bubbles, .garden,
+        .frontPage, .receipt, .punchCard, .stamps, .constellation,
+    ]
 
     var title: String {
         switch self {
@@ -116,19 +179,26 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
         case .stamps: return "Stamps"
         case .bubbles: return "Bubbles"
         case .receipt: return "Receipt"
+        case .ledger: return "Ledger"
+        case .timeline: return "Timeline"
+        case .minimal: return "Minimal"
         }
     }
 
-    /// Notes and the week's dots need a row to sit in.
-    var showsRowDetail: Bool { self == .list }
+    /// Each habit's note needs a row to sit under: List and Timeline.
+    var showsHabitNotes: Bool { self == .list || self == .timeline }
+
+    /// The last seven days as dots in a row: List and Ledger.
+    var showsWeekDots: Bool { self == .list || self == .ledger }
 
     /// Focus and Orbit stand alone as one poster under a centred header.
     var isPoster: Bool { self == .focus || self == .orbit }
 
     /// The layouts that are a thing of their own (a front page, a punch card,
     /// a night sky, an envelope, a receipt): the whole image, with their own
-    /// paper, ink and type, so the card's background, accent and type do not
-    /// reach them.
+    /// paper, ink and type, so the card's accent and type do not reach them.
+    /// The receipt is a slip lying on the card's background, so that still
+    /// reaches it.
     var ownsLook: Bool {
         switch self {
         case .frontPage, .punchCard, .constellation, .stamps, .receipt: return true
@@ -136,32 +206,38 @@ nonisolated enum ReportLayout: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The layouts with a ring beside the verdict, which `ReportRing` can
-    /// shrink to the corner or leave off. Focus and Orbit are their ring,
-    /// Rings and Sundial count the day in their middle, and the layouts with
-    /// a look of their own print it their way.
-    var showsRing: Bool { !isPoster && !ownsLook && self != .rings && self != .sundial }
+    /// The card's background shows: every layout but the ones that bring
+    /// their own paper edge to edge.
+    var showsBackground: Bool { !ownsLook || self == .receipt }
+
+    /// The layouts with the day's count in the header's corner, which
+    /// `ReportRing` sizes or turns into a number. Focus and Orbit are their
+    /// ring, Rings, Sundial and Minimal count the day in their middle, and
+    /// the layouts with a look of their own print it their way.
+    var showsRing: Bool {
+        !isPoster && !ownsLook && self != .rings && self != .sundial && self != .minimal
+    }
 }
 
 // MARK: - Report Ring
 
-/// Where the card's progress ring sits. Persisted by raw value
-/// (`AppPreferences.reportRing`).
+/// How the header counts the day. Persisted by raw value
+/// (`AppPreferences.reportRing`); the names are older than the choices.
 nonisolated enum ReportRing: String, CaseIterable, Identifiable, Sendable {
-    /// Big beside the verdict.
+    /// A big ring in the header's corner.
     case big
-    /// Small in the header's top corner, so the card is shorter.
+    /// A small ring in the header's corner.
     case corner
-    /// No ring: the verdict and the day's share say it in words.
+    /// No ring: the count as a number.
     case off
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .big: return "Big"
-        case .corner: return "Corner"
-        case .off: return "Off"
+        case .big: return "Big ring"
+        case .corner: return "Small ring"
+        case .off: return "Number"
         }
     }
 }
@@ -238,6 +314,7 @@ nonisolated struct ReportOptions: Sendable, Hashable {
     /// The app's look, which `.app` paints.
     var appLook: CanvasLook = .classic
     var layout: ReportLayout = .list
+    var yearLayout: YearLayout = .pixels
     var ring: ReportRing = .big
     /// A palette colour's hex for the ring, mark and note bar, or empty to
     /// follow the theme's own accent.
@@ -255,6 +332,29 @@ nonisolated struct ReportOptions: Sendable, Hashable {
 
     /// The canvas behind the card, or nil for paper.
     var look: CanvasLook? { theme.look(appLook: appLook) }
+
+    /// The note for this card, trimmed; empty when there is none.
+    var trimmedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// These options with another layout, for the layout gallery.
+    func with(layout: ReportLayout) -> ReportOptions {
+        var copy = self
+        copy.layout = layout
+        return copy
+    }
+
+    func with(yearLayout: YearLayout) -> ReportOptions {
+        var copy = self
+        copy.yearLayout = yearLayout
+        return copy
+    }
+
+    /// The look alone, so typing a note does not count as a new look.
+    var style: ReportOptions {
+        var copy = self
+        copy.note = ""
+        return copy
+    }
 
     /// True when the card needs Apple Health numbers.
     var needsHealth: Bool { !metrics.isEmpty }

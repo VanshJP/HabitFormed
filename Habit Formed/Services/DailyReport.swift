@@ -39,20 +39,23 @@ nonisolated struct DailyReport: Sendable, Hashable {
     var fraction: Double { expected == 0 ? 0 : Double(done) / Double(expected) }
     var remaining: Int { max(expected - done, 0) }
     var isPerfect: Bool { expected > 0 && done >= expected }
-    var percentText: String { "\((fraction * 100).safeRounded)%" }
 
     /// "Tue, Oct 13".
     var dateText: String {
         date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
-    /// One line for the hero: what the day amounted to.
+    /// What the day amounted to, in words: "Perfect day", "3 of 5 done", or
+    /// "Rest day" when nothing was asked.
     var verdict: String {
         if expected == 0 { return done > 0 ? "Bonus day" : "Rest day" }
         if isPerfect { return "Perfect day" }
-        if isToday { return remaining == 1 ? "1 to go" : "\(remaining) to go" }
-        return fraction >= 0.5 ? "Solid day" : "Building back"
+        return "\(done) of \(expected) done"
     }
+
+    /// The count a ring or a number prints: "3/5", or "Rest" on a day that
+    /// asked nothing, where "0/0" would read as a failure.
+    var countText: String { expected == 0 ? "Rest" : "\(done)/\(expected)" }
 }
 
 // MARK: - Number formats

@@ -26,7 +26,7 @@ final class MessageComposer: NSObject, MFMessageComposeViewControllerDelegate {
         if let image,
            MFMessageComposeViewController.canSendAttachments(),
            let data = image.pngData() {
-            composer.addAttachmentData(data, typeIdentifier: UTType.png.identifier, filename: "Daily report.png")
+            composer.addAttachmentData(data, typeIdentifier: UTType.png.identifier, filename: "Report.png")
         }
         root.present(composer, animated: true)
         return true

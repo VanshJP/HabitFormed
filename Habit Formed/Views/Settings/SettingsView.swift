@@ -37,7 +37,7 @@ struct SettingsView: View {
         .background { AppBackground() }
         .pageTopBar("Settings")
         .sheet(isPresented: $showArrange) { ArrangeHabitsSheet() }
-        .sheet(isPresented: $showReportCard) { DailyReportSheet(day: Date(), isPreset: true) }
+        .sheet(isPresented: $showReportCard) { ReportSheet(day: Date(), isPreset: true) }
         .onChange(of: reminderOn) { _, isOn in
             // Turning it on lands it just after the day usually wraps up.
             if isOn, let suggested = suggestedReminder {

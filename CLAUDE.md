@@ -60,9 +60,10 @@ Habit Formed/
 ├── Habit_FormedApp.swift     # App entry: ModelContainer (Habit, HabitCompletion) + services
 ├── ContentView.swift         # Today, the root page: month control, week strip, the habits, undo toast
 ├── Models/                   # Habit, HabitCompletion, DayLedger, ReminderTiming, ReminderSuggestion,
-│                             #   HabitGuess, ReportOptions (+ ReportTheme)
-├── Services/                 # HealthKit, notifications, timer, widget sync, report + weekly recap builders,
-│                             #   renderer, share, Messages, HabitInsights, OnDeviceModel, ReportHeadline
+│                             #   HabitGuess, ReportOptions (+ ReportTheme, ReportScope, ReportLayout, YearLayout)
+├── Services/                 # HealthKit, notifications, timer, widget sync, day, week (WeeklyRecap) and
+│                             #   year (YearReport) builders, renderer (+ ReportPosterView), share, Messages,
+│                             #   HabitInsights, OnDeviceModel, ReportHeadline
 ├── Intents/                  # Siri: HabitEntity, LogHabitTodayIntent, AddHabitIntent, TodayStatusIntent,
 │                             #   HabitShortcuts
 ├── Theme/                    # Ported SpeakUp tokens: AppColors, AppLayout, AppType, AppMotion,
@@ -75,14 +76,17 @@ Habit Formed/
     ├── AddHabit/             # AddHabitView, HabitDraft (+ HabitTemplate), form sections (ideas, look, how you log it,
 │                             #   how often), HabitReminderSection, asked as plain questions with chips
     ├── History/              # HistoryHero, PatternsSection, ConsistencyHeatMap (+ legend), DayRow
-    ├── Report/               # DailyReportSheet, ReportCardView (+ ReportCardLayouts, ReportWeekBoard,
-    │                         #   ReportBubbles, ReportReceipt, ReportHealthSection,
-    │                         #   ReportRingLayouts: the day ring, Rings, Orbit, ReportSundial, ReportGarden,
-    │                         #   and the ones with a look of their own: ReportFrontPage, ReportPunchCard,
-    │                         #   ReportConstellation, ReportStamps),
-    │                         #   ReportStyleEditor, MacroFieldsRow,
-    │                         #   WeeklyRecapSheet, WeeklyRecapCardView (+ Grid),
-    │                         #   ReportSheetParts (preview, theme row, edit button, send bar shared by both sheets)
+    ├── Report/               # ReportSheet (Day, Week, Year; the send page or the studio), ReportSheetFields,
+    │                         #   ReportSheetParts (preview, stage, thumbnail), ReportSheetControls (scope picker,
+    │                         #   theme row, edit button, send bar), ReportStudio (+ ReportLayoutTools,
+    │                         #   ReportCardTools: Content and Style), MacroFieldsRow,
+    │                         #   ReportCardChrome (palette, header, note, regions, ground),
+    │                         #   ReportCardView (+ ReportCardLayouts: Grid, Focus; ReportLedger, ReportTimeline,
+    │                         #   ReportMinimal, ReportWeekBoard, ReportBubbles, ReportHealthSection,
+    │                         #   ReportRingLayouts: the day ring, Rings, Orbit; ReportSundial (+ Key), ReportGarden,
+    │                         #   and the ones with a look of their own: ReportFrontPage, ReportReceipt,
+    │                         #   ReportPunchCard, ReportConstellation, ReportStamps),
+    │                         #   WeeklyRecapCardView (+ Grid), YearReportCardView (+ YearReportDays, YearReportHabits)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
     ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
     ├── HabitTileView.swift   # One grid tile
@@ -324,96 +328,140 @@ Habits can carry an optional countdown timer
 pause/resume/reset, and auto-logs the habit on completion (only if not
 already logged today). Closing before completion does **not** log.
 
-### Daily report
+### Reports
 
-Keep it simple: one report, everything on by default, switches to take
-things out. No templates, layouts or placeholder tokens.
+Keep it simple: one sheet, one card at a time, everything on by default,
+switches to take things out. No templates or placeholder tokens.
 
+- `ReportSheet` is the one way to send: Day, Week or Year
+  (`ReportScope`, `ReportScopePicker`: one glass capsule pinned under the
+  title, the picked one a solid white pill that glides) over the card as
+  it will be sent, then one panel of fields (calories eaten while Calories
+  is on, protein, carbs and fat while Macros is on, the day card only; then
+  this card's note), with Text it (`MessageComposer`, Messages with the
+  image attached) and Share (`SharePresenter`; Save and Copy live in the
+  share sheet) pinned at the foot (`safeAreaBar`), so they never scroll out
+  of reach. Today's Share report opens it on Day, History's Weekly recap,
+  the Sunday nudge and `WidgetLink.recap` on Week (`RootSheet.recap`); the
+  week ends and the year runs up to the sheet's day. Every card sends alone,
+  with no text typed under it, and prints the reporter's name
+  (`AppPreferences.reporterName`) so a forwarded card still says whose it
+  was.
+- Edit, or a tap on the card, opens the studio (`ReportStudio`): the whole
+  card on a stage (`ReportStage`, scaled to fit both ways) over a dock of
+  tools picked with chips, Layout (the day's layouts as a rail of live
+  thumbnails of your own card, `ReportLayoutGallery`, with the Count chips
+  under it; Pixels or Months for the year; the week has one layout),
+  Content (name, this card's note, habits, details, Health, as
+  `ToggleChip` bands) and Style (background rail, accent dots, type, each
+  only where the card shows it). The card is edited on itself: its parts
+  are `reportRegion`s, outlined in dashes in the studio only, and a tap on
+  one opens its tools (the habits Layout, the name, Health and note
+  Content, the ground Style). `reportRegionTap` is set only by the studio,
+  so the image sent and the send page never react. Settings → Report
+  style opens the studio alone (`ReportSheet(isPreset: true)`, nothing to
+  send). The sheet sends nothing it has not shown: the poster is the
+  preview too.
 - `ReportOptions` is the whole configuration: a `ReportTheme` (App look by
   default, which paints whatever `AppCanvas` the app wears via
-  `ReportOptions.appLook`; or a canvas, the plain ones first; or paper), a `ReportLayout` (List, Grid like Today,
-  Week: a board of the last seven days, Rings: the same week as a ring per
-  habit from the outside in, seven arcs each, named beside it in ring
-  order, Focus: one big ring and a strip of glyphs, Orbit: the day's ring
-  with each habit a circle on an orbit round it, sized by its streak,
-  Sundial: a 24-hour dial, midnight at the top, each log a bead at its
-  time named along a spoke (spokes closer than 45 minutes fan apart with a
-  hairline back), the night's sleep (`DayHealthMetrics.sleepSpan`, the
-  longest stretch, so a nap stays out) and workouts (`workoutSpans`) as rim
-  bands while the card shows them, a hand at now on today's, Garden: a plant
-  per habit, a leaf per step of its run (four at most), a bloom once done,
-  a bud while open filled to a Health habit's `progress`, Constellation: a
-  night sky, done stars joined in the order logged (`Item.loggedAt`), dashed
-  on through the dark ones, three to a row winding back and forth,
-  Bubbles: a honeycomb of circles that fill when done (rows of one or three
-  take turns with rows of two, `ReportBubbles.rowPlan`, so no row lands on
-  the one above; seven is 2, 3, 2), Front page: "The Daily Habit", its
-  headline and the line under it written from the numbers by
-  `ReportHeadline` (no model), done and still open in two columns, "By the
-  numbers", a ticker of runs, Punch card: a kraft card on a dark table, a
-  hole punched through per day logged in the last week, Stamps: a stamp per
-  habit on an airmail envelope, postmarked once done, Health as a customs
-  declaration, or Receipt: a
-  torn paper slip in monospaced capitals, habits on dotted leaders, totals
-  and Health numbers as line items, a barcode; the image sent is the slip
-  alone, 340pt, clear around its torn edges, with no card or canvas).
-  Front page, Punch card, Constellation, Stamps and Receipt are things of
-  their own (`ReportLayout.ownsLook`): the whole image, in their own paper,
-  ink and type from `AppColors` (Report papers) and iOS's own faces (Didot,
-  Courier, Futura, Baskerville, Bodoni), so the editor hides Background
-  and Type for them (and Accent, but for the receipt's mark); they print
-  Health as lines (`DayHealthMetrics.lines(showing:)`, shared with the
-  receipt). Then
-  `ReportRing` for the layouts with a ring beside the verdict (Big, Corner:
-  small at the header's trailing edge, or Off). Every card's day ring is
-  `ReportDayRing`: an arc per expected habit, in its colour once done, done
-  ones first, so a perfect day closes in every colour. Then an accent (empty follows
-  the theme's `CanvasLook.accent`, or a palette hex), a `ReportFont`
-  (Default, Rounded, Serif, Mono), hidden habits, switches for each habit's
-  streak (the card prints no perfect-day streak; History keeps that),
-  notes and last 7 days, and the Apple Health numbers (`ReportMetric`: steps,
-  exercise, sleep, mindful, calories in vs out, macros), one chip each so
-  what is picked is exactly what shows. On a day with a workout, exercise
-  is drawn like the macros: the total over what it went on
-  (`DayHealthMetrics.exerciseKinds`: Health's exercise minutes inside each
-  workout, by kind, the rest as "Other"; without an Apple Watch, the
-  workouts' own lengths), at most three parts. Notes and the week's dots exist only
-  in List. All in `@AppStorage` (metrics as one comma-joined
-  `report.metrics`, defaulting to what the old Calories and Activity
-  switches had on); the note is for one card only. `ReportStyleEditor`
-  edits them and is the one editor for Settings → Report style and the
-  sheet's Edit, so every customization lives there: "On the card" leads (one
-  panel: your name, kept for every card and recap, then a band of chips
-  each for habits, details and Health numbers, 10pt apart either way), the
-  look follows (layout as a 3-wide `SketchPicker` with the Ring chips under
-  it, background, accent, type, the last three only where the layout uses
-  them).
-- `DailyReportBuilder` turns habits + options into a `DailyReport` value;
-  `ReportCardView` draws it at a fixed 390pt width with painted fills only
-  (no glass: `ImageRenderer` cannot draw it), using `ReportPalette` for ink
-  on canvas or paper. The sheets show that view live, scaled to fit
-  (`ReportPreview`), so a theme or switch shows at once;
-  `ReportCardRenderer` draws the image at 3x only when it is sent.
-- The look is set ahead of time, so sending carries no choices: Settings →
-  Report style opens `DailyReportSheet(isPreset: true)` (live preview, theme
-  layout as `SketchPicker` pictures, background rail, accent dots, type
-  chips, "On the card" as `ToggleChip`s; nothing to send).
-- `DailyReportSheet` to send: live preview, one panel of fields (calories
-  eaten while Calories is on, protein, carbs and fat while Macros is on,
-  this card's note), then
-  Text it (`MessageComposer`, Messages with the image attached) and Share
-  (`SharePresenter`; Save and Copy live in the share sheet), right under
-  the note. Edit (`ReportEditButton`, top trailing) opens
-  `ReportStyleEditor` and pins the send bar; what is picked there is the
-  preset too. The recap takes the theme, accent and type; its Edit opens
-  the theme. Both send the card alone, with no text typed under it. The card prints the reporter's name
-  (`AppPreferences.reporterName`) so a forwarded card still says whose day
-  it was. Calories eaten and macros come from Apple Health and can be typed
-  over before sending.
+  `ReportOptions.appLook`; or a canvas, the plain ones first; or a paper:
+  Paper, Stone, Cloud), a `ReportLayout`, offered in `ReportLayout.gallery`
+  order, the plain ones first: List, Ledger (a table: today's mark, the run
+  and the last seven days in columns under eyebrow headings, a total under
+  a double rule), Minimal (the count set large, the habits in two columns,
+  a dot each), Timeline (each log at its time on a line down the leading
+  edge, then still open, also done and off today), Grid like Today, Week (a
+  board of the last seven days), Rings (the same week as a ring per habit
+  from the outside in, seven arcs each, named beside it in ring order),
+  Focus (one big ring and a centred strip of glyphs), Orbit (the day's ring
+  with each habit a circle on an orbit round it, bigger for a run of a week
+  or more), Sundial (a 24-hour dial, midnight at the top: logs made within
+  40 minutes of each other gather into one numbered bead at the first's
+  time, `SundialMoment`, shared in wedges, named in `ReportSundialKey`
+  under the dial with what is open, done untimed and off; the night's
+  sleep, `DayHealthMetrics.sleepSpan`, the longest stretch so a nap stays
+  out, and workouts, `workoutSpans`, as thin rim bands while the card shows
+  them; a hand at now on today's), Bubbles (a honeycomb of circles that fill
+  when done; rows of one or three take turns with rows of two,
+  `ReportBubbles.rowPlan`, so no row lands on the one above), Garden (a
+  plant per habit in beds of up to five, a leaf per step of its run while
+  streaks show, four at most, a bloom once done, a bud while open filled to
+  a Health habit's `progress`), then the things of their own: Front page
+  ("The Daily Habit", its headline and the line under it written from the
+  numbers by `ReportHeadline`, no model; done and still open in two
+  columns, or one side across both when the other is empty; "By the
+  numbers"; a ticker of the five longest runs), Receipt (a torn slip in
+  monospaced capitals lying on the card's background, habits on dotted
+  leaders, Health numbers as line items, a barcode), Punch card (a kraft
+  card on a dark table, a hole punched through per day logged in the last
+  week), Stamps (a stamp per habit on an airmail envelope, postmarked once
+  done, Health as a customs declaration) and Constellation (a night sky,
+  done stars joined in the order logged, `Item.loggedAt`, dashed on through
+  the dark ones, three to a row winding back and forth). Front page,
+  Receipt, Punch card, Stamps and Constellation are `ReportLayout.ownsLook`:
+  their own paper, ink and type from `AppColors` (Report papers) and iOS's
+  own faces (Didot, Courier, Futura, Baskerville, Bodoni), so the studio
+  hides Accent and Type for them and Background for all but the receipt
+  (`showsBackground`; its store mark takes the accent); they print Health
+  as lines (`DayHealthMetrics.lines(showing:)`). Then `ReportRing` for the
+  layouts with a count in the header's corner (`showsRing`: Big ring, Small
+  ring, or Number), an accent (empty follows the theme's
+  `CanvasLook.accent`, or a palette hex), a `ReportFont` (Default, Rounded,
+  Serif, Mono), the year's `YearLayout`, hidden habits, switches for each
+  habit's streak (the card prints no perfect-day streak; History keeps
+  that), habit notes (List, Timeline: `showsHabitNotes`) and the last 7
+  days (List, Ledger: `showsWeekDots`), and the Apple Health numbers
+  (`ReportMetric`: steps, exercise, sleep, mindful, calories in vs out,
+  macros), one chip each so what is picked is exactly what shows. All in
+  `@AppStorage` (metrics as one comma-joined `report.metrics`, defaulting
+  to what the old Calories and Activity switches had on); the note is for
+  one card only.
+- Every card is built on `ReportCardChrome`: `ReportPalette` (ink on canvas
+  or paper), `ReportCardHeader` (name, date and, on a perfect day, a green
+  "Perfect day"; the count at its trailing edge), `ReportNote`,
+  `reportCardFrame` (390pt, inset, ground, type) and `reportInk` (Dynamic
+  Type pinned). A card says each fact once: no verdict or percent beside
+  the count, no app wordmark, no captions explaining the drawing. Every
+  day ring is `ReportDayRing`: an arc per expected habit, in its colour once
+  done, done ones first, so a perfect day closes in every colour; its
+  centre is `DailyReport.countText` ("3/5", or "Rest" on a day that asked
+  nothing). Health is at most two wells (`ReportHealthSection`: activity in
+  up to four columns, with exercise split over the day's workouts,
+  `DayHealthMetrics.exerciseKinds`, at most three parts; then food,
+  calories over the macros), and a number Health lacks is left out, never
+  "n/a". No text on a card under 11pt.
+- `DailyReportBuilder` turns habits + options into a `DailyReport` value,
+  `WeeklyRecapBuilder` a `WeeklyRecap`, `YearReportBuilder` a `YearReport`;
+  `ReportCardView`, `WeeklyRecapCardView` and `YearReportCardView` draw them
+  with painted fills only (no glass: `ImageRenderer` cannot draw it).
+  `ReportPosterView` lays a card on its backdrop (`ReportBackdrop`: its
+  canvas or paper, or the colour under a layout with paper of its own)
+  never taller than 4:5 (`ReportCardRenderer.maxAspect`), the tallest
+  Messages and Instagram show whole: a taller card gets the backdrop
+  widened beside it instead of anything cut, and the backdrop is painted
+  edge to edge so a widened canvas has no seam (`reportPaintsCanvas`). The
+  send page shows that poster live (`ReportPreview`);
+  `ReportCardRenderer` draws it at 3x, opaque, only when it is sent. Keep a
+  5-habit card without Health near 390 by 487 so it is not shrunk.
 - An optional daily reminder (`report-reminder`) opens today's report.
   Turning it on sets it 30 minutes after the day's usual last log
   (`ReminderTiming.reminder(afterTypical:)`), with that reason as the
   row's caption; the time stays the person's to change.
+
+### Weekly recap and year
+
+The week's card is the same idea for the last seven days:
+`WeeklyRecapBuilder` (perfect days against the week before, each habit's
+seven `DayStatus` squares, the longest streak and the habit that climbed
+most) and `WeeklyRecapCardView`, each number over the habit it belongs to.
+An optional Sunday 7 PM nudge (`recap-reminder`, switched on in Settings)
+opens it. The year's card runs from January 1 to the sheet's day:
+`YearReportBuilder` walks those days once (`DayLedger.summaries`) for
+perfect days, logs, the best run of perfect days, each habit's rate (weekly
+habits by the weeks they met) and best run, the best month and the
+strongest weekday, and `YearReportCardView` draws the days as Pixels (a row
+per month, a square per day) or Months (twelve small calendars). Both share
+the day card's theme, accent, type, hidden habits and name.
 
 ### Siri and Apple Intelligence
 
@@ -435,18 +483,6 @@ devices), never calls it from `body`, and checks the reply (length, no
 numbers it was not given) before showing it. Today it rewords a reminder
 suggestion's reason and writes History's one tip, cached a day per set of
 facts (`AppPreferences.insightsTip`).
-
-### Weekly recap
-
-The Sunday recap is the same idea for a week: `WeeklyRecapBuilder` turns
-habits into a `WeeklyRecap` value for the last seven days (perfect days
-against the week before, each habit's seven `DayStatus` squares, the
-longest streak and the habit that climbed most), and `WeeklyRecapCardView`
-draws it under the daily card's rules. `WeeklyRecapSheet` shares the
-daily report's theme, hidden habits and name, and its preview, theme row
-and send bar (`ReportSheetParts`). It opens from History's "Weekly recap"
-button, from an optional Sunday 7 PM nudge (`recap-reminder`, switched on
-in Settings), or from `WidgetLink.recap`.
 
 ## Conventions
 

@@ -5,8 +5,9 @@ import Foundation
 /// calorie balance when the card shows it. No model: the words follow the
 /// numbers, so a headline never claims what the day did not do.
 nonisolated enum ReportHeadline {
-    /// "Three-day runs hold for Read, Creatine and Mobility".
-    static func headline(for report: DailyReport) -> String {
+    /// "Three-day runs hold for Read, Creatine and Mobility". With
+    /// `showsStreaks` off it never talks about runs.
+    static func headline(for report: DailyReport, showsStreaks: Bool = true) -> String {
         if report.expected == 0 {
             return report.done > 0 ? "A bonus day: \(words(report.done)) done with nothing due" : "A day of rest"
         }
@@ -14,7 +15,7 @@ nonisolated enum ReportHeadline {
             return report.expected == 1 ? "One for one: the day is done" : "Clean sweep: all \(words(report.expected)) done"
         }
         let done = report.items.filter(\.isDone)
-        if let leader = done.max(by: { $0.streak < $1.streak }), leader.streak >= 2 {
+        if showsStreaks, let leader = done.max(by: { $0.streak < $1.streak }), leader.streak >= 2 {
             let unit = unitWord(leader.streakUnit)
             let leaders = done.filter { $0.streak == leader.streak && unitWord($0.streakUnit) == unit }
             let run = "\(words(leader.streak))-\(unit)"

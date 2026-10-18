@@ -15,14 +15,16 @@ struct ReportPunchCard: View {
     private let condensed = "Futura-CondensedExtraBold"
     private var cardSoft: Color { AppColors.kraftInk.opacity(0.72) }
     private var tableSoft: Color { AppColors.tableInk.opacity(0.7) }
-    private let nameWidth: CGFloat = 112
-    private let cell: CGFloat = 20
+    /// The card's inside (342 less its 14pt insets) split exactly: the name,
+    /// seven holes and the run, 3pt between each.
+    private let nameWidth: CGFloat = 134
+    private let cell: CGFloat = 18
     private let runWidth: CGFloat = 30
 
     var body: some View {
         let shown = Array(report.items.prefix(ReportCardView.maxItems))
         let lines = report.health.lines(showing: options.metrics)
-        let note = options.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = options.trimmedNote
 
         VStack(alignment: .leading, spacing: 18) {
             header
@@ -34,10 +36,6 @@ struct ReportPunchCard: View {
                     .foregroundStyle(AppColors.tableInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Habit Formed")
-                .font(.custom("Courier", size: 11))
-                .foregroundStyle(tableSoft)
-                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 24)
         .padding(.top, 28)
@@ -51,16 +49,17 @@ struct ReportPunchCard: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(report.name.isEmpty ? "Habit card" : report.name)
+                Text(report.name.isEmpty ? "Daily report" : report.name)
                     .font(.custom(condensed, size: 26))
                     .textCase(.uppercase)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text(report.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                     .font(.custom("Courier", size: 13))
                     .foregroundStyle(tableSoft)
             }
             Spacer(minLength: 8)
-            Text("\(report.done)/\(report.expected)")
+            Text(report.countText)
                 .font(.custom(condensed, size: 34))
         }
         .foregroundStyle(AppColors.tableInk)
@@ -103,7 +102,7 @@ struct ReportPunchCard: View {
                 Spacer(minLength: 8)
                 Text(report.isToday ? "Red ring = still open" : "Red ring = missed")
             }
-            .font(.custom("Courier", size: 10.5))
+            .font(.custom("Courier", size: 11))
             .foregroundStyle(cardSoft)
             .padding(.top, 10)
             .overlay(alignment: .top) { Rectangle().fill(AppColors.kraftRule).frame(height: 1.5) }
@@ -122,13 +121,13 @@ struct ReportPunchCard: View {
             Color.clear.frame(width: nameWidth, height: 1)
             ForEach(days.indices, id: \.self) { index in
                 Text(days[index].formatted(.dateTime.weekday(.narrow)))
-                    .font(.custom(index == 6 ? "Courier-Bold" : "Courier", size: 10.5))
+                    .font(.custom(index == 6 ? "Courier-Bold" : "Courier", size: 11))
                     .foregroundStyle(index == 6 ? AppColors.kraftInk : cardSoft)
                     .frame(width: cell, height: 30)
                     .background(index == 6 ? AppColors.newsRed.opacity(0.1) : .clear)
             }
             Text(options.showStreaks ? "Run" : "")
-                .font(.custom("Courier", size: 9.5))
+                .font(.custom("Courier", size: 11))
                 .textCase(.uppercase)
                 .foregroundStyle(cardSoft)
                 .frame(width: runWidth, alignment: .trailing)
@@ -140,8 +139,8 @@ struct ReportPunchCard: View {
         HStack(spacing: 3) {
             Text(item.title)
                 .font(typed)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
                 .frame(width: nameWidth, alignment: .leading)
             ForEach(0..<7, id: \.self) { day in
                 hole(item, day: day)
@@ -191,24 +190,24 @@ struct ReportPunchCard: View {
         return item.streakUnit.hasPrefix("wk") ? "\(item.streak)w" : "\(item.streak)"
     }
 
-    /// The Health numbers typed in capitals, three to a line.
+    /// The Health numbers typed in capitals, two to a line.
     private func carbonCopy(_ lines: [HealthLine]) -> some View {
-        let rows = stride(from: 0, to: lines.count, by: 3).map { Array(lines[$0..<min($0 + 3, lines.count)]) }
+        let rows = stride(from: 0, to: lines.count, by: 2).map { Array(lines[$0..<min($0 + 2, lines.count)]) }
         return VStack(alignment: .leading, spacing: 6) {
             Text("Carbon copy")
-                .font(.custom("Courier", size: 10.5))
+                .font(.custom("Courier", size: 11))
                 .textCase(.uppercase)
                 .kerning(1.6)
                 .foregroundStyle(tableSoft)
             ForEach(rows.indices, id: \.self) { index in
-                HStack(spacing: 8) {
+                HStack(spacing: 12) {
                     ForEach(rows[index], id: \.self) { line in
                         Text("\(line.label) \(line.value)")
                             .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                            .minimumScaleFactor(0.9)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    ForEach(0..<(3 - rows[index].count), id: \.self) { _ in
+                    if rows[index].count < 2 {
                         Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                     }
                 }
