@@ -13,6 +13,8 @@ struct ReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(HealthKitService.self) private var health
     @Environment(\.appCanvas) private var canvas
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
@@ -153,6 +155,9 @@ struct ReportSheet: View {
         .presentationDetents([.large])
         .presentationBackground { AppBackground(style: .subtle) }
         .task(id: needsHealth) { await loadHealth() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await loadHealth() } }
+        }
     }
 
     // MARK: - Send
@@ -220,7 +225,10 @@ struct ReportSheet: View {
 
     // MARK: - Health
 
+    /// Reads Health afresh, habits included, so the card never prints the
+    /// last sync's totals beside a newer reading.
     private func loadHealth() async {
+        await health.syncHealthKitHabits(in: modelContext)
         guard needsHealth else { return }
         if !askedHealth {
             askedHealth = true

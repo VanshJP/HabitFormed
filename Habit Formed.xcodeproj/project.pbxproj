@@ -390,12 +390,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Habit Formed/Habit_Formed.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit-Formed-Info.plist";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, mindful minutes, and calories eaten and burned from Apple Health to update your habits and fill in your daily report.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed only reads from Apple Health. It never writes or changes your Health data.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Habit Formed saves your daily report cards to Photos when you ask it to.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,12 +429,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Habit Formed/Habit_Formed.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit-Formed-Info.plist";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Habit Formed reads steps, sleep, mindful minutes, and calories eaten and burned from Apple Health to update your habits and fill in your daily report.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Habit Formed only reads from Apple Health. It never writes or changes your Health data.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Habit Formed saves your daily report cards to Photos when you ask it to.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -466,7 +468,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "Habit Formed Widget/Habit_Formed_Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
@@ -498,7 +500,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "Habit Formed Widget/Habit_Formed_Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = F9MZJ6MU5W;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Habit Formed Widget/Info.plist";
