@@ -2,7 +2,7 @@ import Foundation
 
 /// What a habit's name says about it: a glyph for the activity, and the
 /// numbers it gives ("Read 20 min", "10k steps", "Gym 3x a week", "Water the
-/// plants every 3 days"). Read on each keystroke of the add sheet and from a
+/// plants every 3 days"). Read on each keystroke of the add page and from a
 /// name said to Siri, so it is words and patterns only; a name that says
 /// nothing comes back empty.
 nonisolated struct HabitGuess: Equatable, Sendable {
@@ -16,6 +16,9 @@ nonisolated struct HabitGuess: Equatable, Sendable {
     var frequency: HabitFrequency?
     var weeklyTarget: Int?
     var intervalDays: Int?
+    /// The days of the week the name gives ("Mon Wed Fri", "on weekends"), as
+    /// `Calendar` weekdays (1 is Sunday): its reminder's days.
+    var weekdays: Set<Int>?
     /// The name without its schedule, first letter capitalized ("Gym" from
     /// "gym 3 times a week"): what a habit made by Siri is called.
     var title = ""
@@ -31,11 +34,30 @@ nonisolated struct HabitGuess: Equatable, Sendable {
         var everyDays: Int?
         var daily = words.contains("daily")
         var schedule: [Range<String.Index>] = []
+        var weekdays: Set<Int> = []
+        var lastDay = -2
+        // "Sun" and "wed" are words too, so a short day counts only in a
+        // list of days or after "on" or "every".
+        let listsDays = words.filter { dayNames[$0] ?? dayNames[String($0.dropLast())] ?? shortDays[$0] != nil }.count > 1
 
         var index = 0
         while index < pieces.count {
             let piece = pieces[index]
             defer { index += 1 }
+
+            // "Mon Wed Fri", "on Mondays and Thursdays", "every weekend"
+            let leadsIn = ["on", "every"].contains(word(index - 1))
+            if let days = named(piece.word, short: listsDays || leadsIn) {
+                weekdays.formUnion(days)
+                let joined = lastDay == index - 1 || (lastDay == index - 2 && ["and", "or"].contains(word(index - 1)))
+                if joined, let last = schedule.indices.last {
+                    schedule[last] = schedule[last].lowerBound..<piece.range.upperBound
+                } else {
+                    schedule.append((leadsIn ? pieces[index - 1].range.lowerBound : piece.range.lowerBound)..<piece.range.upperBound)
+                }
+                lastDay = index
+                continue
+            }
 
             // "every day", "every other day", "every 3 days", "every week"
             if piece.word == "every" {
@@ -156,6 +178,15 @@ nonisolated struct HabitGuess: Equatable, Sendable {
             guess.minutes = minutes.safeRounded
         }
 
+        // Days of the week are that many a week ("Gym Mon Wed Fri" is 3), and
+        // all seven are every day.
+        if weekdays.count == 7 {
+            daily = true
+        } else if !weekdays.isEmpty {
+            guess.weekdays = weekdays
+            weeklyCount = weeklyCount ?? weekdays.count
+        }
+
         // A count a week makes it a weekly habit, checked off by hand: Health
         // only knows a week as one total.
         if let count = weeklyCount {
@@ -196,6 +227,16 @@ nonisolated struct HabitGuess: Equatable, Sendable {
         }
         guess.title = title.prefix(1).uppercased() + title.dropFirst()
         return guess
+    }
+
+    /// The weekdays a word names: "monday", "mondays", "weekends", and with
+    /// `short` "mon" or "thurs".
+    private static func named(_ word: String, short: Bool) -> Set<Int>? {
+        if let day = dayNames[word] ?? dayNames[String(word.dropLast())] { return [day] }
+        if word == "weekday" || word == "weekdays" { return [2, 3, 4, 5, 6] }
+        if word == "weekend" || word == "weekends" { return [1, 7] }
+        if short, let day = shortDays[word] { return [day] }
+        return nil
     }
 
     /// A whole word, or its plural; a stem ending in "*" takes any word that
@@ -280,6 +321,13 @@ nonisolated struct HabitGuess: Equatable, Sendable {
     private static let mileWords: Set<String> = ["mi", "mile", "miles"]
     private static let floorWords: Set<String> = ["floor", "floors", "flight", "flights"]
     private static let negations: Set<String> = ["no", "quit", "stop", "avoid", "skip"]
+    private static let dayNames: [String: Int] = [
+        "sunday": 1, "monday": 2, "tuesday": 3, "wednesday": 4, "thursday": 5, "friday": 6, "saturday": 7,
+    ]
+    private static let shortDays: [String: Int] = [
+        "sun": 1, "mon": 2, "tue": 3, "tues": 3, "wed": 4, "weds": 4,
+        "thu": 5, "thur": 5, "thurs": 5, "fri": 6, "sat": 7,
+    ]
 
     // ponytail: first row with a match wins, so things (the dog, the plants)
     // come before what is done to them (walk, water), and times of day last.

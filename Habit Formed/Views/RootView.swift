@@ -1,18 +1,16 @@
 import SwiftUI
 import SwiftData
 
-/// What the shell presents over every page: the add flow, a timer opened
-/// from a notification or the mini banner, and the report sheet, opened on
-/// a day's card or on the week's.
+/// What the shell presents over every page: a timer opened from a
+/// notification or the mini banner, and the report sheet, opened on a day's
+/// card or on the week's.
 enum RootSheet: Identifiable {
-    case addHabit
     case timer(Habit)
     case report(Date)
     case recap(Date)
 
     var id: String {
         switch self {
-        case .addHabit: return "add"
         case .timer(let habit): return "timer-\(habit.id.uuidString)"
         case .report(let date): return "report-\(date.timeIntervalSince1970)"
         case .recap(let date): return "recap-\(date.timeIntervalSince1970)"
@@ -37,13 +35,12 @@ struct RootView: View {
     @Namespace private var timerZoom
 
     var body: some View {
-        // One stack, no tab bar: History and Settings are pushed from
-        // Today's top row. The canvas is painted inside the stack: SwiftUI
+        // One stack, no tab bar: a new habit, History and Settings are
+        // pushed from Today's top row. The canvas is painted inside the stack: SwiftUI
         // hosts navigation content in an opaque view, so a background behind
         // it would never show.
         NavigationStack {
             ContentView(
-                onAdd: { Haptics.light(); sheet = .addHabit },
                 onShareReport: { date in openReport(for: date) },
                 onShareWeek: { openRecap() }
             )
@@ -71,8 +68,6 @@ struct RootView: View {
         .motion(AppMotion.settle, value: timerCenter.isActive)
         .sheet(item: $sheet) { item in
             switch item {
-            case .addHabit:
-                AddHabitView()
             case .timer(let habit):
                 TimerView(habit: habit)
                     .navigationTransition(.zoom(sourceID: "timer", in: timerZoom))

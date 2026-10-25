@@ -25,9 +25,20 @@ struct HabitDraft: Equatable {
     /// When the habit is usually logged, read once when editing.
     private(set) var usualLogMinute: Int?
 
+    /// The latest days the habit was logged for, newest first, read once
+    /// when editing.
+    private(set) var recentLogDays: [Date] = []
+
     /// What the habit's logs have taught so far.
     var learnedReminderTime: ReminderTime? {
         usualLogMinute.map { ReminderTiming.reminder(beforeTypical: $0) }
+    }
+
+    /// The weekdays a weekly habit is usually logged on, as many as its
+    /// target. Health logs are written by sync, so they say nothing.
+    var usualWeekdays: Set<Int>? {
+        guard frequency == .weekly, kind != .health else { return nil }
+        return ReminderTiming.usualWeekdays(of: recentLogDays, count: weeklyTarget)
     }
 
     init() {}
@@ -51,6 +62,7 @@ struct HabitDraft: Equatable {
         reminderLearnsTime = habit.reminderEnabled ? habit.reminderLearnsTime : true
         reminderWeekdays = habit.reminderWeekdays
         usualLogMinute = habit.usualLogMinute
+        recentLogDays = Array(habit.completionDates.sorted(by: >).prefix(ReminderTiming.window))
     }
 
     /// The palette color the fewest habits wear, so each new habit starts
@@ -78,7 +90,7 @@ struct HabitDraft: Equatable {
 
     var canSave: Bool { !trimmedTitle.isEmpty }
 
-    /// How often and the reminder in one line, the add sheet's folded
+    /// How often and the reminder in one line, the add page's folded
     /// schedule: "Every day, no reminder", "3 times a week, reminder on".
     var summary: String {
         let often = switch frequency {
@@ -121,8 +133,8 @@ struct HabitDraft: Equatable {
 
     // MARK: - Following the name
 
-    /// How and how often the habit is logged: what a typed name can fill in
-    /// besides the glyph.
+    /// How and how often the habit is logged, and the days it reminds on:
+    /// what a typed name can fill in besides the glyph.
     struct Plan: Equatable {
         var kind: HabitTrackKind
         var source: HealthKitSource
@@ -131,12 +143,14 @@ struct HabitDraft: Equatable {
         var frequency: HabitFrequency
         var weeklyTarget: Int
         var intervalDays: Int
+        var reminderWeekdays: Set<Int>
     }
 
     var plan: Plan {
         get {
             Plan(kind: kind, source: source, targetValue: targetValue, timerDurationSeconds: timerDurationSeconds,
-                 frequency: frequency, weeklyTarget: weeklyTarget, intervalDays: intervalDays)
+                 frequency: frequency, weeklyTarget: weeklyTarget, intervalDays: intervalDays,
+                 reminderWeekdays: reminderWeekdays)
         }
         set {
             kind = newValue.kind
@@ -146,6 +160,7 @@ struct HabitDraft: Equatable {
             frequency = newValue.frequency
             weeklyTarget = newValue.weeklyTarget
             intervalDays = newValue.intervalDays
+            reminderWeekdays = newValue.reminderWeekdays
         }
     }
 
@@ -179,6 +194,7 @@ struct HabitDraft: Equatable {
         if let frequency = guess.frequency { self.frequency = frequency }
         if let count = guess.weeklyTarget { weeklyTarget = count }
         if let days = guess.intervalDays { intervalDays = days }
+        if let days = guess.weekdays { reminderWeekdays = days }
         if kind == .health {
             targetValue = guess.target ?? (frequency == .weekly ? source.weeklyDefaultTarget : source.defaultTarget)
         }
@@ -192,6 +208,7 @@ struct HabitDraft: Equatable {
         frequency = template.frequency
         weeklyTarget = template.weeklyTarget
         intervalDays = template.intervalDays
+        reminderWeekdays = []
         if let source = template.source {
             self.source = source
             targetValue = template.target ?? source.defaultTarget

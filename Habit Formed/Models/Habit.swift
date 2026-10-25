@@ -24,7 +24,7 @@ nonisolated enum HabitFrequency: String, Codable, CaseIterable, Identifiable, Se
         }
     }
 
-    /// The add sheet's "How often?" choice.
+    /// The add page's "How often?" choice.
     var shortLabel: String {
         switch self {
         case .daily:    return "Every day"

@@ -138,21 +138,14 @@ final class NotificationService {
     /// - daily: repeating alert at the reminder time, or with `splitWeek`
     ///   one alert per weekday so a day already handled stays quiet. Picked
     ///   days always split, keeping only those weekdays.
-    /// - weekly: the same; body reflects this week's progress toward the
-    ///   target, and a week whose target is met stays quiet.
+    /// - weekly: the same, and a week whose target is met stays quiet.
     /// - interval: rolling one-shots on upcoming cycle due dates (plus
     ///   catch-up nags while overdue). Never-logged interval habits get
     ///   a repeating nudge until the first log starts the countdown.
     private static func reminderRequests(for habit: Habit, splitWeek: Bool) -> [UNNotificationRequest] {
         switch habit.frequency {
-        case .daily:
-            let content = content(for: habit, body: dailyBody(for: habit))
-            if splitWeek { return weekRequests(habit, content: content) }
-            return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
-
-        case .weekly:
-            let body = "\(habit.completionsThisWeek) of \(habit.weeklyTarget) this week."
-            let content = content(for: habit, body: body)
+        case .daily, .weekly:
+            let content = content(for: habit, body: body(for: habit))
             if splitWeek { return weekRequests(habit, content: content) }
             return [request(id: reminderID(habit), content: content, trigger: repeatingTrigger(habit))]
 
@@ -210,11 +203,9 @@ final class NotificationService {
         let calendar = Calendar.current
         let time = habit.reminderFireTime
         return upcomingFirings(habit).enumerated().map { index, firing in
-            let handled = isHandled(firing, habit: habit)
-            let firstFire = handled ? firing.adding(days: 7) : firing
             let trigger: UNCalendarNotificationTrigger
-            if handled {
-                var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: firstFire)
+            if isHandled(firing, habit: habit) {
+                var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: firing.adding(days: 7))
                 parts.timeZone = calendar.timeZone
                 trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
             } else {
@@ -224,22 +215,8 @@ final class NotificationService {
                 parts.minute = time.minute
                 trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: true)
             }
-            let dayContent = habit.frequency == .weekly
-                ? weeklyContent(habit, base: content, firstFire: firstFire)
-                : content
-            return request(id: "\(reminderID(habit))-d\(index)", content: dayContent, trigger: trigger)
+            return request(id: "\(reminderID(habit))-d\(index)", content: content, trigger: trigger)
         }
-    }
-
-    /// A weekly alert whose first firing lands in a later week starts that
-    /// week at zero, not at this week's count.
-    private static func weeklyContent(
-        _ habit: Habit, base: UNMutableNotificationContent, firstFire: Date
-    ) -> UNMutableNotificationContent {
-        guard !Calendar.current.isDate(firstFire, equalTo: Date(), toGranularity: .weekOfYear),
-              let fresh = base.mutableCopy() as? UNMutableNotificationContent else { return base }
-        fresh.body = "0 of \(habit.weeklyTarget) this week."
-        return fresh
     }
 
     // MARK: - Interval chains
@@ -308,10 +285,16 @@ final class NotificationService {
         return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
     }
 
-    /// Says why the reminder came now when the time was learned.
-    private static func dailyBody(for habit: Habit) -> String {
-        guard habit.reminderLearnsTime, let usual = habit.usualLogMinute else { return "Time to log." }
-        return "You usually log this around \(ReminderTime(minuteOfDay: usual).label)."
+    /// Says why the reminder came now when the time was learned, else a
+    /// weekly habit's goal. Never this week's count: a repeating alert would
+    /// carry it into weeks it no longer describes.
+    private static func body(for habit: Habit) -> String {
+        if habit.reminderLearnsTime, let usual = habit.usualLogMinute {
+            return "You usually log this around \(ReminderTime(minuteOfDay: usual).label)."
+        }
+        // A weekly Health goal is a total, not a count of days.
+        guard habit.frequency == .weekly, habit.trackKind != .health else { return "Time to log." }
+        return habit.weeklyTarget == 1 ? "Once a week." : "\(habit.weeklyTarget) times a week."
     }
 
     private static func content(for habit: Habit, body: String) -> UNMutableNotificationContent {

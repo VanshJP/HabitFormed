@@ -8,9 +8,10 @@ import SwiftData
 /// and a 20 minute timer), so Return adds it. How you log it stays in view,
 /// since it is the choice that makes habits different; how often and the
 /// reminder fold into one line ("Every day, no reminder") until opened.
-/// Editing shows everything. Close is the X; the one solid button, pinned at
-/// the bottom, adds or saves. Every field lives in a `HabitDraft` that is
-/// written on save.
+/// Editing shows everything. A page pushed like History and Settings; with
+/// changes made, back asks first and swiping back is off. The one solid
+/// button, pinned at the bottom, adds or saves. Every field lives in a
+/// `HabitDraft` that is written on save.
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -37,57 +38,44 @@ struct AddHabitView: View {
     private var isDirty: Bool { draft != original }
 
     var body: some View {
-        NavigationStack {
-            PageScrollView {
-                VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
-                    nameCard
-                    if habit == nil {
-                        // Lit only once tapped: a typed name that matches an
-                        // idea has not taken its settings.
-                        HabitIdeas(pickedTitle: draft.title == pickedIdea ? draft.title : "") { template in
-                            pickedIdea = template.title
-                            withMotion(AppMotion.settle) { draft.apply(template) }
-                            nameFocused = false
-                        }
-                    }
-                    HabitTrackSection(draft: $draft)
-                    if habit == nil {
-                        scheduleRow
-                    }
-                    if showSchedule {
-                        HabitScheduleSection(draft: $draft)
-                        HabitReminderSection(draft: $draft, routine: routine)
+        PageScrollView {
+            VStack(alignment: .leading, spacing: AppLayout.chapterSpacing) {
+                nameCard
+                if habit == nil {
+                    // Lit only once tapped: a typed name that matches an
+                    // idea has not taken its settings.
+                    HabitIdeas(pickedTitle: draft.title == pickedIdea ? draft.title : "") { template in
+                        pickedIdea = template.title
+                        withMotion(AppMotion.settle) { draft.apply(template) }
+                        nameFocused = false
                     }
                 }
-                .padding(.horizontal, AppLayout.pageHorizontal)
-                .padding(.bottom, AppLayout.pageBottom)
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .background { AppBackground(style: .subtle) }
-            .safeAreaBar(edge: .bottom) {
-                GlassButton(title: habit == nil ? "Add habit" : "Save changes", style: .primary, size: .large, fullWidth: true, action: save)
-                    .disabled(!draft.canSave)
-                    .pinnedBar()
-            }
-            .navigationTitle(habit == nil ? "New habit" : "Edit habit")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(role: .close) {
-                        if isDirty { confirmDiscard = true } else { dismiss() }
-                    }
-                    // On the button, so the dialog grows out of the X rather
-                    // than floating over the middle of the form.
-                    .confirmationDialog("Discard your changes?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-                        Button("Discard changes", role: .destructive) { dismiss() }
-                        Button("Keep editing", role: .cancel) {}
-                    }
+                HabitTrackSection(draft: $draft)
+                if habit == nil {
+                    scheduleRow
+                }
+                if showSchedule {
+                    HabitScheduleSection(draft: $draft)
+                    HabitReminderSection(draft: $draft, routine: routine)
                 }
             }
-            .interactiveDismissDisabled(isDirty)
-            .onAppear(perform: load)
-            .onChange(of: draft.title) { followName() }
+            .padding(.horizontal, AppLayout.pageHorizontal)
+            .padding(.bottom, AppLayout.pageBottom)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background { AppBackground(style: .subtle) }
+        .safeAreaBar(edge: .bottom) {
+            GlassButton(title: habit == nil ? "Add habit" : "Save changes", style: .primary, size: .large, fullWidth: true, action: save)
+                .disabled(!draft.canSave)
+                .pinnedBar()
+        }
+        .pageTopBar(habit == nil ? "New habit" : "Edit habit", back: isDirty && !isSaving ? { confirmDiscard = true } : nil)
+        .alert("Discard your changes?", isPresented: $confirmDiscard) {
+            Button("Discard changes", role: .destructive) { dismiss() }
+            Button("Keep editing", role: .cancel) {}
+        }
+        .onAppear(perform: load)
+        .onChange(of: draft.title) { followName() }
     }
 
     // MARK: - Name

@@ -32,9 +32,11 @@ struct HabitTileView: View {
     @Environment(TimerCenter.self) private var timerCenter
     @Environment(DayTracker.self) private var dayTracker
 
-    /// How full the tile is, 0...1. The knob drives it while it slides; a
-    /// log or an undo made anywhere else plays it to 1 or 0.
+    /// How far the first coat has poured, 0...1. The knob drives it while it
+    /// slides; a log or an undo made anywhere else plays it to 1 or 0.
     @State private var fill: CGFloat = 0
+    /// The second coat, the color itself, poured once the log lands.
+    @State private var coat: CGFloat = 0
     /// While the knob is held the long-press menu stays empty, so pausing
     /// mid-slide never opens it.
     @State private var isSliding = false
@@ -52,7 +54,7 @@ struct HabitTileView: View {
             // A resting interval habit recedes so it reads as "sitting out
             // today" yet stays discoverable.
             .opacity(intervalRestingDays == nil || isPastDay ? 1 : 0.6)
-            .completionFill(habit.color, amount: $fill)
+            .completionFill(habit.color, amount: $fill, coat: coat)
             .glassCard(
                 cornerRadius: AppLayout.tileRadius,
                 tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
@@ -132,7 +134,7 @@ struct HabitTileView: View {
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withMotion(animation) { fill = state.done ? 1 : 0 }
+        CompletionFill.sync(state, fill: $fill, coat: $coat, animation: animation)
     }
 
     // MARK: - Bottom section

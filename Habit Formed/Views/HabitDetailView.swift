@@ -49,7 +49,7 @@ struct HabitDetailView: View {
         .sheet(isPresented: $showingTimer) {
             TimerView(habit: habit)
         }
-        .sheet(isPresented: $showingEdit) {
+        .navigationDestination(isPresented: $showingEdit) {
             AddHabitView(habit: habit)
         }
         .confirmsLogRemoval($pendingRemoval, remove: delete)

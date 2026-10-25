@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A group of rows on one pane of Liquid Glass, hairlines between rows
-/// starting at the text. History, Settings, the report and add sheets are
+/// starting at the text. History, Settings, the report sheet and the add page are
 /// built on it. Controls inside read `isOnGlass` and paint plates, never a
 /// second pane of glass.
 struct Panel<Content: View>: View {

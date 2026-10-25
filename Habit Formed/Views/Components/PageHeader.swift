@@ -14,17 +14,21 @@ extension View {
     /// of the page. The system bar stays hidden everywhere: pushed from a
     /// bar-less Today it animated in on its own track, its back button and
     /// title trailing the page. This bar is the page's, so it moves with it.
-    func pageTopBar(_ title: String) -> some View {
-        pageTopBar(title) { EmptyView() }
+    func pageTopBar(_ title: String, back: (() -> Void)? = nil) -> some View {
+        pageTopBar(title, back: back) { EmptyView() }
     }
 
     /// A pushed page's top bar with a control at its trailing end, such as
     /// a habit's More menu, worn in the same glass as the back button.
-    func pageTopBar<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+    /// `back` takes over the back button and turns swiping back off, for a
+    /// page with something to lose, such as a form with unsaved changes.
+    func pageTopBar<Trailing: View>(
+        _ title: String, back: (() -> Void)? = nil, @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
         navigationTitle(title)
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaBar(edge: .top) { PageTopBar(title: title, trailing: trailing()) }
-            .background { SwipeBackHook() }
+            .safeAreaBar(edge: .top) { PageTopBar(title: title, back: back, trailing: trailing()) }
+            .background { SwipeBackHook(allowsSwipe: back == nil) }
     }
 }
 
@@ -32,27 +36,42 @@ extension View {
 /// and from anywhere in the content: UIKit's own answer for both gestures
 /// turns them off with the bar. This one allows them whenever there is a
 /// page to go back to (never on the root, where a swipe would wedge the
-/// stack) and the swipe heads toward the trailing edge.
+/// stack) and the swipe heads toward the trailing edge. A page that holds
+/// its back button (`allowsSwipe` false) is left only by that button.
 private struct SwipeBackHook: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIViewController { Hook() }
-    func updateUIViewController(_ controller: UIViewController, context: Context) {}
+    let allowsSwipe: Bool
 
-    private final class Hook: UIViewController {
+    func makeUIViewController(context: Context) -> Hook { Hook() }
+    func updateUIViewController(_ hook: Hook, context: Context) { hook.allowsSwipe = allowsSwipe }
+
+    final class Hook: UIViewController {
+        var allowsSwipe = true {
+            didSet { if viewIfLoaded?.window != nil { Gate.shared.allowsSwipe = allowsSwipe } }
+        }
+
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
             guard let navigation = navigationController else { return }
             Gate.shared.navigation = navigation
+            Gate.shared.allowsSwipe = allowsSwipe
             navigation.interactivePopGestureRecognizer?.delegate = Gate.shared
             navigation.interactiveContentPopGestureRecognizer?.delegate = Gate.shared
+        }
+
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            // The page under it may never hear it appear again.
+            if !allowsSwipe { Gate.shared.allowsSwipe = true }
         }
     }
 
     private final class Gate: NSObject, UIGestureRecognizerDelegate {
         static let shared = Gate()
         weak var navigation: UINavigationController?
+        var allowsSwipe = true
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            guard let navigation, navigation.viewControllers.count > 1 else { return false }
+            guard allowsSwipe, let navigation, navigation.viewControllers.count > 1 else { return false }
             guard let pan = gestureRecognizer as? UIPanGestureRecognizer, let view = pan.view else { return true }
             // Toward the trailing edge only: a swipe that leans up or down
             // is a scroll.
@@ -78,6 +97,7 @@ private struct SwipeBackHook: UIViewControllerRepresentable {
 /// bar sat, so a page's content starts where it always did.
 private struct PageTopBar<Trailing: View>: View {
     let title: String
+    let back: (() -> Void)?
     let trailing: Trailing
 
     @Environment(\.dismiss) private var dismiss
@@ -91,7 +111,7 @@ private struct PageTopBar<Trailing: View>: View {
                 .padding(.horizontal, AppLayout.minHitTarget + 12)
             HStack {
                 Button {
-                    dismiss()
+                    if let back { back() } else { dismiss() }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.body.weight(.semibold))

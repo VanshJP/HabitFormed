@@ -35,4 +35,17 @@ for (title, _) in expected {
         check(reason.count < 50 && !reason.contains("\u{2014}"), "reason copy: \(reason)")
     }
 }
+// Usual days: the most logged weekdays, as many as asked, two logs each at least.
+var gregorian = Calendar(identifier: .gregorian)
+gregorian.timeZone = TimeZone(identifier: "UTC")!
+gregorian.firstWeekday = 2
+func days(_ dates: [Int]) -> [Date] { dates.map { gregorian.date(from: DateComponents(year: 2026, month: 10, day: $0))! } }
+let mondayWednesdayFriday = days([23, 21, 19, 16, 14, 13, 12])
+check(ReminderDays.weekOrder(gregorian) == [2, 3, 4, 5, 6, 7, 1], "Monday first")
+check(ReminderTiming.usualWeekdays(of: mondayWednesdayFriday, count: 3, calendar: gregorian) == [2, 4, 6], "usual days")
+check(ReminderTiming.usualWeekdays(of: mondayWednesdayFriday, count: 2, calendar: gregorian) == [2, 4], "ties go in the week's order")
+check(ReminderTiming.usualWeekdays(of: days([23, 21, 16, 14, 9]), count: 3, calendar: gregorian) == [4, 6], "fewer days than asked")
+check(ReminderTiming.usualWeekdays(of: days([19, 13]), count: 3, calendar: gregorian) == nil, "one log a day is no pattern")
+check(ReminderTiming.usualWeekdays(of: mondayWednesdayFriday, count: 7, calendar: gregorian) == nil, "every day")
+
 print("reminder suggestions match for \(expected.count) names")

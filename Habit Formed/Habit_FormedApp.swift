@@ -29,6 +29,7 @@ struct Habit_FormedApp: App {
         UNUserNotificationCenter.current().delegate = router
         n.registerCategories()
         router.modelContainer = Self.sharedModelContainer
+        LogHabitIntent.writeInApp = { await HabitLifecycle.writeWidgetLogs(in: Self.sharedModelContainer.mainContext) }
     }
 
     /// The one store, reachable without a view so Siri and notification

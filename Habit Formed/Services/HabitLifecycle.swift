@@ -32,6 +32,16 @@ enum HabitLifecycle {
         return TodayLog(habit: habit, wasLogged: wasLogged, habits: habits)
     }
 
+    /// Writes the widget's queued logs, then refreshes the widget and
+    /// reminders. `LogHabitIntent` runs it in the app's process, often with
+    /// no window open.
+    static func writeWidgetLogs(in context: ModelContext) async {
+        let all = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)])
+        guard let habits = try? context.fetch(all) else { return }
+        WidgetSync.refresh(habits: habits, in: context)
+        await NotificationService().syncReminders(for: habits)
+    }
+
     static func delete(
         _ habit: Habit,
         in context: ModelContext,

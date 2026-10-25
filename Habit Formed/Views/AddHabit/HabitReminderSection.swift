@@ -25,7 +25,16 @@ struct HabitReminderSection: View {
             }
             if draft.reminderEnabled && draft.frequency != .interval {
                 VStack(spacing: 0) {
-                    SettingsRow("Days", icon: "calendar", caption: daysCaption)
+                    SettingsRow("Days", icon: "calendar", caption: daysCaption) {
+                        if let usual = suggestedDays {
+                            Button("Use") {
+                                Haptics.selection()
+                                draft.reminderWeekdays = usual
+                            }
+                            .buttonStyle(.textLink)
+                            .accessibilityLabel("Use \(ReminderDays.label(usual))")
+                        }
+                    }
                     ReminderDaysPicker(days: $draft.reminderWeekdays)
                         .padding(.horizontal, AppLayout.tilePadding)
                         .padding(.bottom, 6)
@@ -65,10 +74,17 @@ struct HabitReminderSection: View {
     /// nothing about the person's routine.
     private var canLearn: Bool { draft.kind != .health }
 
-    /// What no picked days means; a weekly habit's reminder still goes quiet
-    /// once the week is done.
+    /// The days a weekly habit is usually logged on, offered while none are
+    /// picked. Never set on its own: the days a reminder has stay put.
+    private var suggestedDays: Set<Int>? {
+        draft.reminderWeekdays.isEmpty ? draft.usualWeekdays : nil
+    }
+
+    /// The usual days while they are offered, else what no picked days
+    /// means; a weekly habit's reminder still goes quiet once the week is done.
     private var daysCaption: String? {
         guard draft.reminderWeekdays.isEmpty else { return nil }
+        if let usual = suggestedDays { return "Usually \(ReminderDays.label(usual))" }
         return draft.frequency == .weekly ? "Every day until the week is done" : "Every day"
     }
 
@@ -127,8 +143,9 @@ struct HabitReminderSection: View {
         let title = draft.trimmedTitle
         guard let suggestion, !suggestion.reason.contains(where: \.isNumber),
               (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+        // The name without its schedule, so the reply cannot echo "Mon Wed Fri".
         let reply = await OnDeviceModel.phrase(
-            "Habit: \(title). Reason for its reminder time: \(suggestion.reason).",
+            "Habit: \(HabitGuess.read(title).title). Reason for its reminder time: \(suggestion.reason).",
             instructions: "Reword the reason as one short, warm phrase in sentence case, under 40 characters. Do not mention a time or add facts that are not given. No em dashes, no final period."
         )
         guard !Task.isCancelled,

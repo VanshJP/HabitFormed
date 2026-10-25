@@ -85,6 +85,24 @@ nonisolated enum ReminderTiming {
         return median % 1440
     }
 
+    /// The weekdays these logs usually fall on: up to `count` of them, the
+    /// most logged first, each with at least two logs among the latest
+    /// `window`, or nil when none has. `days` are the days the logs count
+    /// for, newest first.
+    static func usualWeekdays(of days: [Date], count: Int, calendar: Calendar = .current) -> Set<Int>? {
+        guard count < 7 else { return nil }
+        var tally: [Int: Int] = [:]
+        for day in days.prefix(window) {
+            tally[calendar.component(.weekday, from: day), default: 0] += 1
+        }
+        let order = ReminderDays.weekOrder(calendar)
+        let ranked = order.filter { tally[$0, default: 0] >= 2 }.sorted { a, b in
+            let (logsA, logsB) = (tally[a, default: 0], tally[b, default: 0])
+            return logsA != logsB ? logsA > logsB : order.firstIndex(of: a)! < order.firstIndex(of: b)!
+        }
+        return ranked.isEmpty ? nil : Set(ranked.prefix(count))
+    }
+
     /// The reminder for a usual time: `leadMinutes` earlier, rounded down to
     /// five minutes so it reads like a time a person would pick.
     static func reminder(beforeTypical minute: Int) -> ReminderTime {

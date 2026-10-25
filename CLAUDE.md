@@ -88,7 +88,7 @@ Habit Formed/
     │                         #   ReportPunchCard, ReportConstellation, ReportStamps),
     │                         #   WeeklyRecapCardView (+ Grid), YearReportCardView (+ YearReportDays, YearReportHabits)
     ├── Settings/             # SettingsView, LayoutPicker (tiles and rows as `SketchPicker` pictures)
-    ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, root sheets
+    ├── RootView.swift        # One NavigationStack (no tab bar), mini timer banner, timer and report sheets
     ├── HabitTileView.swift   # One grid tile
     ├── HabitRowView.swift    # One capsule row (the Rows layout), with RowTimerButton
     ├── HabitActions.swift    # HabitActions + HabitContextMenu, shared by tiles, rows, done chips
@@ -115,20 +115,24 @@ Habit Formed Widget/          # Widget extension (see the membership note above)
 ## Interaction model
 
 `RootView` hosts one `NavigationStack` and no tab bar, so nothing sits over
-the habits. Today is its root page, with no navigation bar; History and
-Settings are pushed from Today's top row. No page shows the system bar:
+the habits. Today is its root page, with no navigation bar; a new habit,
+History and Settings are pushed from Today's top row, and Edit habit from a
+habit's menu or page. No page shows the system bar:
 pushed from a bar-less Today it animated in on its own track, its back
 button and title trailing the page. Every pushed page wears
 `pageTopBar(_:)` instead (`PageHeader.swift`): a back button in header
 glass, the title, an optional trailing control, drawn as part of the page
 so it moves with it, and a hook (`SwipeBackHook`) that keeps swiping back
 working with the bar hidden, from the edge or anywhere on the page (a swipe
-that starts on a sideways rail scrolls the rail).
+that starts on a sideways rail scrolls the rail). A page with something to
+lose passes `back:` (the add and edit page while it has changes): back asks
+first and swiping back is off.
 
 - **Today**: `ContentView`. No page title: the top row is the month
   ("October ⌄" in `.title` bold, as big as fits beside the capsule, its
   chevron in the look's accent; it opens the calendar) and a capsule holding
-  add (+), Share report (the day shown), History (clock, pushed) and Settings (gear, pushed). The
+  Share report (the day shown, a sheet), then the pages it pushes: add (+),
+  History (clock) and Settings (gear). The
   calendar is a full-height sheet (a shorter one floats off the screen's
   edges on iOS 26). Right under it the `WeekStrip` is the date control: one
   row of 7 rings drawn on the canvas, each holding its weekday and date and
@@ -202,8 +206,10 @@ instead of glass: the lifted copy is drawn from the card left in the grid,
 so glass would keep showing the spot it left.
 
 The slide-to-log knob mirrors iOS's slide-to-answer. As it travels, the
-habit's color pours out of it (a circle centred on the knob that reaches
-the tile's far corner as the knob arrives) and its chevron winds clockwise
+habit's color pours out of it at half strength (a circle centred on the
+knob that reaches the tile's far corner as the knob arrives; once the log
+lands a second coat, the full color, pours out of the check at once,
+`CompletionFill.sync`) and its chevron winds clockwise
 into clock hands showing the time right now (the knob's disc is the face),
 holds there, then folds into a check (`ClockGlyph`: one stroke, a corner
 and two legs moving between poses); at ~75% the check is whole and it
@@ -262,8 +268,11 @@ A new habit fills itself in from its name as it is typed
 (`HabitGuess`, words and patterns, no model): a glyph for the activity
 ("Walk the dog" a paw, "Water the plants" a leaf), a timer for a length
 ("Read 20 min"), Apple Health for a metric ("10k steps", "Sleep 8 hours",
-"Run 5k"), and the schedule ("3x a week", "every 3 days"). The glyph and
-the plan (`HabitDraft.Plan`: how and how often) each follow the name only
+"Run 5k"), and the schedule ("3x a week", "every 3 days"; days of the week,
+"Gym Mon Wed Fri" or "on weekends", are that many a week and become the
+reminder's days, a short "Sun" or "Wed" only in a list or after "on" or
+"every"). The glyph and the plan (`HabitDraft.Plan`: how and how often, and
+the reminder's days) each follow the name only
 while they still hold what it last set (`HabitDraft.follow`), so a chip the
 person taps, or an idea, makes that part theirs; editing never moves them.
 A length or count outside the chips joins them as the lit one.
@@ -299,9 +308,14 @@ A daily or weekly reminder can keep to picked weekdays
 week's order); none picked is every day, and a weekly one still goes quiet
 once the week's target is met. Picked days are always one alert per day
 (`pickedReminderDays`), so they never fall back to the daily alert.
-Interval habits ignore them. A reminder switch that is on while iOS has
-notifications off shows `NotificationsOffRow`, which opens the app's
-notification settings.
+Interval habits ignore them. Editing a weekly habit with no days picked
+offers the days it is usually logged on (`ReminderTiming.usualWeekdays`:
+as many as its target, two logs each at least) with a "Use" link, never
+set on their own. A reminder never prints this week's count: a repeating
+alert would carry it into later weeks, so a weekly one says its goal ("3
+times a week"). A reminder switch that is on while iOS has notifications
+off shows `NotificationsOffRow`, which opens the app's notification
+settings.
 
 A new habit gets a suggested time while its name is typed
 (`ReminderSuggestion`): a word in the name ("meditate" mornings, "read"
@@ -324,15 +338,18 @@ small widget opens today's report (`WidgetLink.report`, handled in
 `RootView.onOpenURL`; the scheme is registered in
 `Habit-Formed-Info.plist`). The medium
 widget's log button runs `LogHabitIntent`, which queues a
-`PendingWidgetLog` and marks the habit done in the snapshot; the app writes
-the real log (keeping the tap time as `loggedAt`) on launch, on returning to
-the foreground, or at once when the intent ran in the app's process. Always
-apply pending logs before writing a snapshot.
+`PendingWidgetLog` and marks the habit done in the snapshot. It is a
+`LiveActivityIntent`, so it runs in the app's process (launched in the
+background when closed), where `LogHabitIntent.writeInApp`, set at launch,
+writes the real log (keeping the tap time as `loggedAt`) and rebuilds
+reminders at once (`HabitLifecycle.writeWidgetLogs`), so one due later
+today stays quiet. A queue left behind is written on launch or on returning
+to the foreground. Always apply pending logs before writing a snapshot.
 
 ### Timers
 
 Habits can carry an optional countdown timer
-(`Habit.timerDurationSeconds`, set in the add sheet's "How do you log it?" → Timer).
+(`Habit.timerDurationSeconds`, set in the add page's "How do you log it?" → Timer).
 `TimerView` is a foreground session with a circular progress ring,
 pause/resume/reset, and auto-logs the habit on completion (only if not
 already logged today). Closing before completion does **not** log.
@@ -477,7 +494,7 @@ the day card's theme, accent, type, hidden habits and name.
 `Intents/` holds the app's App Intents: `LogHabitTodayIntent` ("Log Read in
 Habit Formed") logs today without opening the app and replies with the
 day's count, `AddHabitIntent` ("Add a habit in Habit Formed") asks for a
-name and makes the habit from it with `HabitGuess`, as the add sheet does
+name and makes the habit from it with `HabitGuess`, as the add page does
 ("Gym 3 times a week" is Gym, 3 a week), and `TodayStatusIntent` ("What's
 left in Habit Formed") lists what is open. `HabitEntity` matches a spoken name loosely. Siri learns habit
 names only from `HabitShortcuts.updateAppShortcutParameters()`, which Today
@@ -503,7 +520,7 @@ The design system is SpeakUp's; when in doubt, match
   `.plateChrome(in:)`, `.inputWell()`, or `.controlChrome(in:)` (which
   branches on `\.isOnGlass`). Radii and padding come from `AppLayout`
   (card 20 / 16, tile 16 / 12, well 12); a `Panel` uses the card radius, Today's habit tiles the tile radius and its rows the slide's pill plus their inset (a capsule). Groups of rows (History,
-  Settings, the report and add sheets) sit on a `Panel`, one pane of glass
+  Settings, the report sheet and the add page) sit on a `Panel`, one pane of glass
   with hairlines. Chips use `controlChrome`, so a row of them on the canvas
   is interactive glass (wrap it in a `GlassEffectContainer`) and inside a
   panel they are plates. Alignment: text outside a card (page titles,
@@ -576,7 +593,7 @@ The design system is SpeakUp's; when in doubt, match
   compactValue) and add a matching branch in
   `HealthKitService.reading(for:from:to:)`. Report-only numbers live in
   `DayHealthMetrics` / `HealthKitService.dayMetrics(for:)`. Health is asked
-  for per type with `requestAuthorization(for:)`: by the add sheet when a
+  for per type with `requestAuthorization(for:)`: by the add page when a
   health habit is saved, and at launch only for types existing habits read.
 - **SwiftData:** persist enums as `String` raw values (`frequencyRaw`,
   `sourceRaw`) with a computed property exposing the enum. New stored properties always get a default so lightweight

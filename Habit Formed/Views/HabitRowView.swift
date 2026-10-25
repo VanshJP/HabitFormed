@@ -34,9 +34,11 @@ struct HabitRowView: View {
     private let trailingWidth: CGFloat = 120
     private let glyphSize: CGFloat = 28
 
-    /// How full the row is, 0...1. The knob drives it while it slides; a
-    /// log or an undo made anywhere else plays it to 1 or 0.
+    /// How far the first coat has poured, 0...1. The knob drives it while it
+    /// slides; a log or an undo made anywhere else plays it to 1 or 0.
     @State private var fill: CGFloat = 0
+    /// The second coat, the color itself, poured once the log lands.
+    @State private var coat: CGFloat = 0
     /// While the knob is held the long-press menu stays empty, so pausing
     /// mid-slide never opens it.
     @State private var isSliding = false
@@ -63,7 +65,7 @@ struct HabitRowView: View {
         .padding(.leading, cornerRadius - glyphSize / 2)
         .padding([.trailing, .vertical], inset)
         .opacity(habit.restingDaysLeft == nil || isPastDay ? 1 : 0.6)
-        .completionFill(habit.color, amount: $fill, cornerRadius: cornerRadius)
+        .completionFill(habit.color, amount: $fill, coat: coat, cornerRadius: cornerRadius)
         .glassCard(
             cornerRadius: cornerRadius,
             tint: isDone ? AppColors.featuredTint(habit.color) : AppColors.identityTint(habit.color)
@@ -92,7 +94,7 @@ struct HabitRowView: View {
     }
 
     private func syncFill(_ state: CompletionFill.Key, animation: Animation?) {
-        withMotion(animation) { fill = state.done ? 1 : 0 }
+        CompletionFill.sync(state, fill: $fill, coat: $coat, animation: animation)
     }
 
     // MARK: - Trailing

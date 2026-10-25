@@ -3,7 +3,7 @@ import Foundation
 import SwiftData
 
 /// "Add a habit in Habit Formed": asks what the habit is and adds it, reading
-/// the name the way the add sheet does (`HabitGuess`), so "Read 20 minutes"
+/// the name the way the add page does (`HabitGuess`), so "Read 20 minutes"
 /// gets a book and a 20 minute timer, "10k steps" checks itself off from
 /// Apple Health, and "Gym 3 times a week" is a habit called Gym, 3 a week.
 struct AddHabitIntent: AppIntent {

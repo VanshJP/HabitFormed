@@ -2,8 +2,8 @@ import AppIntents
 import SwiftUI
 import SwiftData
 
-/// Today, the app's root page: a header with the doors to History and
-/// Settings, a week strip to jump between recent days
+/// Today, the app's root page: a header with the doors to a new habit,
+/// History and Settings, a week strip to jump between recent days
 /// (its rings are the day's progress), the habits as tiles or rows, each
 /// filled with its color once done. The report is a door in the header.
 struct ContentView: View {
@@ -18,12 +18,13 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\Habit.sortOrder), SortDescriptor(\Habit.createdAt)])
     private var habits: [Habit]
 
-    var onAdd: () -> Void = {}
     var onShareReport: (Date) -> Void = { _ in }
     var onShareWeek: () -> Void = {}
 
-    @State private var sheet: HabitSheet?
     @State private var openHabit: Habit?
+    @State private var addingHabit = false
+    @State private var editingHabit: Habit?
+    @State private var timerHabit: Habit?
     @State private var pendingDelete: Habit?
     @State private var pendingStop: Habit?
     @State private var selectedDate: Date = .now
@@ -84,7 +85,7 @@ struct ContentView: View {
                         title: "No habits yet",
                         message: "Pick an idea or name your own. Slide a tile to log it each day.",
                         buttonTitle: "Add a habit",
-                        buttonAction: onAdd
+                        buttonAction: openAdd
                     )
                 } else {
                     // No title or count over the grid: the strip's ring is the
@@ -150,16 +151,21 @@ struct ContentView: View {
         }
     }
 
+    private func openAdd() {
+        Haptics.light()
+        addingHabit = true
+    }
+
     private func actions(for habit: Habit) -> HabitActions {
         HabitActions(
             open: { openHabit = habit },
             log: { logToday(habit) },
             undoToday: { undoToday(habit) },
             togglePastDay: { togglePastDay(habit) },
-            edit: { sheet = .edit(habit) },
+            edit: { editingHabit = habit },
             arrange: { showArrange = true },
             requestDelete: { pendingDelete = habit },
-            startTimer: { sheet = .timer(habit) },
+            startTimer: { timerHabit = habit },
             requestStopTimer: { pendingStop = habit }
         )
     }
@@ -190,11 +196,14 @@ struct ContentView: View {
             .navigationDestination(item: $openHabit) { habit in
                 HabitDetailView(habit: habit)
             }
-            .sheet(item: $sheet) { item in
-                switch item {
-                case .edit(let habit): AddHabitView(habit: habit)
-                case .timer(let habit): TimerView(habit: habit)
-                }
+            .navigationDestination(isPresented: $addingHabit) {
+                AddHabitView()
+            }
+            .navigationDestination(item: $editingHabit) { habit in
+                AddHabitView(habit: habit)
+            }
+            .sheet(item: $timerHabit) { habit in
+                TimerView(habit: habit)
             }
             // Full height: iOS 26 floats a shorter sheet clear of the
             // screen's edges, and this one should rise from the bottom.
@@ -246,7 +255,7 @@ struct ContentView: View {
             }
             .task(id: healthSources) {
                 // Health is asked for only what habits read, never on a bare
-                // first launch. The add sheet asks first when one is saved.
+                // first launch. The add page asks first when one is saved.
                 guard !healthSources.isEmpty else { return }
                 try? await health.requestAuthorization(for: healthSources)
                 await health.syncHealthKitHabits(in: modelContext)
@@ -266,9 +275,6 @@ struct ContentView: View {
             }
             .onChange(of: WidgetSync.signature(habits: habits, today: dayTracker.today)) { _, _ in
                 WidgetSync.update(habits: habits)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .habitLoggedFromWidget)) { _ in
-                WidgetSync.refresh(habits: habits, in: modelContext)
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
@@ -318,17 +324,8 @@ struct ContentView: View {
             Spacer(minLength: 8)
 
             HStack(spacing: 0) {
-                Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(GlassPressStyle())
-                .accessibilityLabel("Add habit")
-
-                // The day shown, so a browsed day shares its own report.
+                // The day shown, so a browsed day shares its own report. It opens a
+                // sheet, so it leads; the three doors after it push pages.
                 Button { onShareReport(selectedDate) } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.body.weight(.semibold))
@@ -338,6 +335,16 @@ struct ContentView: View {
                 }
                 .buttonStyle(GlassPressStyle())
                 .accessibilityLabel("Share report")
+
+                Button(action: openAdd) {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: AppLayout.minHitTarget, height: AppLayout.minHitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlassPressStyle())
+                .accessibilityLabel("Add habit")
 
                 NavigationLink {
                     HistoryView(onShareReport: onShareReport, onShareWeek: onShareWeek)
@@ -518,20 +525,6 @@ struct UndoLog: Equatable {
         if completesDay { return "Perfect day" }
         let when = day.isToday ? "" : " for \(day.relativeDayName)"
         return wasLogged ? "\(title) logged\(when)" : "\(title) unlogged\(when)"
-    }
-}
-
-// MARK: - Sheet Routing
-
-enum HabitSheet: Identifiable {
-    case edit(Habit)
-    case timer(Habit)
-
-    var id: String {
-        switch self {
-        case .edit(let h):   return "edit-\(h.id.uuidString)"
-        case .timer(let h):  return "timer-\(h.id.uuidString)"
-        }
     }
 }
 

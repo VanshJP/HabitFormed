@@ -93,4 +93,20 @@ expect("Run 5k 3 times a week") { $0.source == nil && $0.weeklyTarget == 3 && $0
 expect("Meditate 10 min every 2 days") { $0.minutes == 10 && $0.frequency == nil }
 expect("Brush teeth twice") { $0.symbol == "mouth.fill" && $0.frequency == nil }
 
+// Days of the week are that many a week, and the reminder's days.
+expect("Gym Mon Wed Fri") { $0.frequency == .weekly && $0.weeklyTarget == 3 && $0.weekdays == [2, 4, 6] && $0.title == "Gym" }
+expect("Read Mon, Wed, Fri") { $0.weekdays == [2, 4, 6] && $0.title == "Read" }
+expect("Gym on Mondays and Thursdays") { $0.weeklyTarget == 2 && $0.weekdays == [2, 5] && $0.title == "Gym" }
+expect("Yoga every Sunday") { $0.weeklyTarget == 1 && $0.weekdays == [1] && $0.title == "Yoga" }
+expect("Run on weekends") { $0.weeklyTarget == 2 && $0.weekdays == [1, 7] && $0.title == "Run" }
+expect("Stretch weekdays") { $0.weeklyTarget == 5 && $0.weekdays == [2, 3, 4, 5, 6] && $0.title == "Stretch" }
+expect("Gym 4x a week Mon Tue Thu Fri") { $0.weeklyTarget == 4 && $0.weekdays == [2, 3, 5, 6] && $0.title == "Gym" }
+expect("Gym 3x a week on weekdays") { $0.weeklyTarget == 3 && $0.weekdays?.count == 5 && $0.title == "Gym" }
+expect("Run 5k on Saturdays") { $0.source == nil && $0.weeklyTarget == 1 && $0.weekdays == [7] && $0.title == "Run 5k" }
+expect("Meditate on sun") { $0.weekdays == [1] && $0.title == "Meditate" }
+// A short day alone is a word, and all seven days are every day.
+expect("Get some sun") { $0.weekdays == nil && $0.frequency == nil && $0.symbol == "sun.max.fill" }
+expect("Sat down to read") { $0.weekdays == nil && $0.symbol == "book.fill" }
+expect("Walk Sun Mon Tue Wed Thu Fri Sat") { $0.frequency == .daily && $0.weekdays == nil && $0.title == "Walk" }
+
 print("habit guesses match")
