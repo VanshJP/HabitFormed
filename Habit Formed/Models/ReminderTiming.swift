@@ -26,6 +26,20 @@ nonisolated struct ReminderTime: Equatable, Sendable {
     }
 }
 
+/// The days of the week a reminder can keep to, as `Calendar` numbers them
+/// (1 is Sunday).
+nonisolated enum ReminderDays {
+    /// All seven, in the order the person's week runs.
+    static func weekOrder(_ calendar: Calendar = .current) -> [Int] {
+        (0..<7).map { (calendar.firstWeekday - 1 + $0) % 7 + 1 }
+    }
+
+    /// "Mon, Wed, and Fri".
+    static func label(_ days: Set<Int>, calendar: Calendar = .current) -> String {
+        weekOrder(calendar).filter(days.contains).map { calendar.shortWeekdaySymbols[$0 - 1] }.formatted(.list(type: .and))
+    }
+}
+
 /// Learns when a habit is usually logged so its reminder can land just
 /// before it: someone who waters the plants around 10:00 AM hears about it at
 /// 9:30 AM.

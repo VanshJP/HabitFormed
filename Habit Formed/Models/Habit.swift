@@ -219,6 +219,9 @@ final class Habit {
     /// `reminderMinute` are the time until then. Off for habits made before
     /// learning existed, so their set times never move on their own.
     var reminderLearnsTime: Bool = false
+    /// The weekdays the reminder keeps to, comma-joined `Calendar` weekdays
+    /// (1 is Sunday). Empty is every day.
+    var reminderWeekdaysRaw: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \HabitCompletion.habit)
     var completions: [HabitCompletion]? = []
@@ -237,6 +240,7 @@ final class Habit {
         reminderHour: Int = 9,
         reminderMinute: Int = 0,
         reminderLearnsTime: Bool = false,
+        reminderWeekdays: Set<Int> = [],
         sortOrder: Int = 0
     ) {
         self.title = title
@@ -254,6 +258,7 @@ final class Habit {
         self.reminderHour = reminderHour
         self.reminderMinute = reminderMinute
         self.reminderLearnsTime = reminderLearnsTime
+        self.reminderWeekdays = reminderWeekdays
     }
 
     // MARK: - Computed
@@ -356,6 +361,19 @@ final class Habit {
     var reminderFireTime: ReminderTime {
         if reminderLearnsTime, let learned = learnedReminderTime { return learned }
         return ReminderTime(hour: reminderHour, minute: reminderMinute)
+    }
+
+    var reminderWeekdays: Set<Int> {
+        get { Set(reminderWeekdaysRaw.split(separator: ",").compactMap { Int($0) }) }
+        set { reminderWeekdaysRaw = newValue.sorted().map(String.init).joined(separator: ",") }
+    }
+
+    /// The days the reminder keeps to, or nil when it fires every day: none
+    /// picked, all seven, or an interval habit, whose due dates decide.
+    var pickedReminderDays: Set<Int>? {
+        let days = reminderWeekdays
+        guard frequency != .interval, !days.isEmpty, days.count < 7 else { return nil }
+        return days
     }
 
     // MARK: - Logging

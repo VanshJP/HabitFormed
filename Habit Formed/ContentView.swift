@@ -413,6 +413,7 @@ struct ContentView: View {
                     String(habit.reminderEnabled),
                     String(habit.reminderLearnsTime),
                     "\(habit.reminderHour):\(habit.reminderMinute)",
+                    habit.reminderWeekdaysRaw,
                     habit.frequencyRaw,
                     habit.sourceRaw,
                     String(habit.weeklyTarget),

@@ -20,6 +20,8 @@ struct HabitDraft: Equatable {
     var reminderMinute = 0
     /// New reminders follow the habit's usual log time by default.
     var reminderLearnsTime = true
+    /// Empty is every day.
+    var reminderWeekdays: Set<Int> = []
     /// When the habit is usually logged, read once when editing.
     private(set) var usualLogMinute: Int?
 
@@ -47,6 +49,7 @@ struct HabitDraft: Equatable {
         // A habit without a reminder yet gets the learning default; one that
         // has a reminder keeps the choice already made.
         reminderLearnsTime = habit.reminderEnabled ? habit.reminderLearnsTime : true
+        reminderWeekdays = habit.reminderWeekdays
         usualLogMinute = habit.usualLogMinute
     }
 
@@ -231,6 +234,7 @@ struct HabitDraft: Equatable {
         habit.reminderHour = reminderHour
         habit.reminderMinute = reminderMinute
         habit.reminderLearnsTime = reminderLearnsTime
+        habit.reminderWeekdays = reminderWeekdays
     }
 
     func makeHabit(sortOrder: Int) -> Habit {
@@ -248,6 +252,7 @@ struct HabitDraft: Equatable {
             reminderHour: reminderHour,
             reminderMinute: reminderMinute,
             reminderLearnsTime: reminderLearnsTime,
+            reminderWeekdays: reminderWeekdays,
             sortOrder: sortOrder
         )
     }

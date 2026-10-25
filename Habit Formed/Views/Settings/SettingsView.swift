@@ -108,6 +108,9 @@ struct SettingsView: View {
                     }
                     SettingsToggle(title: "Weekly recap on Sundays at \(Self.recapTime.label)", isOn: $recapOn)
                 }
+                if (reminderOn || recapOn) && notifications.isDenied {
+                    NotificationsOffRow()
+                }
             }
             .motion(AppMotion.snap, value: reminderOn)
             .motion(AppMotion.snap, value: recapOn)

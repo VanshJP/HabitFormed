@@ -294,6 +294,15 @@ requests, the handled ones becoming one-shots a week out, and the next sync
 folds it back. Habit reminders stay within `habitReminderBudget` (56 of
 iOS's 64 pending), and habits past it keep the plain daily alert.
 
+A daily or weekly reminder can keep to picked weekdays
+(`Habit.reminderWeekdays`, `ReminderDaysPicker`: a letter per day in the
+week's order); none picked is every day, and a weekly one still goes quiet
+once the week's target is met. Picked days are always one alert per day
+(`pickedReminderDays`), so they never fall back to the daily alert.
+Interval habits ignore them. A reminder switch that is on while iOS has
+notifications off shows `NotificationsOffRow`, which opens the app's
+notification settings.
+
 A new habit gets a suggested time while its name is typed
 (`ReminderSuggestion`): a word in the name ("meditate" mornings, "read"
 evenings, "at night") or, when another habit is usually logged near then,

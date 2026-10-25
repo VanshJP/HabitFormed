@@ -126,13 +126,15 @@ struct HabitDetailView: View {
         let usualLabel = usual.map { ReminderTime(minuteOfDay: $0).label }
         guard habit.reminderEnabled else { return usualLabel.map { "Usually logged around \($0)" } }
         let setTime = ReminderTime(hour: habit.reminderHour, minute: habit.reminderMinute).label
+        // "Reminds you Mon, Wed, and Fri at 9:30 AM" when it keeps to days.
+        let reminds = habit.pickedReminderDays.map { "Reminds you \(ReminderDays.label($0))" } ?? "Reminds you"
         guard habit.reminderLearnsTime, habit.trackKind != .health else {
-            return usualLabel.map { "Reminds you at \(setTime), usually logged around \($0)" } ?? "Reminds you at \(setTime)"
+            return usualLabel.map { "\(reminds) at \(setTime), usually logged around \($0)" } ?? "\(reminds) at \(setTime)"
         }
         guard let usual, let usualLabel else {
-            return "Reminds you at \(setTime), learns your routine after \(ReminderTiming.minimumLogs) logs"
+            return "\(reminds) at \(setTime), learns your routine after \(ReminderTiming.minimumLogs) logs"
         }
-        return "Reminds you at \(ReminderTiming.reminder(beforeTypical: usual).label), before your usual \(usualLabel)"
+        return "\(reminds) at \(ReminderTiming.reminder(beforeTypical: usual).label), before your usual \(usualLabel)"
     }
 
     /// Copy for the interval next-due line; urgent means due or overdue.

@@ -20,6 +20,17 @@ struct HabitReminderSection: View {
     var body: some View {
         Panel {
             SettingsRow("Remind me", icon: "bell", caption: draft.reminderEnabled && canLearn ? nil : explanation, isOn: $draft.reminderEnabled)
+            if draft.reminderEnabled && notifications.isDenied {
+                NotificationsOffRow()
+            }
+            if draft.reminderEnabled && draft.frequency != .interval {
+                VStack(spacing: 0) {
+                    SettingsRow("Days", icon: "calendar", caption: daysCaption)
+                    ReminderDaysPicker(days: $draft.reminderWeekdays)
+                        .padding(.horizontal, AppLayout.tilePadding)
+                        .padding(.bottom, 6)
+                }
+            }
             if draft.reminderEnabled {
                 SettingsRow("Time", icon: "clock") {
                     if let learned = shownLearnedTime {
@@ -53,6 +64,13 @@ struct HabitReminderSection: View {
     /// Health habits log themselves from Apple Health, so their log times say
     /// nothing about the person's routine.
     private var canLearn: Bool { draft.kind != .health }
+
+    /// What no picked days means; a weekly habit's reminder still goes quiet
+    /// once the week is done.
+    private var daysCaption: String? {
+        guard draft.reminderWeekdays.isEmpty else { return nil }
+        return draft.frequency == .weekly ? "Every day until the week is done" : "Every day"
+    }
 
     private var shownLearnedTime: ReminderTime? {
         canLearn && draft.reminderLearnsTime ? draft.learnedReminderTime : nil
@@ -117,6 +135,7 @@ struct HabitReminderSection: View {
               let text = reply?.trimmingCharacters(in: CharacterSet(charactersIn: ".")),
               text.count <= 45, !text.contains(where: \.isNumber)
         else { return }
-        phrased = (title, text)
+        // The model does not always keep to sentence case.
+        phrased = (title, text.prefix(1).uppercased() + text.dropFirst())
     }
 }

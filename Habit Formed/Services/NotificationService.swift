@@ -32,10 +32,15 @@ final class NotificationService {
 
     // MARK: - Authorization
 
+    /// Turned off for the app in iOS Settings, so a reminder switch that is
+    /// on can say why nothing will come.
+    var isDenied: Bool = false
+
     @MainActor
     func refreshAuthorizationStatus() async {
         let status = await UNUserNotificationCenter.current().notificationSettings()
         isAuthorized = (status.authorizationStatus == .authorized || status.authorizationStatus == .provisional)
+        isDenied = status.authorizationStatus == .denied
     }
 
     @MainActor
@@ -44,6 +49,7 @@ final class NotificationService {
             let granted = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound])
             isAuthorized = granted
+            isDenied = !granted
             hasRequestedAuthorization = true
         } catch {
             print("Notification authorization failed: \(error)")
@@ -101,8 +107,9 @@ final class NotificationService {
         var spare = Self.habitReminderBudget - reminding.reduce(0) { $0 + Self.baseRequestCount($1) }
 
         for habit in reminding {
-            let splitWeek = spare >= 6 && Self.hasHandledDay(habit)
-            if splitWeek { spare -= 6 }
+            let picked = habit.pickedReminderDays != nil
+            let splitWeek = picked || (spare >= 6 && Self.hasHandledDay(habit))
+            if splitWeek && !picked { spare -= 6 }
             for request in Self.reminderRequests(for: habit, splitWeek: splitWeek) {
                 do {
                     try await center.add(request)
@@ -129,7 +136,8 @@ final class NotificationService {
     /// Builds every notification request a habit needs right now.
     ///
     /// - daily: repeating alert at the reminder time, or with `splitWeek`
-    ///   one alert per weekday so a day already handled stays quiet.
+    ///   one alert per weekday so a day already handled stays quiet. Picked
+    ///   days always split, keeping only those weekdays.
     /// - weekly: the same; body reflects this week's progress toward the
     ///   target, and a week whose target is met stays quiet.
     /// - interval: rolling one-shots on upcoming cycle due dates (plus
@@ -157,22 +165,28 @@ final class NotificationService {
         }
     }
 
-    /// Requests a habit needs before any week is split.
+    /// Requests a habit needs before any week is split. Picked days are
+    /// already one alert each.
     private static func baseRequestCount(_ habit: Habit) -> Int {
-        habit.frequency == .interval && habit.lastCompletionDate != nil ? intervalHorizon : 1
+        if let days = habit.pickedReminderDays { return days.count }
+        return habit.frequency == .interval && habit.lastCompletionDate != nil ? intervalHorizon : 1
     }
 
     // MARK: - Skipping handled days
 
     /// The next seven firings at the reminder time, one per weekday,
-    /// starting with today's while it is still ahead.
+    /// starting with today's while it is still ahead, keeping only the
+    /// picked days.
     private static func upcomingFirings(_ habit: Habit, now: Date = Date()) -> [Date] {
+        let calendar = Calendar.current
         let time = habit.reminderFireTime
-        guard var first = Calendar.current.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: now) else {
+        guard var first = calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: now) else {
             return []
         }
         if first <= now { first = first.adding(days: 1) }
-        return (0..<7).map { first.adding(days: $0) }
+        let firings = (0..<7).map { first.adding(days: $0) }
+        guard let days = habit.pickedReminderDays else { return firings }
+        return firings.filter { days.contains(calendar.component(.weekday, from: $0)) }
     }
 
     /// A firing that would nag about a day already handled: one that is
